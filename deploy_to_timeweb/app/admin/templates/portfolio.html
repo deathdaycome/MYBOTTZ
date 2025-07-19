@@ -1,0 +1,2653 @@
+{% extends "base.html" %}
+
+{% block title %}Портфолио - Админ-панель{% endblock %}
+
+{% block page_title %}🎨 Управление портфолио{% endblock %}
+
+{% block header_actions %}
+<div class="btn-group">
+    <button class="btn btn-success btn-custom" onclick="openPortfolioModal()">
+        <i class="fas fa-plus me-1"></i> Добавить проект
+    </button>
+    <button class="btn btn-primary btn-custom" onclick="reorderPortfolio()">
+        <i class="fas fa-sort me-1"></i> Изменить порядок
+    </button>
+    <button class="btn btn-info btn-custom" onclick="importPortfolio()">
+        <i class="fas fa-upload me-1"></i> Импорт
+    </button>
+    <button class="btn btn-secondary btn-custom" onclick="exportPortfolio()">
+        <i class="fas fa-download me-1"></i> Экспорт
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Filters and Search -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" class="form-control" id="searchPortfolio" 
+                           placeholder="Поиск по названию, описанию, технологиям...">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="categoryFilter">
+                    <option value="">Все категории</option>
+                    <option value="telegram_bots">Telegram боты</option>
+                    <option value="web_development">Веб-разработка</option>
+                    <option value="mobile_apps">Мобильные приложения</option>
+                    <option value="ai_integration">AI интеграции</option>
+                    <option value="automation">Автоматизация</option>
+                    <option value="ecommerce">E-commerce</option>
+                    <option value="other">Другое</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="statusFilter">
+                    <option value="">Все статусы</option>
+                    <option value="active">Активные</option>
+                    <option value="featured">Рекомендуемые</option>
+                    <option value="draft">Черновики</option>
+                    <option value="archived">Архивные</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="sortBy">
+                    <option value="created_desc">Новые первые</option>
+                    <option value="created_asc">Старые первые</option>
+                    <option value="title_asc">По названию А-Я</option>
+                    <option value="title_desc">По названию Я-А</option>
+                    <option value="order_asc">По порядку</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="viewMode" id="gridView" checked>
+                    <label class="btn btn-outline-secondary" for="gridView">
+                        <i class="fas fa-th"></i>
+                    </label>
+                    <input type="radio" class="btn-check" name="viewMode" id="listView">
+                    <label class="btn btn-outline-secondary" for="listView">
+                        <i class="fas fa-list"></i>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Portfolio Stats -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card primary">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-folder fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="totalProjects">{{ portfolio_stats.total or 0 }}</div>
+                    <div class="text-white-75">Всего проектов</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card success">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-star fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="featuredProjects">{{ portfolio_stats.featured or 0 }}</div>
+                    <div class="text-white-75">Рекомендуемые</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card info">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-eye fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="totalViews">{{ portfolio_stats.total_views or 0 }}</div>
+                    <div class="text-white-75">Просмотров</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card warning">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-heart fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="totalLikes">{{ portfolio_stats.total_likes or 0 }}</div>
+                    <div class="text-white-75">Лайков</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Portfolio Grid -->
+<div id="portfolioContainer">
+    <div class="row" id="portfolioGrid">
+        <!-- Portfolio items will be loaded here -->
+    </div>
+</div>
+
+<!-- Pagination -->
+<div class="d-flex justify-content-between align-items-center mt-4">
+    <div class="text-muted">
+        Показано <span id="itemsShown">0</span> из <span id="totalItems">0</span> проектов
+    </div>
+    <nav>
+        <ul class="pagination mb-0" id="portfolioPagination">
+            <!-- Pagination will be generated by JavaScript -->
+        </ul>
+    </nav>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Add/Edit Portfolio Modal -->
+<div class="modal fade" id="portfolioModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus me-2"></i>
+                    <span id="modalTitle">Добавить проект в портфолио</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="portfolioForm" enctype="multipart/form-data">
+                    <input type="hidden" id="portfolioId" name="id">
+                    
+                    <div class="row">
+                        <!-- Left Column -->
+                        <div class="col-lg-8">
+                            <div class="mb-3">
+                                <label class="form-label required">Название проекта</label>
+                                <input type="text" class="form-control" id="projectTitle" name="title" 
+                                       placeholder="Telegram бот для интернет-магазина" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Краткое описание</label>
+                                <input type="text" class="form-control" id="projectSubtitle" name="subtitle" 
+                                       placeholder="Автоматизация продаж и поддержки клиентов">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label required">Подробное описание</label>
+                                <textarea class="form-control" id="projectDescription" name="description" 
+                                          rows="4" required placeholder="Детальное описание проекта, решаемых задач, особенностей реализации..."></textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label required">Категория</label>
+                                    <select class="form-select" id="projectCategory" name="category" required>
+                                        <option value="">Выберите категорию</option>
+                                        <option value="telegram_bots">Telegram боты</option>
+                                        <option value="web_development">Веб-разработка</option>
+                                        <option value="mobile_apps">Мобильные приложения</option>
+                                        <option value="ai_integration">AI интеграции</option>
+                                        <option value="automation">Автоматизация</option>
+                                        <option value="ecommerce">E-commerce</option>
+                                        <option value="other">Другое</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Сложность</label>
+                                    <select class="form-select" id="projectComplexity" name="complexity">
+                                        <option value="simple">Простой</option>
+                                        <option value="medium" selected>Средний</option>
+                                        <option value="complex">Сложный</option>
+                                        <option value="premium">Премиум</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Уровень сложности</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="projectComplexityLevel" name="complexity_level" 
+                                               value="5" min="1" max="10" placeholder="5">
+                                        <span class="input-group-text">из 10</span>
+                                    </div>
+                                    <small class="text-muted">1 - очень простой, 10 - очень сложный</small>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Технологии</label>
+                                <input type="text" class="form-control" id="projectTechnologies" name="technologies" 
+                                       placeholder="Python, PostgreSQL, Redis, Docker" 
+                                       data-bs-toggle="tooltip" title="Разделяйте технологии запятыми">
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Стоимость проекта</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="projectCost" name="cost" 
+                                               placeholder="50000">
+                                        <span class="input-group-text">₽</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Время разработки</label>
+                                    <div class="input-group">
+                                        <input type="number" class="form-control" id="projectDuration" name="development_time" 
+                                               placeholder="14">
+                                        <span class="input-group-text">дней</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Дата завершения</label>
+                                    <input type="date" class="form-control" id="projectCompletedAt" name="completed_at">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Ссылки</label>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Демо-ссылка</label>
+                                        <input type="url" class="form-control" id="projectDemoLink" name="demo_link" 
+                                               placeholder="https://demo.example.com">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Репозиторий</label>
+                                        <input type="url" class="form-control" id="projectRepositoryLink" name="repository_link" 
+                                               placeholder="https://github.com/username/repo">
+                                    </div>
+                                </div>
+                                <div id="linksContainer">
+                                    <div class="input-group mb-2">
+                                        <span class="input-group-text">
+                                            <i class="fab fa-telegram"></i>
+                                        </span>
+                                        <input type="url" class="form-control" name="links[]" 
+                                               placeholder="https://t.me/your_bot">
+                                        <button type="button" class="btn btn-outline-danger" onclick="removeLink(this)">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="addLink()">
+                                    <i class="fas fa-plus me-1"></i> Добавить ссылку
+                                </button>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Диапазон стоимости</label>
+                                    <input type="text" class="form-control" id="projectCostRange" name="cost_range" 
+                                           placeholder="10000-15000">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Клиент</label>
+                                    <input type="text" class="form-control" id="projectClientName" name="client_name" 
+                                           placeholder="Название компании">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Статус проекта</label>
+                                <select class="form-select" id="projectStatus" name="project_status">
+                                    <option value="completed" selected>Завершен</option>
+                                    <option value="in_progress">В разработке</option>
+                                    <option value="demo">Демо-версия</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Right Column -->
+                        <div class="col-lg-4">
+                            <div class="mb-3">
+                                <label class="form-label">Главное изображение</label>
+                                <div class="image-upload-area" id="mainImageUpload">
+                                    <div class="upload-placeholder">
+                                        <i class="fas fa-cloud-upload-alt fa-3x mb-2"></i>
+                                        <p>Нажмите или перетащите изображение</p>
+                                        <small class="text-muted">PNG, JPG до 5MB</small>
+                                    </div>
+                                    <input type="file" class="form-control d-none" id="mainImage" name="main_image" 
+                                           accept="image/*">
+                                    <div class="image-preview d-none">
+                                        <img src="" alt="Preview" class="img-fluid rounded" style="max-width: 100%; height: 120px; object-fit: cover;">
+                                        <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" 
+                                                onclick="removeImage('main')">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Дополнительные изображения</label>
+                                <div class="additional-images">
+                                    <div class="row" id="additionalImagesContainer">
+                                        <!-- Additional images will be added here -->
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-primary w-100 mt-2" onclick="addImageSlot()">
+                                        <i class="fas fa-plus me-1"></i> Добавить изображение
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Настройки отображения</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="projectFeatured" name="is_featured">
+                                    <label class="form-check-label" for="projectFeatured">
+                                        <i class="fas fa-star text-warning me-1"></i>
+                                        Рекомендуемый проект
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="projectActive" name="is_visible" checked>
+                                    <label class="form-check-label" for="projectActive">
+                                        <i class="fas fa-eye text-success me-1"></i>
+                                        Показывать в портфолио
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="projectShowCost" name="show_cost">
+                                    <label class="form-check-label" for="projectShowCost">
+                                        <i class="fas fa-ruble-sign text-info me-1"></i>
+                                        Показывать стоимость
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Порядок отображения</label>
+                                <input type="number" class="form-control" id="projectOrder" name="sort_order" 
+                                       value="0" min="0" placeholder="0">
+                                <small class="text-muted">Меньшее число = выше в списке</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Теги для поиска</label>
+                                <input type="text" class="form-control" id="projectTags" name="tags" 
+                                       placeholder="бот, автоматизация, продажи"
+                                       data-bs-toggle="tooltip" title="Разделяйте теги запятыми">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i> Отмена
+                </button>
+                <button type="button" class="btn btn-primary" onclick="previewPortfolioItem()">
+                    <i class="fas fa-eye me-1"></i> Предварительный просмотр
+                </button>
+                <button type="button" class="btn btn-success" onclick="savePortfolioItem()">
+                    <i class="fas fa-save me-1"></i> Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye me-2"></i>
+                    Предварительный просмотр
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="portfolio-preview" id="portfolioPreview">
+                    <!-- Preview content will be generated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Закрыть
+                </button>
+                <button type="button" class="btn btn-primary" onclick="sendTestToBot()">
+                    <i class="fab fa-telegram me-1"></i> Отправить тест в бот
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-upload me-2"></i>
+                    Импорт портфолио
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Загрузите JSON файл с данными портфолио:</p>
+                <div class="mb-3">
+                    <input type="file" class="form-control" id="importFile" accept=".json">
+                </div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>Формат файла:</strong> JSON с массивом объектов портфолио
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Отмена
+                </button>
+                <button type="button" class="btn btn-primary" onclick="processImport()">
+                    <i class="fas fa-upload me-1"></i> Импортировать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reorder Modal -->
+<div class="modal fade" id="reorderModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-sort me-2"></i>
+                    Изменить порядок отображения
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">Перетащите проекты для изменения порядка:</p>
+                <div id="sortablePortfolio" class="sortable-list">
+                    <!-- Sortable items will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Отмена
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveNewOrder()">
+                    <i class="fas fa-save me-1"></i> Сохранить порядок
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+/* Portfolio Grid Styles */
+.portfolio-item {
+    background: white !important;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    margin-bottom: 30px;
+    position: relative;
+    border: 1px solid rgba(0,0,0,0.05);
+}
+
+.portfolio-item:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+}
+
+.portfolio-item.featured {
+    border: 2px solid #ffd700;
+    background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%) !important;
+}
+
+.portfolio-item.featured::after {
+    content: '✨';
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: linear-gradient(135deg, #ffd700, #ffb300);
+    color: white;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+.portfolio-image {
+    height: 180px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px 8px 0 0;
+}
+
+.portfolio-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    transition: transform 0.4s ease;
+    border-radius: 0;
+    display: block;
+    background-color: #f8f9fa;
+}
+
+.portfolio-image img[src*="placeholder"] {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.portfolio-image .placeholder-content {
+    color: white;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 500;
+    opacity: 0.9;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+}
+
+.portfolio-item:hover .portfolio-image img {
+    transform: scale(1.08);
+}
+
+.portfolio-content {
+    padding: 25px;
+    background: white !important;
+}
+
+.portfolio-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b !important;
+    margin-bottom: 10px;
+    line-height: 1.3;
+    font-family: 'Comfortaa', sans-serif;
+}
+
+.portfolio-subtitle {
+    color: #64748b !important;
+    font-size: 0.95rem;
+    margin-bottom: 15px;
+    font-weight: 500;
+}
+
+.portfolio-description {
+    color: #475569 !important;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.portfolio-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.portfolio-tag {
+    background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+    color: #1565c0;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid rgba(21, 101, 192, 0.1);
+}
+
+.portfolio-tech {
+    background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+    color: #6a1b9a;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid rgba(106, 27, 154, 0.1);
+}
+
+.portfolio-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 20px;
+    border-top: 2px solid #f1f5f9;
+    margin-top: 5px;
+}
+
+.portfolio-stats {
+    display: flex;
+    gap: 20px;
+}
+
+.portfolio-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #64748b !important;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.portfolio-stat i {
+    color: #3b82f6;
+}
+
+.portfolio-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-portfolio {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+.btn-portfolio-primary {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    color: white;
+}
+
+.btn-portfolio-primary:hover {
+    background: linear-gradient(135deg, #1d4ed8, #1e40af);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-portfolio-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.btn-portfolio-warning:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.btn-portfolio-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.btn-portfolio-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* List View Styles */
+.portfolio-list-item {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    margin-bottom: 15px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    transition: all 0.3s ease;
+}
+
+.portfolio-list-item:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.portfolio-list-image {
+    width: 100px;
+    height: 100px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.portfolio-list-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.portfolio-list-content {
+    flex-grow: 1;
+}
+
+.portfolio-list-actions {
+    flex-shrink: 0;
+}
+
+/* Image Upload Styles */
+.image-upload-area {
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    min-height: 120px; /* Уменьшили с 150px до 120px */
+    max-width: 300px; /* Ограничиваем ширину */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-upload-area:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.image-upload-area.dragover {
+    border-color: #28a745;
+    background-color: #d4edda;
+}
+
+.upload-placeholder {
+    color: #6c757d;
+}
+
+.image-preview {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    max-width: 260px; /* Ограничиваем ширину превью */
+    margin: 0 auto; /* Центрируем */
+}
+
+.image-preview img {
+    width: 100% !important;
+    height: 120px !important; /* Уменьшили с 200px до 120px */
+    object-fit: cover !important;
+    border-radius: 6px;
+    display: block !important;
+    max-width: 100% !important;
+}
+
+/* Additional Images */
+.additional-image-slot {
+    border: 1px dashed #dee2e6;
+    border-radius: 6px;
+    padding: 15px 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 10px;
+    min-height: 70px;
+    max-width: 200px; /* Ограничиваем ширину */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.additional-image-slot:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.additional-image-preview {
+    position: relative;
+    margin-bottom: 10px;
+    max-width: 200px; /* Ограничиваем ширину */
+}
+
+.additional-image-preview img {
+    width: 100% !important;
+    height: 70px !important; /* Уменьшили с 80px до 70px */
+    object-fit: cover !important;
+    border-radius: 6px;
+    display: block !important;
+    max-width: 100% !important;
+}
+
+/* Sortable List */
+.sortable-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.sortable-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    cursor: move;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s ease;
+}
+
+.sortable-item:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.sortable-item.ui-sortable-helper {
+    box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+    transform: rotate(2deg);
+}
+
+.sortable-handle {
+    color: #6c757d;
+    cursor: grab;
+}
+
+.sortable-handle:active {
+    cursor: grabbing;
+}
+
+.sortable-image {
+    width: 50px;
+    height: 50px;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.sortable-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    background-color: #f8f9fa;
+}
+
+.sortable-content {
+    flex-grow: 1;
+}
+
+.sortable-title {
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 4px;
+}
+
+.sortable-category {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+/* Portfolio Preview */
+.portfolio-preview {
+    max-width: 400px;
+    margin: 0 auto;
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+.preview-header {
+    text-align: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.preview-image {
+    width: 100%;
+    height: 200px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+
+.preview-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    background-color: #f8f9fa;
+}
+
+.preview-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 8px;
+}
+
+.preview-subtitle {
+    color: #7f8c8d;
+    margin-bottom: 12px;
+}
+
+.preview-description {
+    color: #34495e;
+    line-height: 1.5;
+    margin-bottom: 15px;
+}
+
+.preview-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 15px;
+}
+
+.preview-tag {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-size: 0.8rem;
+}
+
+.preview-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 10px;
+    border-top: 1px solid #dee2e6;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .portfolio-item {
+        margin-bottom: 20px;
+    }
+    
+    .portfolio-content {
+        padding: 20px;
+    }
+    
+    .portfolio-image {
+        height: 200px;
+    }
+    
+    .portfolio-title {
+        font-size: 1.1rem;
+    }
+    
+    .portfolio-meta {
+        gap: 8px;
+    }
+    
+    .portfolio-tag, .portfolio-tech {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+    
+    .portfolio-stats {
+        gap: 15px;
+    }
+    
+    .portfolio-stat {
+        font-size: 0.8rem;
+    }
+    
+    .portfolio-buttons {
+        gap: 8px;
+    }
+    
+    .btn-portfolio {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+    
+    .portfolio-list-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .portfolio-list-image {
+        width: 100%;
+        max-width: 200px;
+        height: 120px;
+        margin: 0 auto;
+    }
+}
+    
+    .image-upload-area {
+        padding: 20px 15px;
+        min-height: 100px;
+        max-width: 100%; /* На мобильных занимаем всю ширину */
+    }
+    
+    .image-preview {
+        max-width: 100%;
+    }
+    
+    .image-preview img {
+        height: 100px !important; /* Уменьшили для мобильных */
+        max-width: 100% !important;
+        object-fit: cover !important;
+    }
+    
+    .additional-image-slot,
+    .additional-image-preview {
+        max-width: 100%;
+    }
+    
+    .modal-xl {
+        margin: 10px;
+        max-width: calc(100% - 20px);
+    }
+}
+
+/* Loading States */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.portfolio-item.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+/* Status Indicators */
+.status-indicator {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    z-index: 2;
+}
+
+.status-active {
+    background: #28a745;
+    color: white;
+}
+
+.status-draft {
+    background: #ffc107;
+    color: #333;
+}
+
+.status-archived {
+    background: #6c757d;
+    color: white;
+}
+
+/* Drag and Drop */
+.drag-over {
+    border-color: #28a745 !important;
+    background-color: #d4edda !important;
+}
+
+.file-over {
+    transform: scale(1.02);
+    border-color: #007bff !important;
+}
+
+/* Animation Classes */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+.slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(20px); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0); 
+    }
+}
+
+/* Required Field Indicator */
+.required::after {
+    content: '*';
+    color: #dc3545;
+    margin-left: 4px;
+}
+
+/* Custom Scrollbar */
+.modal-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Кнопка удаления изображения */
+.image-preview .btn-danger,
+.additional-image-preview .btn-danger {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    z-index: 10;
+}
+
+.image-preview .btn-danger:hover,
+.additional-image-preview .btn-danger:hover {
+    transform: scale(1.1);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Подключаем JavaScript для управления портфолио -->
+<script src="{{ url_for('static', path='/js/portfolio.js') }}"></script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let portfolioData = [];
+    let currentPage = 1;
+    let itemsPerPage = 12;
+    let isGridView = true;
+    let currentSort = 'created_desc';
+    let filters = {
+        search: '',
+        category: '',
+        status: ''
+    };
+
+    // Простая функция для открытия модального окна
+    function openPortfolioModal() {
+        console.log('Функция openPortfolioModal вызвана');
+        
+        // Находим модальное окно
+        const modal = document.getElementById('portfolioModal');
+        if (modal) {
+            console.log('Модальное окно найдено');
+            
+            // Очищаем форму
+            const form = document.getElementById('portfolioForm');
+            if (form) {
+                form.reset();
+                console.log('Форма очищена');
+            }
+            
+            // Показываем модальное окно
+            if (typeof bootstrap !== 'undefined') {
+                const bsModal = new bootstrap.Modal(modal);
+                bsModal.show();
+                console.log('Модальное окно открыто через Bootstrap');
+            } else {
+                // Fallback - показываем модальное окно напрямую
+                modal.style.display = 'block';
+                modal.classList.add('show');
+                document.body.classList.add('modal-open');
+                console.log('Модальное окно открыто напрямую');
+            }
+        } else {
+            console.error('Модальное окно не найдено!');
+            alert('Ошибка: модальное окно не найдено');
+        }
+    }
+
+    // Тестовая функция для диагностики
+    function testAddPortfolioItem() {
+        console.log('🧪 Тестовая функция вызвана!');
+        alert('Кнопка работает! Открываем модальное окно...');
+        
+        // Пытаемся найти модальное окно
+        const modalElement = document.getElementById('portfolioModal');
+        console.log('Модальное окно найдено:', modalElement);
+        
+        if (modalElement) {
+            try {
+                // Пытаемся создать экземпляр Bootstrap модала
+                const modal = new bootstrap.Modal(modalElement);
+                console.log('Bootstrap Modal создан:', modal);
+                modal.show();
+                console.log('Модальное окно должно открыться');
+            } catch (error) {
+                console.error('Ошибка при открытии модального окна:', error);
+                alert('Ошибка при открытии модального окна: ' + error.message);
+            }
+        } else {
+            console.error('Модальное окно не найдено!');
+            alert('Модальное окно не найдено в DOM!');
+        }
+    }
+
+    // Initialize portfolio page
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('=== ИНИЦИАЛИЗАЦИЯ СТРАНИЦЫ ПОРТФОЛИО ===');
+        
+        // Debug modal state on page load
+        setTimeout(() => {
+            debugModalState();
+        }, 1000);
+        
+        loadPortfolioData();
+        initializeEventListeners();
+        initializeTooltips();
+        initializeDragAndDrop();
+    });
+
+    // Load portfolio data
+    function loadPortfolioData() {
+        console.log('Загрузка данных портфолио...');
+        showLoadingState();
+        
+        fetch('/admin/api/portfolio', {
+            headers: getAuthHeaders()
+        })
+            .then(response => {
+                console.log('Ответ API:', response.status);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Данные портфолио:', data);
+                if (data.success) {
+                    portfolioData = data.items || [];
+                    updateStats(data.stats);
+                    applyFiltersAndSort();
+                } else {
+                    throw new Error(data.error || 'Ошибка загрузки данных');
+                }
+                hideLoadingState();
+            })
+            .catch(error => {
+                console.error('Ошибка загрузки портфолио:', error);
+                showNotification('Ошибка загрузки портфолио: ' + error.message, 'error');
+                hideLoadingState();
+                showEmptyState();
+            });
+    }
+
+    // Initialize event listeners
+    function initializeEventListeners() {
+        // Search input
+        document.getElementById('searchPortfolio').addEventListener('input', function() {
+            filters.search = this.value.toLowerCase();
+            applyFiltersAndSort();
+        });
+
+        // Filter selects
+        document.getElementById('categoryFilter').addEventListener('change', function() {
+            filters.category = this.value;
+            applyFiltersAndSort();
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', function() {
+            filters.status = this.value;
+            applyFiltersAndSort();
+        });
+
+        // Sort select
+        document.getElementById('sortBy').addEventListener('change', function() {
+            currentSort = this.value;
+            applyFiltersAndSort();
+        });
+
+        // View mode toggles
+        document.querySelectorAll('input[name="viewMode"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                isGridView = this.id === 'gridView';
+                renderPortfolio();
+            });
+        });
+    }
+
+    // Initialize tooltips
+    function initializeTooltips() {
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+
+    // Initialize drag and drop
+    function initializeDragAndDrop() {
+        // Main image upload
+        const mainImageUpload = document.getElementById('mainImageUpload');
+        const mainImageInput = document.getElementById('mainImage');
+
+        mainImageUpload.addEventListener('click', () => mainImageInput.click());
+        mainImageUpload.addEventListener('dragover', handleDragOver);
+        mainImageUpload.addEventListener('drop', handleImageDrop);
+        mainImageInput.addEventListener('change', handleImageSelect);
+
+        // Additional images
+        initializeAdditionalImageSlots();
+    }
+
+    // Handle drag over
+    function handleDragOver(e) {
+        e.preventDefault();
+        e.currentTarget.classList.add('drag-over');
+    }
+
+    // Handle image drop
+    function handleImageDrop(e) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            const fileInput = e.currentTarget.querySelector('input[type="file"]');
+            fileInput.files = files;
+            handleImageSelect({ target: fileInput });
+        }
+    }
+
+    // Handle image selection
+    function handleImageSelect(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showNotification('Пожалуйста, выберите изображение', 'error');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            showNotification('Размер файла не должен превышать 5MB', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const uploadArea = file.target || e.target.closest('.image-upload-area') || e.target.closest('.additional-image-slot');
+            const placeholder = uploadArea.querySelector('.upload-placeholder');
+            const preview = uploadArea.querySelector('.image-preview');
+            
+            if (placeholder) placeholder.classList.add('d-none');
+            if (preview) {
+                preview.classList.remove('d-none');
+                preview.querySelector('img').src = e.target.result;
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // Apply filters and sorting
+    function applyFiltersAndSort() {
+        let filteredData = [...portfolioData];
+
+        // Apply search filter
+        if (filters.search) {
+            filteredData = filteredData.filter(item => 
+                item.title.toLowerCase().includes(filters.search) ||
+                item.description.toLowerCase().includes(filters.search) ||
+                (item.technologies && item.technologies.toLowerCase().includes(filters.search)) ||
+                (item.tags && item.tags.toLowerCase().includes(filters.search))
+            );
+        }
+
+        // Apply category filter
+        if (filters.category) {
+            filteredData = filteredData.filter(item => item.category === filters.category);
+        }
+
+        // Apply status filter
+        if (filters.status) {
+            filteredData = filteredData.filter(item => {
+                switch(filters.status) {
+                    case 'active': return item.active;
+                    case 'featured': return item.featured;
+                    case 'draft': return !item.active;
+                    case 'archived': return item.archived;
+                    default: return true;
+                }
+            });
+        }
+
+        // Apply sorting
+        filteredData.sort((a, b) => {
+            switch(currentSort) {
+                case 'created_desc':
+                    return new Date(b.created_at) - new Date(a.created_at);
+                case 'created_asc':
+                    return new Date(a.created_at) - new Date(b.created_at);
+                case 'title_asc':
+                    return a.title.localeCompare(b.title);
+                case 'title_desc':
+                    return b.title.localeCompare(a.title);
+                case 'order_asc':
+                    return (a.order || 0) - (b.order || 0);
+                default:
+                    return 0;
+            }
+        });
+
+        // Update pagination
+        const totalItems = filteredData.length;
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        
+        if (currentPage > totalPages) {
+            currentPage = Math.max(1, totalPages);
+        }
+
+        // Get items for current page
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const pageItems = filteredData.slice(startIndex, endIndex);
+
+        // Render portfolio
+        renderPortfolio(pageItems);
+        renderPagination(totalPages, totalItems);
+        updateItemsCounter(startIndex + 1, Math.min(endIndex, totalItems), totalItems);
+    }
+
+    // Render portfolio
+    function renderPortfolio(items = null) {
+        if (!items) {
+            applyFiltersAndSort();
+            return;
+        }
+
+        const container = document.getElementById('portfolioGrid');
+        container.innerHTML = '';
+
+        if (items.length === 0) {
+            container.innerHTML = `
+                <div class="col-12">
+                    <div class="text-center py-5">
+                        <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                        <h5 class="text-muted">Проекты не найдены</h5>
+                        <p class="text-muted">Попробуйте изменить фильтры или добавить новый проект</p>
+                        <button class="btn btn-primary" onclick="addPortfolioItem()">
+                            <i class="fas fa-plus me-1"></i> Добавить проект
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        items.forEach(item => {
+            const element = isGridView ? renderGridItem(item) : renderListItem(item);
+            container.appendChild(element);
+        });
+    }
+
+    // Render grid item
+    function renderGridItem(item) {
+        const col = document.createElement('div');
+        col.className = 'col-lg-4 col-md-6';
+        
+        const statusClass = item.active ? 'active' : 'draft';
+        const featuredClass = item.featured ? 'featured' : '';
+        
+        col.innerHTML = `
+            <div class="portfolio-item ${featuredClass} fade-in" data-id="${item.id}">
+                <div class="status-indicator status-${statusClass}">
+                    ${item.active ? 'Активен' : 'Черновик'}
+                </div>
+                <div class="portfolio-image">
+                    <img src="${item.main_image || '../static/images/placeholder.jpg'}" 
+                         alt="${item.title}" 
+                         onerror="this.src='../static/images/placeholder.jpg'; this.onerror=null;"
+                         loading="lazy">
+                </div>
+                <div class="portfolio-content">
+                    <h5 class="portfolio-title">${item.title}</h5>
+                    ${item.subtitle ? `<p class="portfolio-subtitle">${item.subtitle}</p>` : ''}
+                    <p class="portfolio-description">${item.description}</p>
+                    
+                    <div class="portfolio-meta">
+                        <span class="portfolio-tag">${getCategoryName(item.category)}</span>
+                        ${item.complexity ? `<span class="portfolio-tag">${getComplexityName(item.complexity)}</span>` : ''}
+                        ${item.cost && item.show_cost ? `<span class="portfolio-tag">${formatCurrency(item.cost)}</span>` : ''}
+                    </div>
+                    
+                    ${item.technologies ? `
+                        <div class="portfolio-meta">
+                            ${item.technologies.split(',').map(tech => 
+                                `<span class="portfolio-tech">${tech.trim()}</span>`
+                            ).join('')}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="portfolio-actions">
+                        <div class="portfolio-stats">
+                            <span class="portfolio-stat">
+                                <i class="fas fa-eye"></i> ${item.views || 0}
+                            </span>
+                            <span class="portfolio-stat">
+                                <i class="fas fa-heart"></i> ${item.likes || 0}
+                            </span>
+                            ${item.duration ? `
+                                <span class="portfolio-stat">
+                                    <i class="fas fa-clock"></i> ${item.duration}д
+                                </span>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="portfolio-buttons">
+                            <button class="btn btn-portfolio btn-portfolio-primary" onclick="editPortfolioItem(${item.id})" 
+                                    data-bs-toggle="tooltip" title="Редактировать">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-portfolio btn-portfolio-warning" onclick="previewPortfolioItem(${item.id})" 
+                                    data-bs-toggle="tooltip" title="Предварительный просмотр">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-portfolio btn-portfolio-danger" onclick="deletePortfolioItem(${item.id})" 
+                                    data-bs-toggle="tooltip" title="Удалить">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        return col;
+    }
+
+    // Render list item
+    function renderListItem(item) {
+        const col = document.createElement('div');
+        col.className = 'col-12';
+        
+        const statusClass = item.active ? 'active' : 'draft';
+        const featuredIcon = item.featured ? '<i class="fas fa-star text-warning me-2"></i>' : '';
+        
+        col.innerHTML = `
+            <div class="portfolio-list-item fade-in" data-id="${item.id}">
+                <div class="portfolio-list-image">
+                    <img src="${item.main_image || '../static/images/placeholder.jpg'}" 
+                         alt="${item.title}" 
+                         onerror="this.src='../static/images/placeholder.jpg'; this.onerror=null;"
+                         loading="lazy">
+                </div>
+                
+                <div class="portfolio-list-content">
+                    <div class="d-flex align-items-center mb-2">
+                        ${featuredIcon}
+                        <h5 class="mb-0">${item.title}</h5>
+                        <span class="badge bg-${statusClass === 'active' ? 'success' : 'warning'} ms-2">
+                            ${item.active ? 'Активен' : 'Черновик'}
+                        </span>
+                    </div>
+                    
+                    ${item.subtitle ? `<p class="text-muted mb-2">${item.subtitle}</p>` : ''}
+                    <p class="mb-2">${item.description}</p>
+                    
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <span class="badge bg-primary">${getCategoryName(item.category)}</span>
+                        ${item.complexity ? `<span class="badge bg-info">${getComplexityName(item.complexity)}</span>` : ''}
+                        ${item.cost && item.show_cost ? `<span class="badge bg-success">${formatCurrency(item.cost)}</span>` : ''}
+                    </div>
+                    
+                    <div class="d-flex gap-3 text-muted small">
+                        <span><i class="fas fa-eye me-1"></i> ${item.views || 0}</span>
+                        <span><i class="fas fa-heart me-1"></i> ${item.likes || 0}</span>
+                        ${item.duration ? `<span><i class="fas fa-clock me-1"></i> ${item.duration} дней</span>` : ''}
+                        ${item.completed_at ? `<span><i class="fas fa-calendar me-1"></i> ${formatDate(item.completed_at)}</span>` : ''}
+                    </div>
+                </div>
+                
+                <div class="portfolio-list-actions">
+                    <div class="btn-group-vertical">
+                        <button class="btn btn-sm btn-outline-primary" onclick="editPortfolioItem(${item.id})">
+                            <i class="fas fa-edit me-1"></i> Редактировать
+                        </button>
+                        <button class="btn btn-sm btn-outline-info" onclick="previewPortfolioItem(${item.id})">
+                            <i class="fas fa-eye me-1"></i> Просмотр
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePortfolioItem(${item.id})">
+                            <i class="fas fa-trash me-1"></i> Удалить
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        return col;
+    }
+
+    // Utility functions
+    function getCategoryName(category) {
+        const categories = {
+            'telegram_bots': 'Telegram боты',
+            'web_development': 'Веб-разработка',
+            'mobile_apps': 'Мобильные приложения',
+            'ai_integration': 'AI интеграции',
+            'automation': 'Автоматизация',
+            'ecommerce': 'E-commerce',
+            'other': 'Другое'
+        };
+        return categories[category] || category;
+    }
+
+    function getComplexityName(complexity) {
+        const complexities = {
+            'simple': 'Простой',
+            'medium': 'Средний',
+            'complex': 'Сложный',
+            'premium': 'Премиум'
+        };
+        return complexities[complexity] || complexity;
+    }
+
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('ru-RU', {
+            style: 'currency',
+            currency: 'RUB',
+            minimumFractionDigits: 0
+        }).format(amount);
+    }
+
+    function formatDate(dateString) {
+        return new Date(dateString).toLocaleDateString('ru-RU');
+    }
+
+    // Add portfolio item
+    function addPortfolioItem() {
+        console.log('Открытие модального окна для добавления проекта');
+        
+        // Очищаем форму
+        const form = document.getElementById('portfolioForm');
+        if (form) {
+            form.reset();
+        }
+        
+        // Устанавливаем заголовок
+        const modalTitle = document.getElementById('modalTitle');
+        if (modalTitle) {
+            modalTitle.innerHTML = '<i class="fas fa-plus me-2"></i>Добавить проект в портфолио';
+        }
+        
+        // Очищаем ID (для создания нового)
+        const portfolioId = document.getElementById('portfolioId');
+        if (portfolioId) {
+            portfolioId.value = '';
+        }
+        
+        // Сбрасываем загрузку изображений
+        resetImageUploads();
+        
+        // Открываем модальное окно
+        const modalElement = document.getElementById('portfolioModal');
+        if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        } else {
+            console.error('Модальное окно не найдено');
+            showNotification('Ошибка открытия формы', 'error');
+        }
+    }
+
+    // Edit portfolio item
+    function editPortfolioItem(id) {
+        console.log('Редактирование проекта ID:', id);
+        
+        const item = portfolioData.find(p => p.id === id);
+        if (!item) {
+            showNotification('Проект не найден', 'error');
+            console.error('Проект не найден в данных:', portfolioData);
+            return;
+        }
+        
+        console.log('Данные проекта для редактирования:', item);
+        
+        // Устанавливаем заголовок
+        const modalTitle = document.getElementById('modalTitle');
+        if (modalTitle) {
+            modalTitle.innerHTML = '<i class="fas fa-edit me-2"></i>Редактировать проект';
+        }
+        
+        // Заполняем форму данными проекта
+        const form = document.getElementById('portfolioForm');
+        if (!form) {
+            showNotification('Форма не найдена', 'error');
+            return;
+        }
+        
+        // Очищаем форму сначала
+        form.reset();
+        
+        // Заполняем основные поля
+        const fieldsMapping = {
+            'id': item.id,
+            'title': item.title,
+            'description': item.description,
+            'category': item.category,
+            'complexity': item.complexity || 'medium',
+            'technologies': item.technologies || '',
+            'cost': item.cost || 0,
+            'duration': item.duration || item.development_time || 0,
+            'featured': item.featured || item.is_featured || false,
+            'active': item.active !== false, // по умолчанию true
+            'show_cost': item.show_cost || false,
+            'order': item.order || item.sort_order || 0
+        };
+        
+        Object.keys(fieldsMapping).forEach(fieldName => {
+            const input = form.querySelector(`[name="${fieldName}"], #project${fieldName.charAt(0).toUpperCase() + fieldName.slice(1)}`);
+            if (input) {
+                const value = fieldsMapping[fieldName];
+                if (input.type === 'checkbox') {
+                    input.checked = Boolean(value);
+                } else {
+                    input.value = value || '';
+                }
+            }
+        });
+        
+        // Загружаем изображения если есть
+        if (item.main_image || (item.image_paths && item.image_paths.length > 0)) {
+            const mainImage = item.main_image || (item.image_paths ? item.image_paths[0] : null);
+            if (mainImage) {
+                loadImagePreview('mainImage', mainImage);
+            }
+        }
+        
+        // Открываем модальное окно
+        const modalElement = document.getElementById('portfolioModal');
+        if (modalElement) {
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        } else {
+            showNotification('Модальное окно не найдено', 'error');
+        }
+    }
+
+    // Delete portfolio item
+    function deletePortfolioItem(id) {
+        console.log('Удаление проекта ID:', id);
+        
+        const item = portfolioData.find(p => p.id === id);
+        if (!item) {
+            showNotification('Проект не найден', 'error');
+            return;
+        }
+
+        // Подтверждение удаления
+        const confirmed = confirm(
+            `Вы уверены, что хотите удалить проект "${item.title}"?\n\n` +
+            'Это действие нельзя отменить!'
+        );
+        
+        if (!confirmed) {
+            return;
+        }
+        
+        console.log('Подтверждено удаление проекта:', item.title);
+
+        fetch(`/admin/api/portfolio/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            }
+        })
+        .then(response => {
+            console.log('Ответ удаления:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Результат удаления:', data);
+            
+            if (data.success) {
+                showNotification('Проект успешно удален', 'success');
+                
+                // Удаляем из локальных данных
+                portfolioData = portfolioData.filter(p => p.id !== id);
+                
+                // Перезагружаем отображение
+                applyFiltersAndSort();
+                
+                // Обновляем статистику
+                updateStats({
+                    total: portfolioData.length,
+                    featured: portfolioData.filter(p => p.featured || p.is_featured).length,
+                    total_views: portfolioData.reduce((sum, p) => sum + (p.views_count || 0), 0),
+                    total_likes: 0
+                });
+            } else {
+                throw new Error(data.error || 'Ошибка удаления');
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка удаления проекта:', error);
+            showNotification('Ошибка удаления проекта: ' + error.message, 'error');
+        });
+    }
+
+    // Save portfolio item
+    function savePortfolioItem() {
+        console.log('Сохранение проекта портфолио...');
+        
+        const form = document.getElementById('portfolioForm');
+        if (!form) {
+            showNotification('Форма не найдена', 'error');
+            return;
+        }
+        
+        // Валидация обязательных полей
+        const title = form.querySelector('[name="title"]');
+        const description = form.querySelector('[name="description"]');
+        const category = form.querySelector('[name="category"]');
+        
+        if (!title || !title.value.trim()) {
+            showNotification('Заполните название проекта', 'error');
+            title?.focus();
+            return;
+        }
+        
+        if (!description || !description.value.trim()) {
+            showNotification('Заполните описание проекта', 'error');
+            description?.focus();
+            return;
+        }
+        
+        if (!category || !category.value) {
+            showNotification('Выберите категорию проекта', 'error');
+            category?.focus();
+            return;
+        }
+        
+        const formData = new FormData(form);
+        
+        // Конвертируем данные формы в правильные типы
+        function prepareFormData(formData) {
+            const data = new FormData();
+            
+            for (let [key, value] of formData.entries()) {
+                // Преобразуем числовые поля
+                if (key === 'development_time' || key === 'complexity_level' || key === 'sort_order') {
+                    if (value && value.trim() !== '') {
+                        data.append(key, parseInt(value));
+                    }
+                } else if (key === 'cost') {
+                    if (value && value.trim() !== '') {
+                        data.append(key, parseFloat(value));
+                    }
+                } else if (key === 'is_featured' || key === 'is_visible' || key === 'show_cost') {
+                    // Булевы поля - если checkbox отмечен, добавляем true
+                    data.append(key, 'true');
+                } else {
+                    // Остальные поля как есть
+                    data.append(key, value);
+                }
+            }
+            
+            // Добавляем булевы поля, которые могут отсутствовать (неотмеченные checkbox)
+            if (!formData.has('is_featured')) {
+                data.append('is_featured', 'false');
+            }
+            if (!formData.has('is_visible')) {
+                data.append('is_visible', 'false');
+            }
+            if (!formData.has('show_cost')) {
+                data.append('show_cost', 'false');
+            }
+            
+            return data;
+        }
+        
+        const processedFormData = prepareFormData(formData);
+        
+        // Логируем обработанные данные
+        console.log('Обработанные данные формы:');
+        for (let [key, value] of processedFormData.entries()) {
+            console.log(`  ${key}: ${value} (${typeof value})`);
+        }
+
+        const portfolioId = formData.get('id');
+        const isEdit = portfolioId && portfolioId !== '';
+        
+        const url = isEdit ? `/admin/api/portfolio/${portfolioId}` : '/admin/api/portfolio';
+        const method = isEdit ? 'PUT' : 'POST';
+        
+        console.log(`${isEdit ? 'Обновление' : 'Создание'} проекта:`, url);
+        
+        // Показываем индикатор загрузки
+        const saveButton = document.querySelector('button[onclick="savePortfolioItem()"]');
+        const originalText = saveButton?.innerHTML;
+        if (saveButton) {
+            saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Сохранение...';
+            saveButton.disabled = true;
+        }
+
+        fetch(url, {
+            method: method,
+            headers: getAuthHeaders(),
+            body: processedFormData
+        })
+        .then(response => {
+            console.log('Ответ сервера:', response.status, response.statusText);
+            if (!response.ok) {
+                // Для ошибок попробуем получить детали
+                return response.text().then(errorText => {
+                    console.error('Текст ошибки:', errorText);
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        console.error('JSON ошибки:', errorData);
+                        throw new Error(errorData.detail || errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+                    } catch (parseError) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText || 'Неизвестная ошибка'}`);
+                    }
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('Результат сохранения:', data);
+            
+            if (data.success) {
+                showNotification(isEdit ? 'Проект обновлен' : 'Проект добавлен', 'success');
+                
+                // Закрываем модальное окно
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById('portfolioModal'));
+                if (modalInstance) {
+                    modalInstance.hide();
+                }
+                
+                // Перезагружаем данные
+                loadPortfolioData();
+            } else {
+                const errorMsg = data.error || data.message || 'Ошибка сохранения';
+                console.error('Ошибка от сервера:', errorMsg);
+                throw new Error(errorMsg);
+            }
+        })
+        .catch(error => {
+            console.error('Полная ошибка сохранения проекта:', error);
+            let errorMessage = 'Неизвестная ошибка';
+            
+            if (typeof error === 'string') {
+                errorMessage = error;
+            } else if (error.message) {
+                errorMessage = error.message;
+            } else if (error.toString) {
+                errorMessage = error.toString();
+            }
+            
+            showNotification('Ошибка сохранения проекта: ' + errorMessage, 'error');
+        })
+        .finally(() => {
+            // Восстанавливаем кнопку
+            if (saveButton && originalText) {
+                saveButton.innerHTML = originalText;
+                saveButton.disabled = false;
+            }
+        });
+    }
+
+    // Preview portfolio item
+    function previewPortfolioItem(id = null) {
+        let item;
+        
+        if (id) {
+            item = portfolioData.find(p => p.id === id);
+        } else {
+            // Preview from form
+            const form = document.getElementById('portfolioForm');
+            const formData = new FormData(form);
+            item = {};
+            for (let [key, value] of formData.entries()) {
+                item[key] = value;
+            }
+        }
+
+        const previewContainer = document.getElementById('portfolioPreview');
+        previewContainer.innerHTML = generatePreviewHTML(item);
+        
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        modal.show();
+    }
+
+    // Generate preview HTML
+    function generatePreviewHTML(item) {
+        return `
+            <div class="preview-header">
+                <strong>📱 Предварительный просмотр в боте</strong>
+            </div>
+            
+            <div class="preview-image">
+                <img src="${item.main_image || '../static/images/placeholder.jpg'}" 
+                     alt="${item.title}"
+                     onerror="this.src='../static/images/placeholder.jpg'; this.onerror=null;"
+                     loading="lazy">
+            </div>
+            
+            <div class="preview-title">${item.title || 'Название проекта'}</div>
+            ${item.subtitle ? `<div class="preview-subtitle">${item.subtitle}</div>` : ''}
+            <div class="preview-description">${item.description || 'Описание проекта'}</div>
+            
+            <div class="preview-tags">
+                <span class="preview-tag">${getCategoryName(item.category) || 'Категория'}</span>
+                ${item.complexity ? `<span class="preview-tag">${getComplexityName(item.complexity)}</span>` : ''}
+                ${item.technologies ? item.technologies.split(',').map(tech => 
+                    `<span class="preview-tag">${tech.trim()}</span>`
+                ).join('') : ''}
+            </div>
+            
+            <div class="preview-footer">
+                <span>
+                    ${item.duration ? `⏱️ ${item.duration} дней` : ''}
+                </span>
+                <span>
+                    ${item.cost && item.show_cost ? `💰 ${formatCurrency(item.cost)}` : ''}
+                </span>
+            </div>
+        `;
+    }
+
+    // Additional helper functions for portfolio management
+    function updateStats(stats) {
+        if (stats) {
+            document.getElementById('totalProjects').textContent = stats.total || 0;
+            document.getElementById('featuredProjects').textContent = stats.featured || 0;
+            document.getElementById('totalViews').textContent = stats.total_views || 0;
+            document.getElementById('totalLikes').textContent = stats.total_likes || 0;
+        }
+    }
+
+    function renderPagination(totalPages, totalItems) {
+        const pagination = document.getElementById('portfolioPagination');
+        pagination.innerHTML = '';
+
+        if (totalPages <= 1) return;
+
+        // Previous button
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+        prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage - 1})">‹</a>`;
+        pagination.appendChild(prevLi);
+
+        // Page numbers
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+
+        if (startPage > 1) {
+            const li = document.createElement('li');
+            li.className = 'page-item';
+            li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${totalPages})">${totalPages}</a>`;
+            pagination.appendChild(li);
+        }
+
+        // Next button
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+        nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage + 1})">›</a>`;
+        pagination.appendChild(nextLi);
+    }
+
+    function changePage(page) {
+        if (page < 1 || page > Math.ceil(portfolioData.length / itemsPerPage)) return;
+        currentPage = page;
+        applyFiltersAndSort();
+    }
+
+    function updateItemsCounter(start, end, total) {
+        document.getElementById('itemsShown').textContent = `${start}-${end}`;
+        document.getElementById('totalItems').textContent = total;
+    }
+
+    function showLoadingState() {
+        const container = document.getElementById('portfolioGrid');
+        container.innerHTML = '<div class="col-12 text-center py-5"><div class="spinner-border text-primary"></div></div>';
+    }
+
+    function hideLoadingState() {
+        // Will be hidden when portfolio is rendered
+    }
+
+    // Image management functions
+    function resetImageUploads() {
+        // Reset main image
+        const mainUpload = document.getElementById('mainImageUpload');
+        const placeholder = mainUpload.querySelector('.upload-placeholder');
+        const preview = mainUpload.querySelector('.image-preview');
+        
+        placeholder.classList.remove('d-none');
+        preview.classList.add('d-none');
+        preview.querySelector('img').src = '';
+        
+        // Reset additional images
+        document.getElementById('additionalImagesContainer').innerHTML = '';
+    }
+
+    function loadImagePreview(inputId, imageSrc) {
+        const uploadArea = document.getElementById(inputId).closest('.image-upload-area');
+        const placeholder = uploadArea.querySelector('.upload-placeholder');
+        const preview = uploadArea.querySelector('.image-preview');
+        
+        placeholder.classList.add('d-none');
+        preview.classList.remove('d-none');
+        preview.querySelector('img').src = imageSrc;
+    }
+
+    function removeImage(type) {
+        if (type === 'main') {
+            const mainUpload = document.getElementById('mainImageUpload');
+            const placeholder = mainUpload.querySelector('.upload-placeholder');
+            const preview = mainUpload.querySelector('.image-preview');
+            
+            placeholder.classList.remove('d-none');
+            preview.classList.add('d-none');
+            preview.querySelector('img').src = '';
+            document.getElementById('mainImage').value = '';
+        }
+    }
+
+    function addImageSlot() {
+        const container = document.getElementById('additionalImagesContainer');
+        const index = container.children.length;
+        
+        const col = document.createElement('div');
+        col.className = 'col-6 mb-2';
+        col.innerHTML = `
+            <div class="additional-image-slot" onclick="this.querySelector('input').click()">
+                <div class="upload-placeholder">
+                    <i class="fas fa-plus"></i>
+                    <small>Добавить</small>
+                </div>
+                <input type="file" class="d-none" accept="image/*" name="additional_images[]" 
+                       onchange="handleAdditionalImageSelect(this, ${index})">
+                <div class="additional-image-preview d-none">
+                    <img src="" alt="Additional image" style="max-width: 100%; height: 100px; object-fit: cover;">
+                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0" 
+                            onclick="removeAdditionalImage(this)">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(col);
+    }
+
+    function handleAdditionalImageSelect(input, index) {
+        const file = input.files[0];
+        if (!file) return;
+
+        if (!file.type.startsWith('image/')) {
+            showNotification('Пожалуйста, выберите изображение', 'error');
+            return;
+        }
+
+        const slot = input.closest('.additional-image-slot');
+        const placeholder = slot.querySelector('.upload-placeholder');
+        const preview = slot.querySelector('.additional-image-preview');
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            placeholder.classList.add('d-none');
+            preview.classList.remove('d-none');
+            preview.querySelector('img').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function removeAdditionalImage(button) {
+        const col = button.closest('.col-6');
+        col.remove();
+    }
+
+    function loadAdditionalImages(images) {
+        const container = document.getElementById('additionalImagesContainer');
+        container.innerHTML = '';
+        
+        images.forEach((imageSrc, index) => {
+            addImageSlot();
+            const slots = container.querySelectorAll('.additional-image-slot');
+            const slot = slots[slots.length - 1];
+            const placeholder = slot.querySelector('.upload-placeholder');
+            const preview = slot.querySelector('.additional-image-preview');
+            
+            placeholder.classList.add('d-none');
+            preview.classList.remove('d-none');
+            preview.querySelector('img').src = imageSrc;
+        });
+    }
+
+    // Link management
+    function addLink() {
+        const container = document.getElementById('linksContainer');
+        const linkGroup = document.createElement('div');
+        linkGroup.className = 'input-group mb-2';
+        linkGroup.innerHTML = `
+            <span class="input-group-text">
+                <i class="fas fa-link"></i>
+            </span>
+            <input type="url" class="form-control" name="links[]" placeholder="https://example.com">
+            <button type="button" class="btn btn-outline-danger" onclick="removeLink(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+        container.appendChild(linkGroup);
+    }
+
+    function removeLink(button) {
+        const linkGroup = button.closest('.input-group');
+        linkGroup.remove();
+    }
+
+    // Import/Export functions
+    function importPortfolio() {
+        const modal = new bootstrap.Modal(document.getElementById('importModal'));
+        modal.show();
+    }
+
+    function processImport() {
+        const fileInput = document.getElementById('importFile');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            showNotification('Пожалуйста, выберите файл', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+                
+                if (!Array.isArray(data)) {
+                    throw new Error('Файл должен содержать массив объектов');
+                }
+
+                // Send to server
+                fetch('/admin/api/portfolio/import', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...getAuthHeaders()
+                    },
+                    body: JSON.stringify({ items: data })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        showNotification(`Импортировано ${result.imported} проектов`, 'success');
+                        bootstrap.Modal.getInstance(document.getElementById('importModal')).hide();
+                        loadPortfolioData();
+                    } else {
+                        throw new Error(result.error || 'Ошибка импорта');
+                    }
+                })
+                .catch(error => {
+                    console.error('Import error:', error);
+                    showNotification('Ошибка импорта: ' + error.message, 'error');
+                });
+
+            } catch (error) {
+                showNotification('Ошибка чтения файла: ' + error.message, 'error');
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function exportPortfolio() {
+        const exportData = portfolioData.map(item => ({
+            title: item.title,
+            subtitle: item.subtitle,
+            description: item.description,
+            category: item.category,
+            complexity: item.complexity,
+            technologies: item.technologies,
+            cost: item.cost,
+            duration: item.duration,
+            tags: item.tags,
+            featured: item.featured,
+            active: item.active,
+            show_cost: item.show_cost,
+            order: item.order
+        }));
+
+        const dataStr = JSON.stringify(exportData, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `portfolio_export_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showNotification('Портфолио экспортировано', 'success');
+    }
+
+    // Reorder functions
+    function reorderPortfolio() {
+        const modal = new bootstrap.Modal(document.getElementById('reorderModal'));
+        
+        // Load sortable items
+        const container = document.getElementById('sortablePortfolio');
+        container.innerHTML = '';
+        
+        const sortedItems = [...portfolioData].sort((a, b) => (a.order || 0) - (b.order || 0));
+        
+        sortedItems.forEach(item => {
+            const sortableItem = document.createElement('div');
+            sortableItem.className = 'sortable-item';
+            sortableItem.setAttribute('data-id', item.id);
+            sortableItem.innerHTML = `
+                <div class="sortable-handle">
+                    <i class="fas fa-grip-vertical"></i>
+                </div>
+                <div class="sortable-image">
+                    <img src="${item.main_image || '../static/images/placeholder.jpg'}" 
+                         alt="${item.title}"
+                         onerror="this.src='../static/images/placeholder.jpg'; this.onerror=null;"
+                         loading="lazy">
+                </div>
+                <div class="sortable-content">
+                    <div class="sortable-title">${item.title}</div>
+                    <div class="sortable-category">${getCategoryName(item.category)}</div>
+                </div>
+            `;
+            container.appendChild(sortableItem);
+        });
+        
+        // Initialize sortable
+        $('#sortablePortfolio').sortable({
+            handle: '.sortable-handle',
+            placeholder: 'sortable-placeholder',
+            tolerance: 'pointer'
+        });
+        
+        modal.show();
+    }
+
+    function saveNewOrder() {
+        const sortableItems = document.querySelectorAll('#sortablePortfolio .sortable-item');
+        const newOrder = Array.from(sortableItems).map((item, index) => ({
+            id: parseInt(item.getAttribute('data-id')),
+            order: index
+        }));
+
+        fetch('/admin/api/portfolio/reorder', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ order: newOrder })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Порядок сохранен', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('reorderModal')).hide();
+                loadPortfolioData();
+            } else {
+                throw new Error(data.error || 'Ошибка сохранения порядка');
+            }
+        })
+        .catch(error => {
+            console.error('Error saving order:', error);
+            showNotification('Ошибка сохранения порядка', 'error');
+        });
+    }
+
+    // Test functions
+    function sendTestToBot() {
+        const previewData = document.getElementById('portfolioPreview').innerHTML;
+        
+        fetch('/admin/api/test-portfolio', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...getAuthHeaders()
+            },
+            body: JSON.stringify({ preview: previewData })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Тест отправлен в бот', 'success');
+            } else {
+                throw new Error(data.error || 'Ошибка отправки теста');
+            }
+        })
+        .catch(error => {
+            console.error('Error sending test:', error);
+            showNotification('Ошибка отправки теста', 'error');
+        });
+    }
+
+    // Notification function
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+
+    // Initialize additional image slots on page load
+    function initializeAdditionalImageSlots() {
+        addImageSlot();
+    }
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+            switch(e.key) {
+                case 'n':
+                    e.preventDefault();
+                    addPortfolioItem();
+                    break;
+                case 'f':
+                    e.preventDefault();
+                    document.getElementById('searchPortfolio').focus();
+                    break;
+                case 'e':
+                    e.preventDefault();
+                    exportPortfolio();
+                    break;
+            }
+        }
+    });
+
+    // Auto-save draft functionality
+    let autoSaveTimer;
+    function setupAutoSave() {
+        const form = document.getElementById('portfolioForm');
+        const inputs = form.querySelectorAll('input, textarea, select');
+        
+        inputs.forEach(input => {
+            input.addEventListener('input', function() {
+                clearTimeout(autoSaveTimer);
+                autoSaveTimer = setTimeout(saveDraft, 30000); // Auto-save after 30 seconds of inactivity
+            });
+        });
+    }
+
+    function saveDraft() {
+        const form = document.getElementById('portfolioForm');
+        const formData = new FormData(form);
+        
+        const draftData = {};
+        for (let [key, value] of formData.entries()) {
+            draftData[key] = value;
+        }
+        
+        localStorage.setItem('portfolio_draft', JSON.stringify(draftData));
+        
+        // Show subtle notification
+        const notification = document.createElement('div');
+        notification.className = 'alert alert-info position-fixed';
+        notification.style.cssText = 'bottom: 20px; right: 20px; z-index: 9999; opacity: 0.8;';
+        notification.innerHTML = '<small><i class="fas fa-save me-1"></i> Черновик сохранен</small>';
+        document.body.appendChild(notification);
+        
+        setTimeout(() => notification.remove(), 2000);
+    }
+
+    function loadDraft() {
+        const draft = localStorage.getItem('portfolio_draft');
+        if (draft) {
+            try {
+                const draftData = JSON.parse(draft);
+                const form = document.getElementById('portfolioForm');
+                
+                Object.keys(draftData).forEach(key => {
+                    const input = form.querySelector(`[name="${key}"]`);
+                    if (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = draftData[key] === 'on';
+                        } else {
+                            input.value = draftData[key];
+                        }
+                    }
+                });
+                
+                showNotification('Черновик восстановлен', 'info');
+            } catch (error) {
+                console.error('Error loading draft:', error);
+            }
+        }
+    }
+
+    // Clear draft
+    function clearDraft() {
+        localStorage.removeItem('portfolio_draft');
+    }
+
+    // Debug function for modal testing
+    function debugModalState() {
+        console.log('=== ОТЛАДКА МОДАЛЬНОГО ОКНА ===');
+        const modal = document.getElementById('portfolioModal');
+        console.log('Элемент модального окна:', modal);
+        console.log('Bootstrap доступен:', typeof bootstrap !== 'undefined');
+        console.log('Все модальные окна в DOM:', document.querySelectorAll('.modal'));
+        
+        if (modal) {
+            console.log('✅ Модальное окно найдено в DOM');
+            console.log('Modal classes:', modal.className);
+            console.log('Modal parent:', modal.parentElement);
+            return true;
+        } else {
+            console.error('❌ Модальное окно НЕ найдено в DOM');
+            return false;
+        }
+    }
+
+    function openPortfolioModal() {
+        console.log('Вызов openPortfolioModal');
+        
+        if (!debugModalState()) {
+            alert('Модальное окно не найдено в DOM!');
+            return;
+        }
+        
+        const modal = document.getElementById('portfolioModal');
+        try {
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+            console.log('✅ Модальное окно успешно открыто');
+        } catch (error) {
+            console.error('❌ Ошибка при открытии модального окна:', error);
+            alert('Ошибка при открытии модального окна: ' + error.message);
+        }
+    }
+
+    // Setup auto-save when modal opens
+    document.getElementById('portfolioModal').addEventListener('shown.bs.modal', function() {
+        setupAutoSave();
+        
+        // Ask about loading draft
+        const draft = localStorage.getItem('portfolio_draft');
+        if (draft && !document.getElementById('portfolioId').value) {
+            if (confirm('Найден сохраненный черновик. Загрузить его?')) {
+                loadDraft();
+            }
+        }
+    });
+
+    // Clear draft when modal closes
+    document.getElementById('portfolioModal').addEventListener('hidden.bs.modal', function() {
+        clearTimeout(autoSaveTimer);
+        if (confirm('Очистить сохраненный черновик?')) {
+            clearDraft();
+        }
+    });
+
+    // Authentication helpers
+    function getAuthHeaders() {
+        // Создаем базовую аутентификацию
+        const username = 'admin';
+        const password = 'qwerty123';
+        const credentials = btoa(username + ':' + password);
+        return {
+            'Authorization': 'Basic ' + credentials
+        };
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,496 @@
+{% extends "base.html" %}
+
+{% block title %}Дашборд - Админ-панель{% endblock %}
+
+{% block page_title %}📊 Дашборд{% endblock %}
+
+{% block content %}
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card primary">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-users fa-3x"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="h3 mb-1">{{ stats.user_stats.total_users or 0 }}</div>
+                    <div class="text-white-75">Всего пользователей</div>
+                    <small class="text-white-50">
+                        +{{ stats.user_stats.new_users or 0 }} за неделю
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card success">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-project-diagram fa-3x"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="h3 mb-1">{{ stats.project_stats.total_projects or 0 }}</div>
+                    <div class="text-white-75">Всего проектов</div>
+                    <small class="text-white-50">
+                        {{ stats.project_stats.completion_rate or 0 }}% завершено
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card info">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-robot fa-3x"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="h3 mb-1">{{ stats.consultant_stats.total_sessions or 0 }}</div>
+                    <div class="text-white-75">Консультаций</div>
+                    <small class="text-white-50">
+                        ⭐ {{ (stats.consultant_stats.avg_rating or 0)|round(1) }}/5.0
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card warning">
+            <div class="d-flex align-items-center">
+                <div class="me-3">
+                    <i class="fas fa-ruble-sign fa-3x"></i>
+                </div>
+                <div class="flex-grow-1">
+                    <div class="h3 mb-1">{{ (stats.financial_stats.total_revenue or 0)|round|int }}</div>
+                    <div class="text-white-75">Доход (₽)</div>
+                    <small class="text-white-50">
+                        Средний чек: {{ (stats.financial_stats.avg_check or 0)|round|int }}₽
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    Динамика проектов
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="projectsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Статусы проектов
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clock me-2"></i>
+                    Последние проекты
+                </h5>
+                <a href="/projects" class="btn btn-outline-primary btn-sm">Все проекты</a>
+            </div>
+            <div class="card-body">
+                {% if recent_projects %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Название</th>
+                                <th>Клиент</th>
+                                <th>Статус</th>
+                                <th>Стоимость</th>
+                                <th>Дата</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for project in recent_projects %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary">#{{ project.id }}</span>
+                                </td>
+                                <td>
+                                    <div class="fw-bold">{{ project.title[:30] }}{% if project.title|length > 30 %}...{% endif %}</div>
+                                    <small class="text-muted">{{ project.complexity }}</small>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="user-avatar me-2">
+                                            {{ (project.user.first_name or 'U')[0] }}
+                                        </div>
+                                        <div>
+                                            <div class="fw-medium">{{ project.user.first_name or 'Неизвестно' }}</div>
+                                            <small class="text-muted">@{{ project.user.username or 'нет' }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="badge status-{{ project.status }}">
+                                        {{ project.status }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="fw-bold">{{ (project.estimated_cost or 0)|round|int }}₽</span>
+                                </td>
+                                <td>
+                                    <span class="text-muted">{{ project.created_at[:16] if project.created_at else 'Н/Д' }}</span>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-outline-primary" onclick="viewProject('{{ project.id }}')">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button class="btn btn-outline-success" onclick="updateProjectStatus('{{ project.id }}')">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Нет проектов</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-plus me-2"></i>
+                    Новые пользователи
+                </h5>
+                <a href="/users" class="btn btn-outline-primary btn-sm">Все пользователи</a>
+            </div>
+            <div class="card-body">
+                {% if recent_users %}
+                <div class="list-group list-group-flush">
+                    {% for user in recent_users %}
+                    <div class="list-group-item border-0 px-0">
+                        <div class="d-flex align-items-center">
+                            <div class="user-avatar me-3">
+                                {{ (user.first_name or 'U')[0] }}
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold">{{ user.first_name or 'Неизвестно' }}</div>
+                                <small class="text-muted">@{{ user.username or 'нет' }}</small>
+                                <div class="small text-muted">
+                                    {{ user.registration_date[:16] if user.registration_date else 'Н/Д' }}
+                                </div>
+                            </div>
+                            <div>
+                                {% if user.projects %}
+                                <span class="badge bg-success">{{ user.projects|length }} проектов</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Новый</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Нет новых пользователей</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-lightning-bolt me-2"></i>
+                    Быстрые действия
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-primary btn-custom" onclick="sendDailyReport()">
+                        <i class="fas fa-file-alt me-2"></i>
+                        Отправить отчет
+                    </button>
+                    <button class="btn btn-success btn-custom" onclick="broadcastMessage()">
+                        <i class="fas fa-bullhorn me-2"></i>
+                        Рассылка
+                    </button>
+                    <button class="btn btn-info btn-custom" onclick="exportData()">
+                        <i class="fas fa-download me-2"></i>
+                        Экспорт данных
+                    </button>
+                    <button class="btn btn-warning btn-custom" onclick="clearCache()">
+                        <i class="fas fa-broom me-2"></i>
+                        Очистить кэш
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Project Status Update Modal -->
+<div class="modal fade" id="statusModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Изменить статус проекта</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="statusForm">
+                    <input type="hidden" id="projectId" name="project_id">
+                    <div class="mb-3">
+                        <label for="newStatus" class="form-label">Новый статус:</label>
+                        <select class="form-select" id="newStatus" name="status" required>
+                            <option value="new">Новый</option>
+                            <option value="review">На рассмотрении</option>
+                            <option value="accepted">Принят</option>
+                            <option value="in_progress">В работе</option>
+                            <option value="testing">Тестирование</option>
+                            <option value="completed">Завершен</option>
+                            <option value="cancelled">Отменен</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveProjectStatus()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Charts
+    document.addEventListener('DOMContentLoaded', function() {
+        initProjectsChart();
+        initStatusChart();
+    });
+
+    function initProjectsChart() {
+        const ctx = document.getElementById('projectsChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+                datasets: [{
+                    label: 'Новые проекты',
+                    data: [2, 4, 3, 5, 7, 3, 4],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }, {
+                    label: 'Завершенные',
+                    data: [1, 2, 2, 3, 4, 2, 3],
+                    borderColor: '#56ab2f',
+                    backgroundColor: 'rgba(86, 171, 47, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function initStatusChart() {
+        const ctx = document.getElementById('statusChart').getContext('2d');
+        
+        // Get data from template variables
+        const newVal = parseInt('{{ stats.project_stats.status_distribution.new or 0 }}', 10);
+        const inProgressVal = parseInt('{{ stats.project_stats.status_distribution.in_progress or 0 }}', 10) 
+            + parseInt('{{ stats.project_stats.status_distribution.accepted or 0 }}', 10);
+        const completedVal = parseInt('{{ stats.project_stats.status_distribution.completed or 0 }}', 10);
+        const cancelledVal = parseInt('{{ stats.project_stats.status_distribution.cancelled or 0 }}', 10);
+
+        const statusData = [
+            newVal,
+            inProgressVal,
+            completedVal,
+            cancelledVal
+        ];
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Новые', 'В работе', 'Завершены', 'Отменены'],
+                datasets: [{
+                    data: statusData,
+                    backgroundColor: [
+                        '#17a2b8',
+                        '#007bff', 
+                        '#28a745',
+                        '#dc3545'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    }
+                }
+            }
+        });
+    }
+
+    // Quick Actions
+    async function sendDailyReport() {
+        try {
+            showNotification('Отправляем отчет...', 'info');
+            const response = await makeRequest('/api/reports/daily', { method: 'POST' });
+            if (response.success) {
+                showNotification('Отчет отправлен!', 'success');
+            } else {
+                showNotification('Ошибка отправки отчета', 'danger');
+            }
+        } catch (error) {
+            showNotification('Ошибка отправки отчета', 'danger');
+        }
+    }
+
+    async function clearCache() {
+        try {
+            showNotification('Очищаем кэш...', 'info');
+            const response = await makeRequest('/api/cache/clear', { method: 'POST' });
+            if (response.success) {
+                showNotification('Кэш очищен!', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification('Ошибка очистки кэша', 'danger');
+            }
+        } catch (error) {
+            showNotification('Ошибка очистки кэша', 'danger');
+        }
+    }
+
+    function broadcastMessage() {
+        // Implement broadcast functionality
+        showNotification('Функция в разработке', 'info');
+    }
+
+    async function exportData() {
+        try {
+            showNotification('Экспортируем данные...', 'info');
+            const response = await fetch('/api/export/projects');
+            const data = await response.json();
+            
+            if (data.success) {
+                const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `projects_export_${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                showNotification('Данные экспортированы!', 'success');
+            } else {
+                showNotification('Ошибка экспорта данных', 'danger');
+            }
+        } catch (error) {
+            showNotification('Ошибка экспорта данных', 'danger');
+        }
+    }
+
+    // Project Management
+    function viewProject(projectId) {
+        window.location.href = `/projects/${projectId}`;
+    }
+
+    function updateProjectStatus(projectId) {
+        document.getElementById('projectId').value = projectId;
+        const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+        modal.show();
+    }
+
+    async function saveProjectStatus() {
+        const form = document.getElementById('statusForm');
+        const formData = new FormData(form);
+        
+        try {
+            const response = await makeRequest(`/api/project/${formData.get('project_id')}/status`, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.success) {
+                showNotification('Статус обновлен!', 'success');
+                const modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+                modal.hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification('Ошибка обновления статуса', 'danger');
+            }
+        } catch (error) {
+            showNotification('Ошибка обновления статуса', 'danger');
+        }
+    }
+
+    // Auto-refresh every 5 minutes
+    setInterval(() => {
+        location.reload();
+    }, 5 * 60 * 1000);
+</script>
+{% endblock %}

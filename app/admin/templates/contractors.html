@@ -1,0 +1,1500 @@
+{% extends "base.html" %}
+
+{% block title %}Исполнители - Админ-панель{% endblock %}
+
+{% block page_title %}👥 Управление исполнителями{% endblock %}
+
+{% block extra_css %}
+<style>
+.contractor-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-bottom: 20px;
+    height: auto;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+}
+
+.contractor-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.contractor-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px 15px 0 0;
+    padding: 20px;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+}
+
+.contractor-info {
+    padding: 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.contractor-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 0 0 15px 15px;
+    margin-top: auto;
+}
+
+.stat-item {
+    text-align: center;
+    flex: 1;
+    padding: 0 5px;
+}
+
+.stat-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #495057;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    line-height: 1.2;
+    margin-top: 2px;
+}
+
+.specialization-badge {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.contract-type-badge {
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.contract-freelance {
+    background: #e7f3ff;
+    color: #0066cc;
+}
+
+.contract-employee {
+    background: #e8f5e8;
+    color: #28a745;
+}
+
+.contract-agency {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.rating-stars {
+    color: #ffc107;
+}
+
+.payment-status {
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-paid {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-overdue {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.assignment-item {
+    border-left: 4px solid #dee2e6;
+    padding: 15px;
+    margin-bottom: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.assignment-active {
+    border-left-color: #007bff;
+}
+
+.assignment-completed {
+    border-left-color: #28a745;
+}
+
+.filter-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+/* Дополнительные стили для улучшения отображения */
+.contractor-card .contractor-info .row {
+    margin-bottom: 10px;
+}
+
+.contractor-card .contractor-info .col-6 {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.contractor-card .contractor-info small {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.contractor-card .contractor-info span {
+    font-size: 0.85rem;
+    line-height: 1.3;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.contractor-card .p-3.border-top .btn {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
+.contractor-card .p-3.border-top {
+    margin-top: auto;
+    padding: 15px !important;
+}
+
+.contractor-card h5 {
+    font-size: 1.1rem;
+    line-height: 1.3;
+    margin-bottom: 8px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.specialization-badge, .contract-type-badge {
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .contractor-card {
+        min-height: auto;
+    }
+    
+    .contractor-card .contractor-info .row {
+        margin-bottom: 8px;
+    }
+    
+    .contractor-card .p-3.border-top .d-flex {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    
+    .contractor-card .p-3.border-top .btn {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
+}
+</style>
+
+<script>
+console.log('=== СКРИПТ CONTRACTORS НАЧИНАЕТ ЗАГРУЖАТЬСЯ ===');
+
+// ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+const adminUsername = 'admin';
+const adminPassword = 'qwerty123';
+let currentPage = 1;
+let currentContractorId = null;
+const itemsPerPage = 12;
+
+console.log('Глобальные переменные определены:', {
+    adminUsername,
+    adminPassword,
+    currentPage,
+    itemsPerPage
+});
+
+console.log('Проверяем showNotification...');
+// ФУНКЦИЯ УВЕДОМЛЕНИЙ - ЗАГЛУШКА НА СЛУЧАЙ ЕСЛИ НЕ ЗАГРУЖЕНА ИЗ BASE.HTML
+if (typeof showNotification === 'undefined') {
+    console.log('showNotification не найден, создаем заглушку');
+    function showNotification(message, type = 'success') {
+        console.log(`[${type.toUpperCase()}] ${message}`);
+        alert(message);
+    }
+} else {
+    console.log('showNotification уже определен');
+}
+console.log('showNotification проверен успешно');
+
+console.log('Определяем функцию updatePagination...');
+// ФУНКЦИЯ ПАГИНАЦИИ - ОПРЕДЕЛЯЕМ В НАЧАЛЕ
+function updatePagination(currentPage, totalPages, totalItems) {
+    const pagination = document.getElementById('pagination');
+    let paginationHtml = '';
+    
+    if (totalPages > 1) {
+        // Предыдущая страница
+        if (currentPage > 1) {
+            paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadContractors(${currentPage - 1})">‹</a></li>`;
+        }
+        
+        // Номера страниц
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === currentPage) {
+                paginationHtml += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+            } else {
+                paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadContractors(${i})">${i}</a></li>`;
+            }
+        }
+        
+        // Следующая страница
+        if (currentPage < totalPages) {
+            paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadContractors(${currentPage + 1})">›</a></li>`;
+        }
+    }
+    
+    pagination.innerHTML = paginationHtml;
+}
+console.log('Функция updatePagination определена успешно');
+
+console.log('Определяем функцию openContractorModal...');
+// Глобальная функция для открытия модального окна - ОПРЕДЕЛЯЕМ В HEAD
+function openContractorModal() {
+    console.log('Функция openContractorModal вызвана');
+    const modalElement = document.getElementById('addContractorModal');
+    console.log('Найдено модальное окно:', modalElement);
+    
+    if (modalElement) {
+        if (typeof bootstrap !== 'undefined') {
+            console.log('Bootstrap доступен, создаем модальное окно');
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        } else {
+            console.error('Bootstrap не найден');
+        }
+    } else {
+        console.error('Модальное окно не найдено');
+    }
+}
+console.log('Функция openContractorModal определена успешно');
+
+console.log('Определяем функцию loadContractors...');
+// ГЛАВНАЯ ФУНКЦИЯ - ЗАГРУЗКА ИСПОЛНИТЕЛЕЙ - ОПРЕДЕЛЯЕМ В HEAD
+async function loadContractors(page = 1) {
+    console.log('loadContractors вызван, page:', page);
+    try {
+        const searchFilter = document.getElementById('searchFilter');
+        const specializationFilter = document.getElementById('specializationFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        
+        console.log('Элементы фильтров найдены:', {
+            searchFilter: !!searchFilter,
+            specializationFilter: !!specializationFilter,
+            statusFilter: !!statusFilter
+        });
+        
+        const searchParams = new URLSearchParams({
+            page: page,
+            limit: 12,
+            search: searchFilter ? searchFilter.value : '',
+            specialization: specializationFilter ? specializationFilter.value : '',
+            status: statusFilter ? statusFilter.value : ''
+        });
+        
+        const url = `/admin/api/contractors/?${searchParams}`;
+        console.log('Запрос к URL:', url);
+        
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': 'Basic ' + btoa('admin:qwerty123')
+            }
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        
+        const data = await response.json();
+        console.log('Данные ответа:', data);
+        
+        if (data.success) {
+            console.log('Количество исполнителей:', data.data.length);
+            displayContractors(data.data);
+            // Обновляем пагинацию
+            updatePagination(page, Math.ceil(data.total / 12), data.total);
+        } else {
+            console.error('API вернул ошибку:', data.message);
+            showNotification('Ошибка при загрузке исполнителей: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        console.error('Критическая ошибка loadContractors:', error);
+        showNotification('Ошибка при загрузке исполнителей: ' + error.message, 'danger');
+    }
+}
+console.log('Функция loadContractors определена успешно');
+
+console.log('Определяем функцию displayContractors...');
+// ГЛАВНАЯ ФУНКЦИЯ - ОТОБРАЖЕНИЕ ИСПОЛНИТЕЛЕЙ - ОПРЕДЕЛЯЕМ В HEAD
+function displayContractors(contractors) {
+    console.log('=== ВНУТРИ displayContractors ===');
+    console.log('=== НАЧАЛО displayContractors ===');
+    console.log('displayContractors вызван с данными:', contractors);
+    console.log('Тип данных:', typeof contractors);
+    console.log('Является ли массивом:', Array.isArray(contractors));
+    console.log('Длина:', contractors ? contractors.length : 'contractors is null/undefined');
+    console.log('ПЫТАЕМСЯ НАЙТИ contractorsList...');
+    
+    const contractorsList = document.getElementById('contractorsList');
+    console.log('Элемент contractorsList найден:', !!contractorsList);
+    console.log('ПОСЛЕ ПОИСКА contractorsList');
+    
+    if (!contractors || contractors.length === 0) {
+        console.log('Нет исполнителей для отображения - показываем сообщение');
+        if (contractorsList) {
+            contractorsList.innerHTML = '<div class="col-12"><div class="alert alert-info">Исполнители не найдены</div></div>';
+        }
+        return;
+    }
+    
+    console.log('Строим HTML для исполнителей...');
+    
+    const containerHtml = contractors.map(contractor => {
+        // Создаем отображаемое имя из username или first_name + last_name
+        const displayName = contractor.first_name && contractor.last_name 
+            ? `${contractor.first_name} ${contractor.last_name}` 
+            : contractor.username;
+        
+        return `
+        <div class="col-lg-4 col-md-6">
+            <div class="contractor-card">
+                <div class="contractor-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">${displayName}</h5>
+                            <div class="d-flex gap-2 mb-2">
+                                <span class="specialization-badge">Исполнитель</span>
+                                <span class="contract-type-badge contract-freelance">Фриланс</span>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="rating-stars">
+                                ★★★★★
+                            </div>
+                            <small>5/5</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="contractor-info">
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Email:</small><br>
+                            <span>${contractor.email || 'Не указан'}</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Username:</small><br>
+                            <span>${contractor.username || 'Не указан'}</span>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <small class="text-muted">Дата создания:</small><br>
+                            <span>${contractor.created_at ? new Date(contractor.created_at).toLocaleDateString('ru-RU') : 'Не указана'}</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Статус:</small><br>
+                            <span class="badge ${contractor.is_active ? 'bg-success' : 'bg-secondary'}">
+                                ${contractor.is_active ? 'Активен' : 'Неактивен'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="contractor-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Проектов</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Активных</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">0₽</div>
+                        <div class="stat-label">Выплачено</div>
+                    </div>
+                </div>
+                <div class="p-3 border-top">
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewContractor(${contractor.id})">
+                            <i class="fas fa-eye"></i> Детали
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="createPayment(${contractor.id})">
+                            <i class="fas fa-money-bill"></i> Выплата
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="editContractor(${contractor.id})">
+                            <i class="fas fa-edit"></i> Редактировать
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    }).join('');
+    
+    console.log('HTML построен, длина:', containerHtml.length);
+    console.log('Записываем HTML в contractorsList...');
+    if (contractorsList) {
+        contractorsList.innerHTML = containerHtml;
+        console.log('HTML записан успешно');
+    } else {
+        console.error('contractorsList элемент не найден!');
+    }
+    console.log('=== КОНЕЦ displayContractors ===');
+}
+console.log('Функция displayContractors определена успешно');
+
+console.log('Определяем функцию handleSaveContractor...');
+// ГЛАВНАЯ ФУНКЦИЯ - СОХРАНЕНИЕ ИСПОЛНИТЕЛЯ - ОПРЕДЕЛЯЕМ В HEAD
+function handleSaveContractor() {
+    console.log('Функция handleSaveContractor вызвана');
+    
+    try {
+        console.log('НАЧАЛО handleSaveContractor try блока');
+        // Проверяем все поля формы
+        const usernameEl = document.getElementById('contractorUsername');
+        const emailEl = document.getElementById('contractorEmail');
+        const adminPasswordEl = document.getElementById('contractorAdminPassword');
+        
+        console.log('Элементы найдены:', {
+            usernameEl: !!usernameEl,
+            emailEl: !!emailEl,
+            adminPasswordEl: !!adminPasswordEl
+        });
+        
+        if (!usernameEl || !emailEl || !adminPasswordEl) {
+            console.error('Не все элементы формы найдены');
+            alert('Ошибка: элементы формы не найдены');
+            return;
+        }
+        
+        const username = usernameEl.value;
+        const email = emailEl.value;
+        const adminPassword = adminPasswordEl.value;
+        
+        console.log('Поля формы:', { username, email, adminPassword });
+        
+        if (!username || !email || !adminPassword) {
+            alert('Заполните обязательные поля: Username, Email и Пароль для админки');
+            return;
+        }
+        
+        const contractorData = {
+            username: username,
+            email: email,
+            first_name: document.getElementById('contractorFirstName').value,
+            last_name: document.getElementById('contractorLastName').value,
+            role: 'executor',
+            is_active: true,
+            admin_login: document.getElementById('contractorAdminLogin').value || username,
+            admin_password: adminPassword,
+            force_password_change: document.getElementById('contractorForcePasswordChange').checked
+        };
+        
+        console.log('Данные исполнителя:', contractorData);
+        
+        // Отправляем запрос
+        fetch('/admin/api/contractors/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa('admin:qwerty123')
+            },
+            body: JSON.stringify(contractorData)
+        })
+        .then(response => {
+            console.log('Ответ сервера:', response);
+            return response.json();
+        })
+        .then(data => {
+            console.log('Данные ответа:', data);
+            
+            if (data.success) {
+                alert('Исполнитель успешно добавлен!');
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addContractorModal'));
+                if (modal) modal.hide();
+                
+                // Очищаем форму
+                document.getElementById('addContractorForm').reset();
+                
+                // Обновляем список исполнителей
+                console.log('Пытаемся обновить список исполнителей...');
+                setTimeout(() => {
+                    loadContractors();
+                }, 500);
+            } else {
+                alert('Ошибка при добавлении исполнителя: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при сохранении исполнителя:', error);
+            alert('Ошибка при добавлении исполнителя: ' + error.message);
+        });
+    } catch (error) {
+        console.error('Критическая ошибка:', error);
+        alert('Критическая ошибка: ' + error.message);
+    }
+}
+console.log('Функция handleSaveContractor определена успешно');
+
+console.log('=== ВСЕ ФУНКЦИИ В EXTRA_CSS ОПРЕДЕЛЕНЫ ===');
+
+// ПРОСТОЙ СПОСОБ ЗАГРУЗКИ ИСПОЛНИТЕЛЕЙ
+console.log('ПРОСТАЯ ЗАГРУЗКА ИСПОЛНИТЕЛЕЙ...');
+setTimeout(function() {
+    console.log('БЫСТРАЯ ИНИЦИАЛИЗАЦИЯ ЧЕРЕЗ 100ms');
+    if (typeof loadContractors === 'function') {
+        console.log('ВЫЗЫВАЕМ loadContractors(1)');
+        loadContractors(1);
+    } else {
+        console.error('loadContractors НЕ ЯВЛЯЕТСЯ ФУНКЦИЕЙ');
+    }
+}, 100);
+
+// ДОБАВЛЯЕМ ОБРАБОТЧИКИ КНОПОК
+setTimeout(function() {
+    console.log('БЫСТРАЯ ПРИВЯЗКА ОБРАБОТЧИКОВ КНОПОК...');
+    
+    const addBtn = document.getElementById('addContractorBtn');
+    const reloadBtn = document.getElementById('reloadBtn');
+    const saveBtn = document.getElementById('saveContractorBtn');
+    
+    console.log('Кнопки найдены:', {
+        addBtn: !!addBtn,
+        reloadBtn: !!reloadBtn,
+        saveBtn: !!saveBtn
+    });
+    
+    if (addBtn) {
+        addBtn.onclick = function() {
+            console.log('Кнопка добавления нажата');
+            openContractorModal();
+        };
+    }
+    
+    if (reloadBtn) {
+        reloadBtn.onclick = function() {
+            console.log('Кнопка перезагрузки нажата');
+            loadContractors(1);
+        };
+    }
+    
+    if (saveBtn) {
+        saveBtn.onclick = function() {
+            console.log('Кнопка сохранения нажата');
+            handleSaveContractor();
+        };
+    }
+    
+    console.log('ОБРАБОТЧИКИ КНОПОК ПРИВЯЗАНЫ');
+}, 50);
+
+</script>
+{% endblock %}
+
+{% block header_actions %}
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" id="addContractorBtn">
+        <i class="fas fa-plus me-1"></i> Добавить исполнителя
+    </button>
+    <button class="btn btn-outline-success" id="exportBtn">
+        <i class="fas fa-download me-1"></i> Экспорт
+    </button>
+    <button class="btn btn-outline-info" id="statsBtn">
+        <i class="fas fa-chart-bar me-1"></i> Статистика
+    </button>
+    <button class="btn btn-outline-warning" id="reloadBtn" title="Отладка: ручная загрузка">
+        <i class="fas fa-refresh me-1"></i> Перезагрузить
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Фильтры -->
+<div class="filter-section">
+    <div class="row">
+        <div class="col-md-3">
+            <label class="form-label">Поиск</label>
+            <input type="text" class="form-control" id="searchFilter" placeholder="Имя, email, специализация...">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Специализация</label>
+            <select class="form-select" id="specializationFilter">
+                <option value="">Все специализации</option>
+                <option value="developer">Разработчик</option>
+                <option value="designer">Дизайнер</option>
+                <option value="tester">Тестировщик</option>
+                <option value="manager">Менеджер</option>
+                <option value="analyst">Аналитик</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Статус</label>
+            <select class="form-select" id="statusFilter">
+                <option value="">Все статусы</option>
+                <option value="active">Активные</option>
+                <option value="inactive">Неактивные</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Действия</label>
+            <div>
+                <button class="btn btn-outline-primary" onclick="applyFilters()">
+                    <i class="fas fa-filter me-1"></i> Применить
+                </button>
+                <button class="btn btn-outline-secondary" onclick="clearFilters()">
+                    <i class="fas fa-times me-1"></i> Очистить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Список исполнителей -->
+<div id="contractorsList" class="row">
+    <!-- Контент будет загружен через JavaScript -->
+</div>
+
+<!-- Пагинация -->
+<nav aria-label="Навигация по страницам">
+    <ul class="pagination justify-content-center" id="pagination">
+        <!-- Пагинация будет добавлена через JavaScript -->
+    </ul>
+</nav>
+
+
+<!-- Модальное окно деталей исполнителя -->
+<div class="modal fade" id="contractorDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Детали исполнителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contractorDetailsContent">
+                <!-- Контент будет загружен через JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-primary" onclick="editContractor()">Редактировать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно создания выплаты -->
+<div class="modal fade" id="createPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создать выплату</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createPaymentForm">
+                    <input type="hidden" id="paymentContractorId">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Сумма (₽) *</label>
+                            <input type="number" class="form-control" id="paymentAmount" min="0" step="0.01" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Тип выплаты</label>
+                            <select class="form-select" id="paymentType" required>
+                                <option value="hourly">Почасовая оплата</option>
+                                <option value="fixed">Фиксированная сумма</option>
+                                <option value="bonus">Бонус</option>
+                                <option value="penalty">Штраф</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Дата выплаты *</label>
+                            <input type="date" class="form-control" id="paymentDate" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Срок выплаты</label>
+                            <input type="date" class="form-control" id="paymentDueDate">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Способ оплаты</label>
+                            <select class="form-select" id="paymentMethod">
+                                <option value="bank_transfer">Банковский перевод</option>
+                                <option value="cash">Наличные</option>
+                                <option value="card">Карта</option>
+                                <option value="crypto">Криптовалюта</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Налоговая ставка (%)</label>
+                            <input type="number" class="form-control" id="paymentTaxRate" min="0" max="100" step="0.1" value="13">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="withholdTax">
+                            <label class="form-check-label" for="withholdTax">
+                                Удержать налог
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание выплаты *</label>
+                        <textarea class="form-control" id="paymentDescription" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="savePayment()">Создать выплату</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно статистики -->
+<div class="modal fade" id="statsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Статистика по исполнителям</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="statsContent">
+                <!-- Контент будет загружен через JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Модальное окно добавления исполнителя -->
+<div class="modal fade" id="addContractorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить исполнителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addContractorForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Username *</label>
+                            <input type="text" class="form-control" id="contractorUsername" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="contractorEmail" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Имя</label>
+                            <input type="text" class="form-control" id="contractorFirstName">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Фамилия</label>
+                            <input type="text" class="form-control" id="contractorLastName">
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    <h6 class="mb-3">Доступ к админке</h6>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Логин для админки</label>
+                            <input type="text" class="form-control" id="contractorAdminLogin" placeholder="Будет использован username если не указан">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Пароль для админки *</label>
+                            <input type="password" class="form-control" id="contractorAdminPassword" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="contractorForcePasswordChange">
+                            <label class="form-check-label" for="contractorForcePasswordChange">
+                                Потребовать смену пароля при первом входе
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveContractorBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+console.log('=== НАЧАЛО СЕКЦИИ EXTRA_JS ===');
+// Переменные уже определены в секции extra_css
+
+// ГЛАВНАЯ ФУНКЦИЯ - СОХРАНЕНИЕ ИСПОЛНИТЕЛЯ - ГЛОБАЛЬНАЯ
+function saveContractor() {
+    console.log('Функция saveContractor вызвана');
+    
+    // Проверяем все поля формы
+    const usernameEl = document.getElementById('contractorUsername');
+    const emailEl = document.getElementById('contractorEmail'); 
+    const adminPasswordEl = document.getElementById('contractorAdminPassword');
+    
+    if (!usernameEl || !emailEl || !adminPasswordEl) {
+        console.error('Элементы формы не найдены');
+        showNotification('Ошибка: форма не найдена', 'danger');
+        return;
+    }
+    
+    const username = usernameEl.value;
+    const email = emailEl.value;
+    const adminPassword = adminPasswordEl.value;
+    
+    if (!username || !email || !adminPassword) {
+        showNotification('Заполните обязательные поля: Username, Email и Пароль для админки', 'warning');
+        return;
+    }
+    
+    const contractorData = {
+        username: username,
+        email: email,
+        first_name: document.getElementById('contractorFirstName').value,
+        last_name: document.getElementById('contractorLastName').value,
+        role: 'executor',
+        is_active: true,
+        admin_login: document.getElementById('contractorAdminLogin').value || username,
+        admin_password: adminPassword,
+        force_password_change: document.getElementById('contractorForcePasswordChange').checked
+    };
+    
+    console.log('Данные исполнителя:', contractorData);
+    
+    // Отправляем запрос
+    fetch('/admin/api/contractors/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + btoa('admin:qwerty123')
+        },
+        body: JSON.stringify(contractorData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Данные ответа:', data);
+        
+        if (data.success) {
+            showNotification('Исполнитель успешно добавлен!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addContractorModal'));
+            modal.hide();
+            
+            // Очищаем форму
+            document.getElementById('addContractorForm').reset();
+            
+            console.log('Пытаемся обновить список исполнителей после сохранения (второе место)...');
+            setTimeout(() => {
+                loadContractors(currentPage);
+            }, 500);
+        } else {
+            showNotification('Ошибка при добавлении исполнителя: ' + data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Ошибка при сохранении исполнителя:', error);
+        showNotification('Ошибка при добавлении исполнителя: ' + error.message, 'danger');
+    });
+}
+
+// ГЛОБАЛЬНЫЕ ФУНКЦИИ - ОПРЕДЕЛЯЕМ СРАЗУ
+window.openModal = function() {
+    console.log('Функция openModal вызвана');
+    const modalElement = document.getElementById('addContractorModal');
+    console.log('Найдено модальное окно:', modalElement);
+    
+    if (modalElement) {
+        if (typeof bootstrap !== 'undefined') {
+            console.log('Bootstrap доступен, создаем модальное окно');
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+        } else {
+            console.error('Bootstrap не найден');
+        }
+    } else {
+        console.error('Модальное окно не найдено');
+    }
+}
+
+window.openAddContractorModal = function() {
+    const modal = new bootstrap.Modal(document.getElementById('addContractorModal'));
+    modal.show();
+}
+
+// Добавляем обработчик события для сохранения состояния при переходе
+window.addEventListener('beforeunload', function() {
+    // Сохраняем текущее состояние фильтров
+    const state = {
+        search: document.getElementById('searchFilter')?.value || '',
+        specialization: document.getElementById('specializationFilter')?.value || '',
+        status: document.getElementById('statusFilter')?.value || '',
+        page: currentPage
+    };
+    sessionStorage.setItem('contractorsState', JSON.stringify(state));
+});
+
+// Восстанавливаем состояние при загрузке страницы
+window.addEventListener('pageshow', function() {
+    const savedState = sessionStorage.getItem('contractorsState');
+    if (savedState) {
+        try {
+            const state = JSON.parse(savedState);
+            // Восстанавливаем фильтры
+            if (document.getElementById('searchFilter')) document.getElementById('searchFilter').value = state.search;
+            if (document.getElementById('specializationFilter')) document.getElementById('specializationFilter').value = state.specialization;
+            if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = state.status;
+            currentPage = state.page || 1;
+        } catch (e) {
+            console.log('Ошибка восстановления состояния:', e);
+        }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== DOM ЗАГРУЖЕН - CONTRACTORS PAGE ===');
+    console.log('URL страницы:', window.location.href);
+    console.log('currentPage на старте:', typeof currentPage !== 'undefined' ? currentPage : 'НЕ ОПРЕДЕЛЕН');
+    console.log('itemsPerPage на старте:', typeof itemsPerPage !== 'undefined' ? itemsPerPage : 'НЕ ОПРЕДЕЛЕН');
+    
+    // Проверяем наличие всех элементов
+    const addBtn = document.getElementById('addContractorBtn');
+    const modal = document.getElementById('addContractorModal');
+    const saveContractorBtn = document.getElementById('saveContractorBtn');
+    const contractorsList = document.getElementById('contractorsList');
+    
+    console.log('Элементы страницы:');
+    console.log('  Кнопка добавления:', !!addBtn, addBtn);
+    console.log('  Модальное окно:', !!modal, modal);
+    console.log('  Кнопка сохранения:', !!saveContractorBtn, saveContractorBtn);
+    console.log('  Контейнер списка:', !!contractorsList, contractorsList);
+    console.log('  Bootstrap доступен:', typeof bootstrap);
+    
+    // Простая проверка доступности функции
+    if (typeof window.openModal === 'function') {
+        console.log('Функция window.openModal доступна');
+    } else {
+        console.error('Функция window.openModal не найдена');
+    }
+    
+    // Восстанавливаем сохраненное состояние
+    const savedState = sessionStorage.getItem('contractorsState');
+    if (savedState) {
+        try {
+            const state = JSON.parse(savedState);
+            if (document.getElementById('searchFilter')) document.getElementById('searchFilter').value = state.search;
+            if (document.getElementById('specializationFilter')) document.getElementById('specializationFilter').value = state.specialization;
+            if (document.getElementById('statusFilter')) document.getElementById('statusFilter').value = state.status;
+            currentPage = state.page || 1;
+        } catch (e) {
+            console.log('Ошибка восстановления состояния:', e);
+        }
+    }
+    
+    console.log('ПОДГОТОВКА К ЗАГРУЗКЕ ИСПОЛНИТЕЛЕЙ:');
+    console.log('  currentPage:', typeof currentPage !== 'undefined' ? currentPage : 'НЕ ОПРЕДЕЛЕН - ИСПОЛЬЗУЕМ 1');
+    console.log('  Функция loadContractors доступна:', typeof loadContractors === 'function');
+    
+    const pageToLoad = typeof currentPage !== 'undefined' ? currentPage : 1;
+    console.log('  Загружаем страницу:', pageToLoad);
+    
+    try {
+        console.log('ВЫЗЫВАЕМ loadContractors(' + pageToLoad + ')...');
+        loadContractors(pageToLoad);
+        console.log('loadContractors вызван успешно');
+    } catch (error) {
+        console.error('ОШИБКА при вызове loadContractors:', error);
+        console.error('Stack:', error.stack);
+    }
+    
+    // Обработчики событий для фильтров
+    document.getElementById('searchFilter').addEventListener('input', applyFilters);
+    document.getElementById('specializationFilter').addEventListener('change', applyFilters);
+    document.getElementById('statusFilter').addEventListener('change', applyFilters);
+    
+    // Дополнительная проверка через setTimeout
+    setTimeout(function() {
+        const addBtn = document.getElementById('addContractorBtn');
+        const modal = document.getElementById('addContractorModal');
+        
+        console.log('Повторная проверка через setTimeout:');
+        console.log('Кнопка добавления (setTimeout):', addBtn);
+        console.log('Модальное окно (setTimeout):', modal);
+        
+        if (addBtn && modal) {
+            console.log('Привязываем обработчик напрямую');
+            addBtn.onclick = function(e) {
+                console.log('Кнопка нажата (onclick)');
+                e.preventDefault();
+                const modalInstance = new bootstrap.Modal(modal);
+                modalInstance.show();
+            };
+        }
+    }, 1000);
+    
+    // Обработчик для кнопки добавления исполнителя через делегирование
+    document.addEventListener('click', function(event) {
+        if (event.target.id === 'addContractorBtn' || event.target.closest('#addContractorBtn')) {
+            console.log('Кнопка добавления исполнителя нажата (делегирование)');
+            event.preventDefault();
+            const modalElement = document.getElementById('addContractorModal');
+            if (modalElement) {
+                console.log('Модальное окно найдено');
+                const modal = new bootstrap.Modal(modalElement);
+                modal.show();
+            } else {
+                console.error('Модальное окно addContractorModal не найдено');
+            }
+        }
+    });
+    
+    // Обработчик для кнопки сохранения исполнителя - уже есть onclick в HTML
+});
+
+// АЛЬТЕРНАТИВНЫЙ СПОСОБ ИНИЦИАЛИЗАЦИИ
+window.addEventListener('load', function() {
+    console.log('=== WINDOW LOAD EVENT - CONTRACTORS ===');
+    console.log('Проверяем, загружены ли исполнители...');
+    
+    const contractorsList = document.getElementById('contractorsList');
+    if (contractorsList && contractorsList.innerHTML.trim() === '') {
+        console.log('Список исполнителей пуст, загружаем...');
+        setTimeout(() => {
+            loadContractors(1);
+        }, 500);
+    } else {
+        console.log('Список исполнителей уже заполнен или элемент не найден');
+    }
+});
+
+// ИНИЦИАЛИЗАЦИЯ СРАЗУ ПОСЛЕ ОПРЕДЕЛЕНИЯ ФУНКЦИЙ
+console.log('=== ИНИЦИАЛИЗАЦИЯ ПОСЛЕ ОПРЕДЕЛЕНИЯ ФУНКЦИЙ ===');
+setTimeout(function() {
+    console.log('Отложенная инициализация через 1 секунду...');
+    const contractorsList = document.getElementById('contractorsList');
+    console.log('contractorsList найден:', !!contractorsList);
+    
+    if (contractorsList && contractorsList.innerHTML.trim() === '') {
+        console.log('Запускаем загрузку исполнителей...');
+        loadContractors(1);
+    }
+}, 1000);
+
+async function loadContractors(page = 1) {
+    console.log('=== ЗАГРУЗКА ИСПОЛНИТЕЛЕЙ ===');
+    console.log('Страница:', page);
+    
+    try {
+        const searchFilter = document.getElementById('searchFilter');
+        const specializationFilter = document.getElementById('specializationFilter');
+        const statusFilter = document.getElementById('statusFilter');
+        
+        console.log('Элементы фильтров найдены:', {
+            searchFilter: !!searchFilter,
+            specializationFilter: !!specializationFilter,
+            statusFilter: !!statusFilter
+        });
+        
+        // Используем фиксированное значение для limit, если itemsPerPage не определен
+        const limit = typeof itemsPerPage !== 'undefined' ? itemsPerPage : 12;
+        
+        const searchParams = new URLSearchParams({
+            page: page,
+            limit: limit,
+            search: searchFilter ? searchFilter.value : '',
+            specialization: specializationFilter ? specializationFilter.value : '',
+            status: statusFilter ? statusFilter.value : ''
+        });
+        
+        const url = `/admin/api/contractors/?${searchParams}`;
+        console.log('Запрос к URL:', url);
+        console.log('Search params:', searchParams.toString());
+        
+        console.log('Отправляем запрос...');
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            }
+        });
+        
+        console.log('Response получен:');
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        if (!response.ok) {
+            console.error('HTTP ошибка:', response.status, response.statusText);
+            const errorText = await response.text();
+            console.error('Текст ошибки:', errorText);
+            showNotification(`Ошибка HTTP ${response.status}: ${response.statusText}`, 'danger');
+            return;
+        }
+        
+        const data = await response.json();
+        console.log('Данные ответа полностью:', JSON.stringify(data, null, 2));
+        
+        if (data.success) {
+            console.log('SUCCESS: Количество исполнителей:', data.data ? data.data.length : 'data.data отсутствует');
+            if (data.data && Array.isArray(data.data)) {
+                console.log('Первый исполнитель:', data.data[0]);
+                displayContractors(data.data);
+                // Обновляем пагинацию
+                updatePagination(page, Math.ceil(data.total / limit), data.total);
+            } else {
+                console.warn('data.data не является массивом или отсутствует');
+                displayContractors([]);
+            }
+        } else {
+            console.error('API SUCCESS=FALSE, сообщение:', data.message);
+            showNotification('Ошибка при загрузке исполнителей: ' + (data.message || 'Неизвестная ошибка'), 'danger');
+            displayContractors([]);
+        }
+    } catch (error) {
+        console.error('КРИТИЧЕСКАЯ ОШИБКА loadContractors:', error);
+        console.error('Stack trace:', error.stack);
+        showNotification('Критическая ошибка при загрузке исполнителей: ' + error.message, 'danger');
+        displayContractors([]);
+    }
+    console.log('=== КОНЕЦ loadContractors ===');
+}
+
+function generateStars(rating) {
+    const fullStars = Math.floor(rating);
+    const halfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
+    
+    return '★'.repeat(fullStars) + (halfStar ? '☆' : '') + '☆'.repeat(emptyStars);
+}
+
+function applyFilters() {
+    currentPage = 1;
+    loadContractors(currentPage);
+}
+
+function clearFilters() {
+    document.getElementById('searchFilter').value = '';
+    document.getElementById('specializationFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    applyFilters();
+}
+
+
+async function viewContractor(contractorId) {
+    try {
+        const response = await fetch(`/admin/api/contractors/${contractorId}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayContractorDetails(data.contractor, data.assignments, data.payments);
+        } else {
+            showNotification('Ошибка при загрузке данных исполнителя: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка при загрузке данных исполнителя: ' + error.message, 'danger');
+    }
+}
+
+function displayContractorDetails(contractor, assignments, payments) {
+    const content = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Основная информация</h6>
+                <table class="table table-sm">
+                    <tr><th>Имя:</th><td>${contractor.name}</td></tr>
+                    <tr><th>Email:</th><td>${contractor.email || 'Не указан'}</td></tr>
+                    <tr><th>Телефон:</th><td>${contractor.phone || 'Не указан'}</td></tr>
+                    <tr><th>Telegram:</th><td>${contractor.telegram_id || 'Не указан'}</td></tr>
+                    <tr><th>Специализация:</th><td>${contractor.specialization || 'Не указана'}</td></tr>
+                    <tr><th>Ставка:</th><td>${contractor.hourly_rate ? contractor.hourly_rate + '₽/час' : 'Не указана'}</td></tr>
+                    <tr><th>Тип договора:</th><td>${contractor.contract_type}</td></tr>
+                    <tr><th>Рейтинг:</th><td>${contractor.rating}/5</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Статистика</h6>
+                <table class="table table-sm">
+                    <tr><th>Всего проектов:</th><td>${contractor.total_projects}</td></tr>
+                    <tr><th>Общий заработок:</th><td>${formatCurrency(contractor.total_earnings)}</td></tr>
+                    <tr><th>Дата регистрации:</th><td>${new Date(contractor.created_at).toLocaleDateString('ru-RU')}</td></tr>
+                    <tr><th>Статус:</th><td><span class="badge ${contractor.is_active ? 'bg-success' : 'bg-secondary'}">${contractor.is_active ? 'Активен' : 'Неактивен'}</span></td></tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h6>Проекты</h6>
+                <div class="assignments-list" style="max-height: 300px; overflow-y: auto;">
+                    ${assignments.map(assignment => `
+                        <div class="assignment-item assignment-${assignment.status}">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <strong>${assignment.project ? assignment.project.title : 'Проект не найден'}</strong>
+                                    <div class="text-muted small">${assignment.role}</div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-${assignment.status === 'completed' ? 'success' : assignment.status === 'in_progress' ? 'primary' : 'secondary'}">${assignment.status}</span>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                ${assignment.hourly_rate ? assignment.hourly_rate + '₽/час' : 'Фиксированная оплата'}
+                                ${assignment.estimated_hours ? ` • ${assignment.estimated_hours}ч (план)` : ''}
+                                ${assignment.actual_hours ? ` • ${assignment.actual_hours}ч (факт)` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6>Выплаты</h6>
+                <div class="payments-list" style="max-height: 300px; overflow-y: auto;">
+                    ${payments.map(payment => `
+                        <div class="payment-item p-2 border-bottom">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <strong>${formatCurrency(payment.net_amount)}</strong>
+                                    <div class="text-muted small">${payment.description}</div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="payment-status status-${payment.status}">${payment.status}</span>
+                                    <div class="small text-muted">${new Date(payment.payment_date).toLocaleDateString('ru-RU')}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('contractorDetailsContent').innerHTML = content;
+    currentContractorId = contractor.id;
+    
+    const modal = new bootstrap.Modal(document.getElementById('contractorDetailsModal'));
+    modal.show();
+}
+
+function createPayment(contractorId) {
+    currentContractorId = contractorId;
+    document.getElementById('paymentContractorId').value = contractorId;
+    document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
+    
+    const modal = new bootstrap.Modal(document.getElementById('createPaymentModal'));
+    modal.show();
+}
+
+async function savePayment() {
+    try {
+        const paymentData = {
+            amount: parseFloat(document.getElementById('paymentAmount').value),
+            payment_type: document.getElementById('paymentType').value,
+            description: document.getElementById('paymentDescription').value,
+            payment_date: document.getElementById('paymentDate').value + 'T00:00:00',
+            due_date: document.getElementById('paymentDueDate').value ? document.getElementById('paymentDueDate').value + 'T00:00:00' : null,
+            payment_method: document.getElementById('paymentMethod').value,
+            tax_rate: parseFloat(document.getElementById('paymentTaxRate').value) / 100,
+            withhold_tax: document.getElementById('withholdTax').checked
+        };
+        
+        const response = await fetch(`/admin/api/contractors/${currentContractorId}/payments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            },
+            body: JSON.stringify(paymentData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Выплата успешно создана!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createPaymentModal'));
+            modal.hide();
+            loadContractors(currentPage);
+        } else {
+            showNotification('Ошибка при создании выплаты: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка при создании выплаты: ' + error.message, 'danger');
+    }
+}
+
+async function showStats() {
+    try {
+        const response = await fetch('/admin/api/contractors/stats', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayStats(data.statistics);
+        } else {
+            showNotification('Ошибка при загрузке статистики: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка при загрузке статистики: ' + error.message, 'danger');
+    }
+}
+
+function displayStats(stats) {
+    const content = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Общая статистика</h6>
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Всего исполнителей:</span>
+                        <strong>${stats.total_contractors}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Активных:</span>
+                        <strong>${stats.active_contractors}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Выплачено за месяц:</span>
+                        <strong>${formatCurrency(stats.total_payments)}</strong>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Топ исполнители</h6>
+                <ul class="list-group">
+                    ${stats.top_contractors.map(contractor => `
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>${contractor.name}</span>
+                            <strong>${formatCurrency(contractor.total_earned)}</strong>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h6>По специализациям</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Специализация</th>
+                                <th>Количество</th>
+                                <th>Средняя ставка</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stats.specializations.map(spec => `
+                                <tr>
+                                    <td>${spec.specialization}</td>
+                                    <td>${spec.count}</td>
+                                    <td>${formatCurrency(spec.avg_rate)}/час</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('statsContent').innerHTML = content;
+    
+    const modal = new bootstrap.Modal(document.getElementById('statsModal'));
+    modal.show();
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount || 0);
+}
+
+async function exportContractors() {
+    try {
+        showNotification('Экспортируем исполнителей...', 'info');
+        
+        const response = await fetch('/admin/api/contractors?limit=1000', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const blob = new Blob([JSON.stringify(data.contractors, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `contractors_export_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showNotification('Исполнители экспортированы!', 'success');
+        } else {
+            showNotification('Ошибка экспорта исполнителей', 'danger');
+        }
+    } catch (error) {
+        showNotification('Критическая ошибка экспорта: ' + error.message, 'danger');
+    }
+}
+</script>
+{% endblock %}

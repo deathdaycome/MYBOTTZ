@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Тест модального окна{% endblock %}
+
+{% block page_title %}🧪 Тест модального окна{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Тест модального окна</h2>
+    <button class="btn btn-primary" onclick="openTestModal()">Открыть модальное окно</button>
+    <div id="debugInfo" class="mt-3"></div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Test Modal -->
+<div class="modal fade" id="testModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Тестовое модальное окно</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Это тестовое модальное окно работает!</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openTestModal() {
+    console.log('Попытка открыть тестовое модальное окно');
+    const modal = document.getElementById('testModal');
+    const debugInfo = document.getElementById('debugInfo');
+    
+    if (modal) {
+        debugInfo.innerHTML = '<div class="alert alert-success">✅ Модальное окно найдено в DOM</div>';
+        console.log('✅ Модальное окно найдено в DOM');
+        
+        try {
+            const bootstrapModal = new bootstrap.Modal(modal);
+            bootstrapModal.show();
+            console.log('✅ Модальное окно успешно открыто');
+        } catch (error) {
+            debugInfo.innerHTML += '<div class="alert alert-danger">❌ Ошибка при открытии: ' + error.message + '</div>';
+            console.error('❌ Ошибка при открытии модального окна:', error);
+        }
+    } else {
+        debugInfo.innerHTML = '<div class="alert alert-danger">❌ Модальное окно НЕ найдено в DOM</div>';
+        console.error('❌ Модальное окно НЕ найдено в DOM');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('=== ТЕСТОВАЯ СТРАНИЦА ЗАГРУЖЕНА ===');
+    console.log('Все модальные окна в DOM:', document.querySelectorAll('.modal'));
+});
+</script>
+{% endblock %}

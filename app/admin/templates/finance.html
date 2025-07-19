@@ -1,0 +1,1218 @@
+{% extends "base.html" %}
+
+{% block title %}Финансы - Админ-панель{% endblock %}
+
+{% block page_title %}💰 Управление финансами{% endblock %}
+
+{% block extra_css %}
+<style>
+.finance-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.finance-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.finance-card-income {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.finance-card-expense {
+    background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+    color: white;
+}
+
+.finance-card-profit {
+    background: linear-gradient(135deg, #007bff 0%, #6610f2 100%);
+    color: white;
+}
+
+.finance-card-budget {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+    color: white;
+}
+
+.transaction-item {
+    border-left: 4px solid #dee2e6;
+    transition: all 0.2s;
+}
+
+.transaction-item:hover {
+    background-color: #f8f9fa;
+    border-left-color: #007bff;
+}
+
+.transaction-income {
+    border-left-color: #28a745;
+}
+
+.transaction-expense {
+    border-left-color: #dc3545;
+}
+
+.amount-income {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.amount-expense {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin: 20px 0;
+}
+
+.filter-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.category-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.375rem;
+    margin-right: 0.5rem;
+}
+
+.btn-finance {
+    border-radius: 25px;
+    padding: 8px 20px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-finance:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.transaction-actions {
+    min-width: 80px;
+}
+
+.transaction-actions .btn {
+    margin-bottom: 2px;
+}
+</style>
+{% endblock %}
+
+{% block header_actions %}
+<div class="btn-group">
+    <button class="btn btn-primary btn-finance" onclick="showAddTransactionModal()">
+        <i class="fas fa-plus me-1"></i> Добавить транзакцию
+    </button>
+    <button class="btn btn-success btn-finance" onclick="showAddCategoryModal()">
+        <i class="fas fa-tags me-1"></i> Категория
+    </button>
+    <button class="btn btn-info btn-finance" onclick="exportFinanceData()">
+        <i class="fas fa-download me-1"></i> Экспорт
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Сводка -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card finance-card finance-card-income">
+            <div class="card-body text-center">
+                <i class="fas fa-arrow-up fa-2x mb-2"></i>
+                <h3 class="mb-0" id="totalIncome">0 ₽</h3>
+                <p class="mb-0">Доходы</p>
+                <small id="incomeCount">0 операций</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card finance-card finance-card-expense">
+            <div class="card-body text-center">
+                <i class="fas fa-arrow-down fa-2x mb-2"></i>
+                <h3 class="mb-0" id="totalExpenses">0 ₽</h3>
+                <p class="mb-0">Расходы</p>
+                <small id="expenseCount">0 операций</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card finance-card finance-card-profit">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-2x mb-2"></i>
+                <h3 class="mb-0" id="totalProfit">0 ₽</h3>
+                <p class="mb-0">Прибыль</p>
+                <small id="profitPercent">0%</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card finance-card finance-card-budget">
+            <div class="card-body text-center">
+                <i class="fas fa-wallet fa-2x mb-2"></i>
+                <h3 class="mb-0" id="budgetUsage">0%</h3>
+                <p class="mb-0">Бюджет</p>
+                <small id="budgetStatus">в пределах нормы</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="filter-section">
+    <div class="row">
+        <div class="col-md-2">
+            <label class="form-label">Период</label>
+            <select class="form-select" id="periodFilter" onchange="loadFinanceData()">
+                <option value="current_month">Текущий месяц</option>
+                <option value="last_month">Прошлый месяц</option>
+                <option value="current_year">Текущий год</option>
+                <option value="custom">Выбрать период</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Дата от</label>
+            <input type="date" class="form-control" id="dateFrom" onchange="loadFinanceData()">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Дата до</label>
+            <input type="date" class="form-control" id="dateTo" onchange="loadFinanceData()">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Тип</label>
+            <select class="form-select" id="typeFilter" onchange="loadFinanceData()">
+                <option value="">Все</option>
+                <option value="income">Доходы</option>
+                <option value="expense">Расходы</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Категория</label>
+            <select class="form-select" id="categoryFilter" onchange="loadFinanceData()">
+                <option value="">Все категории</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <button class="btn btn-outline-danger w-100" onclick="clearFilters()">
+                <i class="fas fa-times"></i> Очистить
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Табы -->
+<ul class="nav nav-tabs mb-4" id="financeTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="transactions-tab" data-bs-toggle="tab" data-bs-target="#transactions" type="button" role="tab">
+            <i class="fas fa-list me-1"></i> Транзакции
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics" type="button" role="tab">
+            <i class="fas fa-chart-bar me-1"></i> Аналитика
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories" type="button" role="tab">
+            <i class="fas fa-tags me-1"></i> Категории
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="financeTabContent">
+    <!-- Транзакции -->
+    <div class="tab-pane fade show active" id="transactions" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Последние транзакции</h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="transactionsList" class="list-group list-group-flush">
+                    <!-- Транзакции будут загружены здесь -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Аналитика -->
+    <div class="tab-pane fade" id="analytics" role="tabpanel">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Динамика доходов и расходов</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="monthlyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Структура расходов</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="expenseChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Категории -->
+    <div class="tab-pane fade" id="categories" role="tabpanel">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Категории доходов</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="incomeCategoriesList">
+                            <!-- Категории доходов будут загружены здесь -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Категории расходов</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="expenseCategoriesList">
+                            <!-- Категории расходов будут загружены здесь -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления транзакции -->
+<div class="modal fade" id="addTransactionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить транзакцию</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addTransactionForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Тип транзакции</label>
+                                <select class="form-select" id="transactionType" required onchange="updateCategoryOptions()">
+                                    <option value="">Выберите тип</option>
+                                    <option value="income">Доход</option>
+                                    <option value="expense">Расход</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Сумма (₽)</label>
+                                <input type="number" class="form-control" id="transactionAmount" required step="0.01" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Категория</label>
+                                <select class="form-select" id="transactionCategory" required>
+                                    <option value="">Выберите категорию</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Дата</label>
+                                <input type="datetime-local" class="form-control" id="transactionDate" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea class="form-control" id="transactionDescription" rows="3" required></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Проект (опционально)</label>
+                                <select class="form-select" id="transactionProject">
+                                    <option value="">Не связано с проектом</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Исполнитель/Поставщик</label>
+                                <input type="text" class="form-control" id="transactionContractor" placeholder="Имя исполнителя">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Заметки</label>
+                        <textarea class="form-control" id="transactionNotes" rows="2"></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="transactionRecurring">
+                        <label class="form-check-label" for="transactionRecurring">
+                            Повторяющаяся транзакция
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveTransaction()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления категории -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить категорию</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCategoryForm">
+                    <div class="mb-3">
+                        <label class="form-label">Название</label>
+                        <input type="text" class="form-control" id="categoryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Тип</label>
+                        <select class="form-select" id="categoryType" required>
+                            <option value="">Выберите тип</option>
+                            <option value="income">Доход</option>
+                            <option value="expense">Расход</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea class="form-control" id="categoryDescription" rows="3"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Цвет</label>
+                                <input type="color" class="form-control form-control-color" id="categoryColor" value="#6c757d">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Иконка</label>
+                                <input type="text" class="form-control" id="categoryIcon" value="fas fa-circle" placeholder="fas fa-circle">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveCategory()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Конфигурация аутентификации
+    const username = 'admin';
+    const password = 'qwerty123';
+    
+    // Глобальные переменные
+    let financeCategories = [];
+    let projects = [];
+    let monthlyChart = null;
+    let expenseChart = null;
+    
+    // Загрузка данных при инициализации
+    document.addEventListener('DOMContentLoaded', function() {
+        loadFinanceCategories();
+        loadProjects();
+        loadFinanceData();
+        setDefaultDates();
+    });
+    
+    // Установка дат по умолчанию
+    function setDefaultDates() {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        document.getElementById('dateFrom').value = firstDay.toISOString().split('T')[0];
+        document.getElementById('dateTo').value = now.toISOString().split('T')[0];
+        document.getElementById('transactionDate').value = now.toISOString().slice(0, 16);
+    }
+    
+    // Загрузка категорий
+    async function loadFinanceCategories() {
+        try {
+            const response = await fetch('/admin/api/finance/categories', {
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Загруженные категории:', data);
+                
+                if (data.success && data.data) {
+                    financeCategories = Array.isArray(data.data) ? data.data : [];
+                } else if (Array.isArray(data)) {
+                    financeCategories = data;
+                } else {
+                    financeCategories = [];
+                }
+                
+                updateCategoryFilter();
+                updateCategoryOptions();
+                renderCategories();
+            } else {
+                console.error('Ошибка загрузки категорий: HTTP', response.status);
+                financeCategories = [];
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки категорий:', error);
+            financeCategories = [];
+        }
+    }
+    
+    // Загрузка проектов
+    async function loadProjects() {
+        try {
+            const response = await fetch('/admin/api/projects', {
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Загруженные проекты:', data);
+                
+                // Проверяем разные возможные форматы ответа
+                if (data.success && data.data) {
+                    projects = Array.isArray(data.data) ? data.data : [];
+                } else if (Array.isArray(data)) {
+                    projects = data;
+                } else {
+                    projects = [];
+                }
+                
+                updateProjectOptions();
+            } else {
+                console.error('Ошибка загрузки проектов: HTTP', response.status);
+                projects = [];
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки проектов:', error);
+            projects = [];
+        }
+    }
+    
+    // Обновление списка транзакций
+    function updateTransactionsList(transactions) {
+        console.log('Обновление списка транзакций, получено:', transactions);
+        const container = document.getElementById('transactionsList');
+        if (!container) {
+            console.error('Контейнер transactionsList не найден');
+            return;
+        }
+        
+        if (!transactions || transactions.length === 0) {
+            console.log('Нет транзакций для отображения');
+            container.innerHTML = `
+                <div class="list-group-item text-center py-4">
+                    <div class="text-muted">
+                        <i class="fas fa-receipt fa-2x mb-2"></i>
+                        <p class="mb-0">Нет транзакций</p>
+                        <small>Создайте первую транзакцию, чтобы начать учет</small>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        // Сортируем транзакции по дате (новые первыми)
+        transactions.sort((a, b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at));
+        
+        // Берем только последние 10 транзакций
+        const recentTransactions = transactions.slice(0, 10);
+        
+        const transactionsHtml = recentTransactions.map(transaction => {
+            const date = new Date(transaction.date || transaction.created_at);
+            const formattedDate = date.toLocaleDateString('ru-RU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+            const formattedTime = date.toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            const category = financeCategories.find(cat => cat.id === transaction.category_id);
+            const categoryName = category ? category.name : 'Неизвестная категория';
+            
+            const amount = Math.abs(transaction.amount);
+            const isIncome = transaction.type === 'income';
+            
+            return `
+                <div class="list-group-item transaction-item ${isIncome ? 'transaction-income' : 'transaction-expense'}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <h6 class="mb-0">${transaction.description}</h6>
+                                <span class="badge badge-${isIncome ? 'success' : 'danger'}">${categoryName}</span>
+                            </div>
+                            <p class="text-muted mb-1 small">${transaction.notes || ''}</p>
+                            <small class="text-muted">
+                                <i class="fas fa-calendar-alt"></i> ${formattedDate} в ${formattedTime}
+                                ${transaction.project_id ? `| <i class="fas fa-project-diagram"></i> Проект #${transaction.project_id}` : ''}
+                            </small>
+                        </div>
+                        <div class="text-right ml-3 d-flex align-items-center">
+                            <div class="amount-${isIncome ? 'income' : 'expense'} h5 mb-0 me-3">
+                                ${isIncome ? '+' : '-'}${amount.toLocaleString('ru-RU')} ₽
+                            </div>
+                            <div class="btn-group-vertical transaction-actions">
+                                <button class="btn btn-sm btn-outline-primary" onclick="editTransaction(${transaction.id})" title="Редактировать">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteTransaction(${transaction.id}, '${transaction.description}')" title="Удалить">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = transactionsHtml;
+    }
+    
+    // Обновление статистики
+    function updateFinanceStats(transactions) {
+        console.log('Обновление статистики для транзакций:', transactions);
+        
+        if (!transactions || transactions.length === 0) {
+            // Обнуляем статистику
+            const totalIncomeEl = document.getElementById('totalIncome');
+            const totalExpensesEl = document.getElementById('totalExpenses');
+            const totalProfitEl = document.getElementById('totalProfit');
+            const incomeCountEl = document.getElementById('incomeCount');
+            const expenseCountEl = document.getElementById('expenseCount');
+            
+            if (totalIncomeEl) totalIncomeEl.textContent = '0 ₽';
+            if (totalExpensesEl) totalExpensesEl.textContent = '0 ₽';
+            if (totalProfitEl) totalProfitEl.textContent = '0 ₽';
+            if (incomeCountEl) incomeCountEl.textContent = '0 операций';
+            if (expenseCountEl) expenseCountEl.textContent = '0 операций';
+            return;
+        }
+        
+        const incomeTransactions = transactions.filter(t => t.type === 'income');
+        const expenseTransactions = transactions.filter(t => t.type === 'expense');
+        
+        const totalIncome = incomeTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const totalExpense = expenseTransactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+        const profit = totalIncome - totalExpense;
+        
+        console.log('Статистика:', {
+            totalIncome,
+            totalExpense,
+            profit,
+            incomeCount: incomeTransactions.length,
+            expenseCount: expenseTransactions.length
+        });
+        
+        // Обновляем значения в карточках
+        const totalIncomeEl = document.getElementById('totalIncome');
+        const totalExpensesEl = document.getElementById('totalExpenses');
+        const totalProfitEl = document.getElementById('totalProfit');
+        const incomeCountEl = document.getElementById('incomeCount');
+        const expenseCountEl = document.getElementById('expenseCount');
+        
+        if (totalIncomeEl) {
+            totalIncomeEl.textContent = totalIncome.toLocaleString('ru-RU') + ' ₽';
+            console.log('Обновлен доход:', totalIncomeEl.textContent);
+        }
+        if (totalExpensesEl) {
+            totalExpensesEl.textContent = totalExpense.toLocaleString('ru-RU') + ' ₽';
+            console.log('Обновлены расходы:', totalExpensesEl.textContent);
+        }
+        if (totalProfitEl) {
+            totalProfitEl.textContent = profit.toLocaleString('ru-RU') + ' ₽';
+            console.log('Обновлена прибыль:', totalProfitEl.textContent);
+        }
+        
+        // Обновляем количество операций
+        if (incomeCountEl) {
+            incomeCountEl.textContent = `${incomeTransactions.length} операций`;
+        }
+        if (expenseCountEl) {
+            expenseCountEl.textContent = `${expenseTransactions.length} операций`;
+        }
+    }
+
+    // ...existing code...
+    
+    function showNotification(message, type = 'info') {
+        alert(message);
+    }
+    
+    function showAddTransactionModal() {
+        // Очищаем форму
+        document.getElementById('addTransactionForm').reset();
+        
+        // Устанавливаем текущую дату и время
+        const now = new Date();
+        const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        document.getElementById('transactionDate').value = localDateTime;
+        
+        // Обновляем список проектов
+        updateProjectOptions();
+        
+        const modal = new bootstrap.Modal(document.getElementById('addTransactionModal'));
+        modal.show();
+    }
+    
+    function showAddCategoryModal() {
+        // Очищаем форму
+        document.getElementById('addCategoryForm').reset();
+        
+        // Устанавливаем значения по умолчанию
+        document.getElementById('categoryColor').value = '#6c757d';
+        document.getElementById('categoryIcon').value = 'fas fa-circle';
+        
+        // Сбрасываем заголовок и кнопку на случай, если было редактирование
+        document.querySelector('#addCategoryModal .modal-title').textContent = 'Добавить категорию';
+        const saveBtn = document.querySelector('#addCategoryModal .btn-primary');
+        saveBtn.textContent = 'Сохранить';
+        saveBtn.onclick = saveCategory;
+        
+        const modal = new bootstrap.Modal(document.getElementById('addCategoryModal'));
+        modal.show();
+    }
+    
+    async function loadFinanceData() {
+        console.log('Загрузка финансовых данных...');
+        
+        try {
+            // Получаем параметры фильтрации
+            const params = new URLSearchParams();
+            
+            const dateFrom = document.getElementById('dateFrom').value;
+            const dateTo = document.getElementById('dateTo').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            
+            if (dateFrom) params.append('date_from', dateFrom);
+            if (dateTo) params.append('date_to', dateTo);
+            if (typeFilter) params.append('type', typeFilter);
+            if (categoryFilter) params.append('category_id', categoryFilter);
+            
+            // Загружаем транзакции
+            const response = await fetch(`/admin/api/finance/transactions?${params}`, {
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Загруженные транзакции:', data);
+                
+                let transactions = [];
+                if (data.success && data.data) {
+                    transactions = Array.isArray(data.data) ? data.data : [];
+                } else if (Array.isArray(data)) {
+                    transactions = data;
+                }
+                
+                console.log('Обработанные транзакции:', transactions);
+                
+                // Обновляем список транзакций
+                updateTransactionsList(transactions);
+                
+                // Обновляем статистику
+                updateFinanceStats(transactions);
+                
+            } else {
+                console.error('Ошибка загрузки транзакций: HTTP', response.status);
+                updateTransactionsList([]);
+            }
+            
+        } catch (error) {
+            console.error('Ошибка загрузки финансовых данных:', error);
+            updateTransactionsList([]);
+        }
+    }
+    
+    function clearFilters() {
+        document.getElementById('periodFilter').value = 'current_month';
+        document.getElementById('typeFilter').value = '';
+        document.getElementById('categoryFilter').value = '';
+        setDefaultDates();
+        loadFinanceData();
+    }
+    
+    function updateCategoryFilter() {
+        const filter = document.getElementById('categoryFilter');
+        if (!filter) return;
+        
+        filter.innerHTML = '<option value="">Все категории</option>';
+        
+        if (financeCategories && Array.isArray(financeCategories)) {
+            financeCategories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                filter.appendChild(option);
+            });
+        }
+    }
+    
+    function updateCategoryOptions() {
+        const typeSelect = document.getElementById('transactionType');
+        const categorySelect = document.getElementById('transactionCategory');
+        
+        if (!typeSelect || !categorySelect) return;
+        
+        const type = typeSelect.value;
+        categorySelect.innerHTML = '<option value="">Выберите категорию</option>';
+        
+        if (type && financeCategories && Array.isArray(financeCategories)) {
+            financeCategories.filter(cat => cat.type === type).forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.id;
+                option.textContent = category.name;
+                categorySelect.appendChild(option);
+            });
+        }
+    }
+    
+    function updateProjectOptions() {
+        const select = document.getElementById('transactionProject');
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">Не связано с проектом</option>';
+        
+        if (projects && Array.isArray(projects)) {
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = `#${project.id} - ${project.title}`;
+                select.appendChild(option);
+            });
+        }
+    }
+    
+    function renderCategories() {
+        const incomeContainer = document.getElementById('incomeCategoriesList');
+        const expenseContainer = document.getElementById('expenseCategoriesList');
+        
+        if (!incomeContainer || !expenseContainer) {
+            console.warn('Контейнеры для категорий не найдены');
+            return;
+        }
+        
+        incomeContainer.innerHTML = '';
+        expenseContainer.innerHTML = '';
+        
+        if (financeCategories && Array.isArray(financeCategories)) {
+            financeCategories.forEach(category => {
+                const categoryElement = document.createElement('div');
+                categoryElement.className = 'category-item p-3 border rounded mb-2';
+                categoryElement.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="${category.icon || 'fas fa-circle'}" style="color: ${category.color || '#6c757d'}"></i>
+                            <strong class="ms-2">${category.name || 'Без названия'}</strong>
+                            <br>
+                            <small class="text-muted">${category.description || 'Без описания'}</small>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="editCategory(${category.id})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                if (category.type === 'income') {
+                    incomeContainer.appendChild(categoryElement);
+                } else {
+                    expenseContainer.appendChild(categoryElement);
+                }
+            });
+        }
+    }
+    
+    async function saveTransaction() {
+        console.log('Сохранение транзакции...');
+        
+        // Получаем данные из формы
+        const form = document.getElementById('addTransactionForm');
+        const formData = {
+            type: document.getElementById('transactionType').value,
+            amount: parseFloat(document.getElementById('transactionAmount').value),
+            category_id: parseInt(document.getElementById('transactionCategory').value),
+            date: document.getElementById('transactionDate').value,
+            description: document.getElementById('transactionDescription').value,
+            project_id: document.getElementById('transactionProject').value || null,
+            contractor_name: document.getElementById('transactionContractor').value || null,
+            notes: document.getElementById('transactionNotes').value || null,
+            is_recurring: document.getElementById('transactionRecurring').checked
+        };
+        
+        // Валидация
+        if (!formData.type) {
+            alert('Выберите тип транзакции');
+            return;
+        }
+        if (!formData.amount || formData.amount <= 0) {
+            alert('Введите корректную сумму');
+            return;
+        }
+        if (!formData.category_id) {
+            alert('Выберите категорию');
+            return;
+        }
+        if (!formData.date) {
+            alert('Выберите дату');
+            return;
+        }
+        if (!formData.description) {
+            alert('Введите описание транзакции');
+            return;
+        }
+        
+        // Преобразуем дату в ISO формат
+        if (formData.date) {
+            formData.date = new Date(formData.date).toISOString();
+        }
+        
+        // Преобразуем project_id если указан
+        if (formData.project_id) {
+            formData.project_id = parseInt(formData.project_id);
+        }
+        
+        try {
+            console.log('Отправка данных:', formData);
+            
+            const response = await fetch('/admin/api/finance/transactions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa('admin:qwerty123')
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            console.log('Ответ сервера:', result);
+            
+            if (result.success) {
+                console.log('Транзакция успешно создана, обновляем данные...');
+                alert('Транзакция успешно создана!');
+                
+                // Закрываем модальное окно
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addTransactionModal'));
+                modal.hide();
+                
+                // Очищаем форму
+                form.reset();
+                
+                // Обновляем данные без перезагрузки страницы
+                await loadFinanceData();
+                console.log('Данные обновлены после создания транзакции');
+                
+            } else {
+                console.error('Ошибка от сервера:', result);
+                alert('Ошибка создания транзакции: ' + (result.error || result.message || 'Неизвестная ошибка'));
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Ошибка при создании транзакции: ' + error.message);
+        }
+    }
+    
+    async function saveCategory() {
+        console.log('Сохранение категории...');
+        
+        // Получаем данные из формы
+        const form = document.getElementById('addCategoryForm');
+        const formData = {
+            name: document.getElementById('categoryName').value.trim(),
+            type: document.getElementById('categoryType').value,
+            description: document.getElementById('categoryDescription').value.trim() || null,
+            color: document.getElementById('categoryColor').value,
+            icon: document.getElementById('categoryIcon').value.trim()
+        };
+        
+        // Валидация
+        if (!formData.name) {
+            alert('Введите название категории');
+            return;
+        }
+        if (!formData.type) {
+            alert('Выберите тип категории');
+            return;
+        }
+        if (!formData.icon) {
+            formData.icon = 'fas fa-circle';
+        }
+        
+        try {
+            console.log('Отправка данных категории:', formData);
+            
+            const response = await fetch('/admin/api/finance/categories', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa('admin:qwerty123')
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            console.log('Ответ сервера:', result);
+            
+            if (result.success) {
+                alert('Категория успешно создана!');
+                
+                // Закрываем модальное окно
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addCategoryModal'));
+                modal.hide();
+                
+                // Очищаем форму
+                form.reset();
+                document.getElementById('categoryColor').value = '#6c757d';
+                document.getElementById('categoryIcon').value = 'fas fa-circle';
+                
+                // Перезагружаем категории
+                await loadFinanceCategories();
+            } else {
+                alert('Ошибка создания категории: ' + (result.error || result.message || 'Неизвестная ошибка'));
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Ошибка при создании категории: ' + error.message);
+        }
+    }
+    
+    async function exportFinanceData() {
+        console.log('Экспорт данных...');
+        
+        try {
+            const response = await fetch('/admin/api/finance/export', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + btoa('admin:qwerty123')
+                }
+            });
+            
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `finance_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                alert('Данные успешно экспортированы!');
+            } else {
+                alert('Ошибка при экспорте данных');
+            }
+        } catch (error) {
+            console.error('Ошибка экспорта:', error);
+            alert('Ошибка при экспорте данных: ' + error.message);
+        }
+    }
+    
+    function editCategory(categoryId) {
+        console.log('Редактирование категории:', categoryId);
+        
+        // Найдем категорию в массиве
+        const category = financeCategories.find(cat => cat.id === categoryId);
+        if (!category) {
+            alert('Категория не найдена');
+            return;
+        }
+        
+        // Заполняем форму данными категории
+        document.getElementById('categoryName').value = category.name;
+        document.getElementById('categoryType').value = category.type;
+        document.getElementById('categoryDescription').value = category.description || '';
+        document.getElementById('categoryColor').value = category.color || '#6c757d';
+        document.getElementById('categoryIcon').value = category.icon || 'fas fa-circle';
+        
+        // Изменяем заголовок модального окна
+        document.querySelector('#addCategoryModal .modal-title').textContent = 'Редактировать категорию';
+        
+        // Изменяем кнопку сохранения
+        const saveBtn = document.querySelector('#addCategoryModal .btn-primary');
+        saveBtn.textContent = 'Сохранить изменения';
+        saveBtn.onclick = () => updateCategory(categoryId);
+        
+        // Показываем модальное окно
+        const modal = new bootstrap.Modal(document.getElementById('addCategoryModal'));
+        modal.show();
+    }
+    
+    async function updateCategory(categoryId) {
+        console.log('Обновление категории:', categoryId);
+        
+        // Получаем данные из формы
+        const form = document.getElementById('addCategoryForm');
+        const formData = {
+            name: document.getElementById('categoryName').value.trim(),
+            type: document.getElementById('categoryType').value,
+            description: document.getElementById('categoryDescription').value.trim() || null,
+            color: document.getElementById('categoryColor').value,
+            icon: document.getElementById('categoryIcon').value.trim()
+        };
+        
+        // Валидация
+        if (!formData.name) {
+            alert('Введите название категории');
+            return;
+        }
+        if (!formData.type) {
+            alert('Выберите тип категории');
+            return;
+        }
+        if (!formData.icon) {
+            formData.icon = 'fas fa-circle';
+        }
+        
+        try {
+            console.log('Отправка данных обновления категории:', formData);
+            
+            const response = await fetch(`/admin/api/finance/categories/${categoryId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa('admin:qwerty123')
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            const result = await response.json();
+            console.log('Ответ сервера:', result);
+            
+            if (result.success) {
+                alert('Категория успешно обновлена!');
+                
+                // Закрываем модальное окно
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addCategoryModal'));
+                modal.hide();
+                
+                // Возвращаем кнопку к исходному состоянию
+                const saveBtn = document.querySelector('#addCategoryModal .btn-primary');
+                saveBtn.textContent = 'Сохранить';
+                saveBtn.onclick = saveCategory;
+                document.querySelector('#addCategoryModal .modal-title').textContent = 'Добавить категорию';
+                
+                // Очищаем форму
+                form.reset();
+                document.getElementById('categoryColor').value = '#6c757d';
+                document.getElementById('categoryIcon').value = 'fas fa-circle';
+                
+                // Перезагружаем категории
+                await loadFinanceCategories();
+            } else {
+                alert('Ошибка обновления категории: ' + (result.error || result.message || 'Неизвестная ошибка'));
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Ошибка при обновлении категории: ' + error.message);
+        }
+    }
+    
+    // Удаление транзакции
+    async function deleteTransaction(transactionId, description) {
+        console.log('Удаление транзакции:', transactionId, description);
+        
+        // Подтверждение удаления
+        if (!confirm(`Вы уверены, что хотите удалить транзакцию "${description}"?\n\nЭто действие нельзя отменить.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/admin/api/finance/transactions/${transactionId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Basic ' + btoa('admin:qwerty123')
+                }
+            });
+            
+            const result = await response.json();
+            console.log('Ответ сервера:', result);
+            
+            if (result.success) {
+                alert('Транзакция успешно удалена!');
+                
+                // Обновляем данные без перезагрузки страницы
+                await loadFinanceData();
+                console.log('Данные обновлены после удаления транзакции');
+                
+            } else {
+                alert('Ошибка удаления транзакции: ' + (result.error || result.message || 'Неизвестная ошибка'));
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Ошибка при удалении транзакции: ' + error.message);
+        }
+    }
+    
+    // Редактирование транзакции
+    function editTransaction(transactionId) {
+        console.log('Редактирование транзакции:', transactionId);
+        
+        // Найдем транзакцию в списке
+        // Для простоты пока просто показываем alert
+        alert('Функция редактирования транзакций будет добавлена в следующей версии.\n\nПока что вы можете создать новую транзакцию и удалить старую.');
+    }
+</script>
+{% endblock %}

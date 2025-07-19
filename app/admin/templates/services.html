@@ -1,0 +1,849 @@
+{% extends "base.html" %}
+
+{% block title %}Управление сервисами - Админ-панель{% endblock %}
+
+{% block page_title %}🖥️ Управление сервисами{% endblock %}
+
+{% block header_actions %}
+<div class="btn-group">
+    <button class="btn btn-primary btn-custom" onclick="showAddServiceModal()">
+        <i class="fas fa-plus me-1"></i> Добавить сервис
+    </button>
+    <button class="btn btn-success btn-custom" onclick="refreshServices()">
+        <i class="fas fa-sync-alt me-1"></i> Обновить
+    </button>
+    <button class="btn btn-info btn-custom" onclick="exportServices()">
+        <i class="fas fa-download me-1"></i> Экспорт
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Фильтры -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="searchInput" placeholder="Поиск сервисов...">
+                    <button class="btn btn-outline-secondary" onclick="filterServices()">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="typeFilter" onchange="filterServices()">
+                    <option value="">Все типы</option>
+                    <option value="ai">ИИ-сервисы</option>
+                    <option value="hosting">Хостинг</option>
+                    <option value="payment">Платежи</option>
+                    <option value="analytics">Аналитика</option>
+                    <option value="storage">Хранилище</option>
+                    <option value="other">Другое</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="statusFilter" onchange="filterServices()">
+                    <option value="">Все статусы</option>
+                    <option value="active">Активные</option>
+                    <option value="inactive">Неактивные</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="sortBy" onchange="sortServices()">
+                    <option value="name">По названию</option>
+                    <option value="cost">По стоимости</option>
+                    <option value="created_at">По дате</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-outline-danger w-100" onclick="clearFilters()">
+                    <i class="fas fa-times me-1"></i> Очистить фильтры
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card primary">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-server fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="totalServices">0</div>
+                    <small>Всего сервисов</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card success">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-check-circle fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="activeServices">0</div>
+                    <small>Активные</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card warning">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-ruble-sign fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="monthlyExpenses">0₽</div>
+                    <small>Расходы за месяц</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card info">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-chart-line fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="yearlyExpenses">0₽</div>
+                    <small>Расходы за год</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Список сервисов -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Список сервисов</h5>
+        <span class="text-muted" id="servicesCount">Показано: 0</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="servicesTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Название</th>
+                        <th>Тип</th>
+                        <th>Модель ценообразования</th>
+                        <th>Месячный расход</th>
+                        <th>Статус</th>
+                        <th>Последний платеж</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="servicesTableBody">
+                    <!-- Данные загружаются через JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления сервиса -->
+<div class="modal fade" id="addServiceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить новый сервис</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addServiceForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="serviceName" class="form-label">Название сервиса</label>
+                                <input type="text" class="form-control" id="serviceName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="serviceType" class="form-label">Тип сервиса</label>
+                                <select class="form-select" id="serviceType" required>
+                                    <option value="">Выберите тип</option>
+                                    <option value="ai">ИИ-сервисы</option>
+                                    <option value="hosting">Хостинг</option>
+                                    <option value="payment">Платежные системы</option>
+                                    <option value="analytics">Аналитика</option>
+                                    <option value="storage">Хранилище данных</option>
+                                    <option value="email">Email-сервисы</option>
+                                    <option value="sms">SMS-сервисы</option>
+                                    <option value="cdn">CDN</option>
+                                    <option value="monitoring">Мониторинг</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="serviceDescription" class="form-label">Описание</label>
+                        <textarea class="form-control" id="serviceDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="serviceWebsite" class="form-label">Веб-сайт</label>
+                                <input type="url" class="form-control" id="serviceWebsite">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="pricingModel" class="form-label">Модель ценообразования</label>
+                                <select class="form-select" id="pricingModel">
+                                    <option value="monthly">Ежемесячная подписка</option>
+                                    <option value="yearly">Годовая подписка</option>
+                                    <option value="usage">По использованию</option>
+                                    <option value="per_request">За запрос</option>
+                                    <option value="one_time">Разовый платеж</option>
+                                    <option value="custom">Индивидуальная</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="contactInfo" class="form-label">Контактная информация (JSON)</label>
+                        <textarea class="form-control" id="contactInfo" rows="3" placeholder='{"email": "support@service.com", "phone": "+1234567890"}'></textarea>
+                        <div class="form-text">Введите контактную информацию в формате JSON</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddService()">Добавить сервис</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования сервиса -->
+<div class="modal fade" id="editServiceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать сервис</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editServiceForm">
+                    <input type="hidden" id="editServiceId">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editServiceName" class="form-label">Название сервиса</label>
+                                <input type="text" class="form-control" id="editServiceName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editServiceType" class="form-label">Тип сервиса</label>
+                                <select class="form-select" id="editServiceType" required>
+                                    <option value="ai">ИИ-сервисы</option>
+                                    <option value="hosting">Хостинг</option>
+                                    <option value="payment">Платежные системы</option>
+                                    <option value="analytics">Аналитика</option>
+                                    <option value="storage">Хранилище данных</option>
+                                    <option value="email">Email-сервисы</option>
+                                    <option value="sms">SMS-сервисы</option>
+                                    <option value="cdn">CDN</option>
+                                    <option value="monitoring">Мониторинг</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editServiceDescription" class="form-label">Описание</label>
+                        <textarea class="form-control" id="editServiceDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editServiceWebsite" class="form-label">Веб-сайт</label>
+                                <input type="url" class="form-control" id="editServiceWebsite">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editPricingModel" class="form-label">Модель ценообразования</label>
+                                <select class="form-select" id="editPricingModel">
+                                    <option value="monthly">Ежемесячная подписка</option>
+                                    <option value="yearly">Годовая подписка</option>
+                                    <option value="usage">По использованию</option>
+                                    <option value="per_request">За запрос</option>
+                                    <option value="one_time">Разовый платеж</option>
+                                    <option value="custom">Индивидуальная</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editContactInfo" class="form-label">Контактная информация (JSON)</label>
+                                <textarea class="form-control" id="editContactInfo" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="editServiceStatus" class="form-label">Статус</label>
+                                <select class="form-select" id="editServiceStatus">
+                                    <option value="active">Активный</option>
+                                    <option value="inactive">Неактивный</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditService()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления расхода -->
+<div class="modal fade" id="addExpenseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить расход</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addExpenseForm">
+                    <input type="hidden" id="expenseServiceId">
+                    
+                    <div class="mb-3">
+                        <label for="expenseAmount" class="form-label">Сумма</label>
+                        <input type="number" class="form-control" id="expenseAmount" step="0.01" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="expenseType" class="form-label">Тип расхода</label>
+                        <select class="form-select" id="expenseType" required>
+                            <option value="subscription">Подписка</option>
+                            <option value="usage">Использование</option>
+                            <option value="one_time">Разовый платеж</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="expenseDescription" class="form-label">Описание</label>
+                        <textarea class="form-control" id="expenseDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="expenseDate" class="form-label">Дата расхода</label>
+                                <input type="date" class="form-control" id="expenseDate" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="expenseProject" class="form-label">Проект (опционально)</label>
+                                <select class="form-select" id="expenseProject">
+                                    <option value="">Общий расход</option>
+                                    <!-- Загружаются через JavaScript -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="invoiceUrl" class="form-label">Ссылка на счёт</label>
+                        <input type="url" class="form-control" id="invoiceUrl">
+                    </div>
+                    
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="isRecurring">
+                        <label class="form-check-label" for="isRecurring">
+                            Повторяющийся расход
+                        </label>
+                    </div>
+                    
+                    <div class="mb-3 d-none" id="recurringPeriodGroup">
+                        <label for="recurringPeriod" class="form-label">Период повторения</label>
+                        <select class="form-select" id="recurringPeriod">
+                            <option value="monthly">Ежемесячно</option>
+                            <option value="yearly">Ежегодно</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="submitAddExpense()">Добавить расход</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Конфигурация
+const username = 'admin';
+const password = 'qwerty123';
+
+let allServices = [];
+let filteredServices = [];
+
+// Инициализация
+document.addEventListener('DOMContentLoaded', function() {
+    loadServices();
+    loadProjects(); // Для выпадающего списка в расходах
+});
+
+// Загрузка сервисов
+async function loadServices() {
+    try {
+        const response = await fetch('/admin/api/services', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            allServices = data.data;
+            filteredServices = [...allServices];
+            updateServicesDisplay();
+            updateStatistics();
+        } else {
+            showNotification('Ошибка загрузки сервисов: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error loading services:', error);
+        showNotification('Ошибка загрузки сервисов', 'error');
+    }
+}
+
+// Загрузка проектов для выпадающего списка
+async function loadProjects() {
+    try {
+        const response = await fetch('/admin/api/projects', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const projectSelect = document.getElementById('expenseProject');
+            projectSelect.innerHTML = '<option value="">Общий расход</option>';
+            
+            data.projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = `#${project.id} - ${project.title}`;
+                projectSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+}
+
+// Обновление отображения сервисов
+function updateServicesDisplay() {
+    const tbody = document.getElementById('servicesTableBody');
+    tbody.innerHTML = '';
+    
+    if (filteredServices.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">Сервисы не найдены</td></tr>';
+        return;
+    }
+    
+    filteredServices.forEach(service => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <div class="fw-bold">${service.name}</div>
+                <small class="text-muted">${service.description || 'Нет описания'}</small>
+            </td>
+            <td>
+                <span class="badge bg-primary">${getServiceTypeLabel(service.provider_type)}</span>
+            </td>
+            <td>${getPricingModelLabel(service.pricing_model)}</td>
+            <td>
+                <span class="fw-bold">${service.monthly_cost || 0}₽</span>
+            </td>
+            <td>
+                <span class="badge ${service.status === 'active' ? 'bg-success' : 'bg-secondary'}">
+                    ${service.status === 'active' ? 'Активный' : 'Неактивный'}
+                </span>
+            </td>
+            <td>
+                <small>${service.last_expense ? new Date(service.last_expense).toLocaleDateString('ru-RU') : 'Нет платежей'}</small>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary" onclick="viewService(${service.id})" title="Просмотр">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-info" onclick="editService(${service.id})" title="Редактировать">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-success" onclick="addExpense(${service.id})" title="Добавить расход">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" onclick="deleteService(${service.id})" title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    document.getElementById('servicesCount').textContent = `Показано: ${filteredServices.length}`;
+}
+
+// Получение меток типов сервисов
+function getServiceTypeLabel(type) {
+    const labels = {
+        'ai': 'ИИ-сервисы',
+        'hosting': 'Хостинг',
+        'payment': 'Платежи',
+        'analytics': 'Аналитика',
+        'storage': 'Хранилище',
+        'email': 'Email',
+        'sms': 'SMS',
+        'cdn': 'CDN',
+        'monitoring': 'Мониторинг',
+        'other': 'Другое'
+    };
+    return labels[type] || type;
+}
+
+// Получение меток моделей ценообразования
+function getPricingModelLabel(model) {
+    const labels = {
+        'monthly': 'Ежемесячно',
+        'yearly': 'Ежегодно',
+        'usage': 'По использованию',
+        'per_request': 'За запрос',
+        'one_time': 'Разовый',
+        'custom': 'Индивидуальная'
+    };
+    return labels[model] || model;
+}
+
+// Обновление статистики
+function updateStatistics() {
+    const total = allServices.length;
+    const active = allServices.filter(s => s.status === 'active').length;
+    const monthlyExpenses = allServices.reduce((sum, s) => sum + (s.monthly_cost || 0), 0);
+    const yearlyExpenses = allServices.reduce((sum, s) => sum + (s.yearly_cost || 0), 0);
+    
+    document.getElementById('totalServices').textContent = total;
+    document.getElementById('activeServices').textContent = active;
+    document.getElementById('monthlyExpenses').textContent = monthlyExpenses + '₽';
+    document.getElementById('yearlyExpenses').textContent = yearlyExpenses + '₽';
+}
+
+// Фильтрация сервисов
+function filterServices() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const type = document.getElementById('typeFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    
+    filteredServices = allServices.filter(service => {
+        const matchesSearch = !search || 
+            service.name.toLowerCase().includes(search) ||
+            (service.description && service.description.toLowerCase().includes(search));
+        
+        const matchesType = !type || service.provider_type === type;
+        const matchesStatus = !status || service.status === status;
+        
+        return matchesSearch && matchesType && matchesStatus;
+    });
+    
+    updateServicesDisplay();
+}
+
+// Сортировка сервисов
+function sortServices() {
+    const sortBy = document.getElementById('sortBy').value;
+    
+    filteredServices.sort((a, b) => {
+        if (sortBy === 'name') {
+            return a.name.localeCompare(b.name);
+        } else if (sortBy === 'cost') {
+            return (b.monthly_cost || 0) - (a.monthly_cost || 0);
+        } else if (sortBy === 'created_at') {
+            return new Date(b.created_at) - new Date(a.created_at);
+        }
+        return 0;
+    });
+    
+    updateServicesDisplay();
+}
+
+// Очистка фильтров
+function clearFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('typeFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    filteredServices = [...allServices];
+    updateServicesDisplay();
+}
+
+// Показать модальное окно добавления сервиса
+function showAddServiceModal() {
+    document.getElementById('addServiceForm').reset();
+    const modal = new bootstrap.Modal(document.getElementById('addServiceModal'));
+    modal.show();
+}
+
+// Добавить сервис
+async function submitAddService() {
+    const formData = {
+        name: document.getElementById('serviceName').value,
+        provider_type: document.getElementById('serviceType').value,
+        description: document.getElementById('serviceDescription').value,
+        website: document.getElementById('serviceWebsite').value,
+        pricing_model: document.getElementById('pricingModel').value,
+        contact_info: {}
+    };
+    
+    try {
+        const contactInfoText = document.getElementById('contactInfo').value;
+        if (contactInfoText.trim()) {
+            formData.contact_info = JSON.parse(contactInfoText);
+        }
+    } catch (error) {
+        showNotification('Ошибка в формате JSON контактной информации', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/admin/api/services', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Сервис успешно добавлен', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addServiceModal'));
+            modal.hide();
+            loadServices();
+        } else {
+            showNotification('Ошибка: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error adding service:', error);
+        showNotification('Ошибка при добавлении сервиса', 'error');
+    }
+}
+
+// Редактировать сервис
+function editService(serviceId) {
+    const service = allServices.find(s => s.id === serviceId);
+    if (!service) return;
+    
+    document.getElementById('editServiceId').value = service.id;
+    document.getElementById('editServiceName').value = service.name;
+    document.getElementById('editServiceType').value = service.provider_type;
+    document.getElementById('editServiceDescription').value = service.description || '';
+    document.getElementById('editServiceWebsite').value = service.website || '';
+    document.getElementById('editPricingModel').value = service.pricing_model || 'monthly';
+    document.getElementById('editContactInfo').value = JSON.stringify(service.contact_info || {}, null, 2);
+    document.getElementById('editServiceStatus').value = service.status;
+    
+    const modal = new bootstrap.Modal(document.getElementById('editServiceModal'));
+    modal.show();
+}
+
+// Сохранить изменения сервиса
+async function submitEditService() {
+    const serviceId = document.getElementById('editServiceId').value;
+    const formData = {
+        name: document.getElementById('editServiceName').value,
+        provider_type: document.getElementById('editServiceType').value,
+        description: document.getElementById('editServiceDescription').value,
+        website: document.getElementById('editServiceWebsite').value,
+        pricing_model: document.getElementById('editPricingModel').value,
+        status: document.getElementById('editServiceStatus').value,
+        contact_info: {}
+    };
+    
+    try {
+        const contactInfoText = document.getElementById('editContactInfo').value;
+        if (contactInfoText.trim()) {
+            formData.contact_info = JSON.parse(contactInfoText);
+        }
+    } catch (error) {
+        showNotification('Ошибка в формате JSON контактной информации', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/api/services/${serviceId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Сервис успешно обновлен', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editServiceModal'));
+            modal.hide();
+            loadServices();
+        } else {
+            showNotification('Ошибка: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error updating service:', error);
+        showNotification('Ошибка при обновлении сервиса', 'error');
+    }
+}
+
+// Добавить расход
+function addExpense(serviceId) {
+    document.getElementById('expenseServiceId').value = serviceId;
+    document.getElementById('addExpenseForm').reset();
+    document.getElementById('expenseDate').value = new Date().toISOString().split('T')[0];
+    
+    const modal = new bootstrap.Modal(document.getElementById('addExpenseModal'));
+    modal.show();
+}
+
+// Переключение отображения повторяющегося расхода
+document.getElementById('isRecurring').addEventListener('change', function() {
+    const recurringGroup = document.getElementById('recurringPeriodGroup');
+    if (this.checked) {
+        recurringGroup.classList.remove('d-none');
+    } else {
+        recurringGroup.classList.add('d-none');
+    }
+});
+
+// Сохранить расход
+async function submitAddExpense() {
+    const formData = {
+        service_provider_id: parseInt(document.getElementById('expenseServiceId').value),
+        amount: parseFloat(document.getElementById('expenseAmount').value),
+        expense_type: document.getElementById('expenseType').value,
+        description: document.getElementById('expenseDescription').value,
+        expense_date: document.getElementById('expenseDate').value,
+        project_id: document.getElementById('expenseProject').value || null,
+        invoice_url: document.getElementById('invoiceUrl').value || null,
+        is_recurring: document.getElementById('isRecurring').checked,
+        recurring_period: document.getElementById('isRecurring').checked ? 
+            document.getElementById('recurringPeriod').value : null
+    };
+    
+    try {
+        const response = await fetch('/admin/api/services/expenses', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Расход успешно добавлен', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addExpenseModal'));
+            modal.hide();
+            loadServices(); // Обновляем список для актуализации статистики
+        } else {
+            showNotification('Ошибка: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error adding expense:', error);
+        showNotification('Ошибка при добавлении расхода', 'error');
+    }
+}
+
+// Удалить сервис
+async function deleteService(serviceId) {
+    if (!confirm('Вы уверены, что хотите удалить этот сервис?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/api/services/${serviceId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Сервис удален', 'success');
+            loadServices();
+        } else {
+            showNotification('Ошибка: ' + data.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting service:', error);
+        showNotification('Ошибка при удалении сервиса', 'error');
+    }
+}
+
+// Просмотр сервиса
+function viewService(serviceId) {
+    const service = allServices.find(s => s.id === serviceId);
+    if (!service) return;
+    
+    alert(`Сервис: ${service.name}\nТип: ${getServiceTypeLabel(service.provider_type)}\nОписание: ${service.description || 'Нет описания'}\nСтатус: ${service.status}`);
+}
+
+// Обновить список
+function refreshServices() {
+    loadServices();
+}
+
+// Экспорт сервисов
+function exportServices() {
+    const dataStr = JSON.stringify(allServices, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `services_export_${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+    
+    showNotification('Экспорт выполнен', 'success');
+}
+
+// Уведомления
+function showNotification(message, type = 'info') {
+    // Можно реализовать красивые уведомления
+    console.log(`${type.toUpperCase()}: ${message}`);
+    alert(message);
+}
+</script>
+{% endblock %}

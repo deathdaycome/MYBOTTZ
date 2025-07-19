@@ -1,0 +1,781 @@
+{% extends "base.html" %}
+
+{% block title %}Правки проектов{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Правки проектов</h1>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRevisionModal">
+            <i class="fas fa-plus"></i> Создать правку
+        </button>
+    </div>
+
+    <!-- Статистика -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                Всего правок
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="totalRevisions">-</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-edit fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                В ожидании
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="pendingRevisions">-</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                Выполнено
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="completedRevisions">-</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                Мои правки
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800" id="myRevisions">-</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-user fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Фильтры -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Фильтры</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="projectFilter">Проект:</label>
+                    <select class="form-select" id="projectFilter">
+                        <option value="">Все проекты</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="statusFilter">Статус:</label>
+                    <select class="form-select" id="statusFilter">
+                        <option value="">Все статусы</option>
+                        <option value="pending">В ожидании</option>
+                        <option value="in_progress">В работе</option>
+                        <option value="completed">Выполнено</option>
+                        <option value="rejected">Отклонено</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label for="priorityFilter">Приоритет:</label>
+                    <select class="form-select" id="priorityFilter">
+                        <option value="">Все</option>
+                        <option value="low">Низкий</option>
+                        <option value="normal">Обычный</option>
+                        <option value="high">Высокий</option>
+                        <option value="urgent">Срочный</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>&nbsp;</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="myRevisionsFilter">
+                        <label class="form-check-label" for="myRevisionsFilter">
+                            Только мои правки
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn btn-secondary w-100" onclick="loadRevisions()">
+                        <i class="fas fa-search"></i> Поиск
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Таблица правок -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Список правок</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered" id="revisionsTable">
+                    <thead>
+                        <tr>
+                            <th>№</th>
+                            <th>Проект</th>
+                            <th>Заголовок</th>
+                            <th>Статус</th>
+                            <th>Приоритет</th>
+                            <th>Создал</th>
+                            <th>Исполнитель</th>
+                            <th>Дата создания</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="revisionsTableBody">
+                        <!-- Данные загружаются через JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно создания правки -->
+<div class="modal fade" id="createRevisionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создать правку</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createRevisionForm">
+                    <div class="mb-3">
+                        <label for="revisionProject" class="form-label">Проект *</label>
+                        <select class="form-select" id="revisionProject" required>
+                            <option value="">Выберите проект</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="revisionTitle" class="form-label">Заголовок *</label>
+                        <input type="text" class="form-control" id="revisionTitle" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="revisionDescription" class="form-label">Описание проблемы *</label>
+                        <textarea class="form-control" id="revisionDescription" rows="4" required></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="revisionPriority" class="form-label">Приоритет</label>
+                            <select class="form-select" id="revisionPriority">
+                                <option value="low">Низкий</option>
+                                <option value="normal" selected>Обычный</option>
+                                <option value="high">Высокий</option>
+                                <option value="urgent">Срочный</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="revisionEstimatedTime" class="form-label">Оценочное время (часы)</label>
+                            <input type="number" class="form-control" id="revisionEstimatedTime" min="1">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="createRevision()">Создать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно просмотра правки -->
+<div class="modal fade" id="viewRevisionModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewRevisionTitle">Правка #</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Информация о правке -->
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="m-0 font-weight-bold text-primary">Информация</h6>
+                            </div>
+                            <div class="card-body" id="revisionInfo">
+                                <!-- Загружается через JavaScript -->
+                            </div>
+                        </div>
+                        
+                        <!-- Файлы правки -->
+                        <div class="card mt-3">
+                            <div class="card-header">
+                                <h6 class="m-0 font-weight-bold text-primary">Файлы</h6>
+                            </div>
+                            <div class="card-body" id="revisionFiles">
+                                <!-- Загружается через JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Сообщения -->
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="m-0 font-weight-bold text-primary">Сообщения</h6>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="showAddMessageForm()">
+                                    <i class="fas fa-plus"></i> Добавить
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="revisionMessages" style="height: 400px; overflow-y: auto;">
+                                    <!-- Загружается через JavaScript -->
+                                </div>
+                                
+                                <!-- Форма добавления сообщения -->
+                                <div id="addMessageForm" style="display: none;" class="mt-3 border-top pt-3">
+                                    <form id="messageForm">
+                                        <div class="mb-3">
+                                            <textarea class="form-control" id="messageText" rows="3" placeholder="Введите сообщение..."></textarea>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="messageFiles" class="form-label">Прикрепить файлы:</label>
+                                            <input type="file" class="form-control" id="messageFiles" multiple>
+                                        </div>
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="messageInternal">
+                                                <label class="form-check-label" for="messageInternal">
+                                                    Внутреннее сообщение (только для команды)
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-primary" onclick="addMessage()">Отправить</button>
+                                            <button type="button" class="btn btn-secondary" onclick="hideAddMessageForm()">Отмена</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="d-flex justify-content-between w-100">
+                    <div>
+                        <button type="button" class="btn btn-success" id="completeRevisionBtn" onclick="updateRevisionStatus('completed')" style="display: none;">
+                            <i class="fas fa-check"></i> Завершить правку
+                        </button>
+                        <button type="button" class="btn btn-warning" id="inProgressRevisionBtn" onclick="updateRevisionStatus('in_progress')" style="display: none;">
+                            <i class="fas fa-play"></i> В работу
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.priority-low { color: #28a745; }
+.priority-normal { color: #007bff; }
+.priority-high { color: #fd7e14; }
+.priority-urgent { color: #dc3545; }
+
+.status-pending { color: #ffc107; }
+.status-in_progress { color: #007bff; }
+.status-completed { color: #28a745; }
+.status-rejected { color: #dc3545; }
+
+.message-item {
+    border-left: 3px solid #007bff;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #f8f9fa;
+}
+
+.message-item.internal {
+    border-left-color: #fd7e14;
+    background-color: #fff3cd;
+}
+
+.message-item.client {
+    border-left-color: #28a745;
+}
+
+.file-item {
+    display: inline-block;
+    margin: 2px;
+    padding: 5px 10px;
+    background-color: #e9ecef;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.file-item a {
+    text-decoration: none;
+    color: #007bff;
+}
+</style>
+
+<script>
+let currentRevisionId = null;
+let projects = [];
+
+// Загрузка данных при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadProjects();
+    loadRevisions();
+    loadStats();
+});
+
+// Загрузка проектов
+async function loadProjects() {
+    try {
+        const response = await fetch('/admin/api/projects/');
+        const data = await response.json();
+        
+        if (data.success) {
+            projects = data.data;
+            
+            // Заполняем селекты проектов
+            const projectSelects = ['projectFilter', 'revisionProject'];
+            projectSelects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (selectId === 'projectFilter') {
+                    select.innerHTML = '<option value="">Все проекты</option>';
+                } else {
+                    select.innerHTML = '<option value="">Выберите проект</option>';
+                }
+                
+                projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.id;
+                    option.textContent = `${project.title} (${project.status})`;
+                    select.appendChild(option);
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Error loading projects:', error);
+    }
+}
+
+// Загрузка правок
+async function loadRevisions() {
+    try {
+        const params = new URLSearchParams();
+        
+        const projectId = document.getElementById('projectFilter').value;
+        const status = document.getElementById('statusFilter').value;
+        const priority = document.getElementById('priorityFilter').value;
+        const assignedToMe = document.getElementById('myRevisionsFilter').checked;
+        
+        if (projectId) params.append('project_id', projectId);
+        if (status) params.append('status', status);
+        if (priority) params.append('priority', priority);
+        if (assignedToMe) params.append('assigned_to_me', 'true');
+        
+        const response = await fetch(`/admin/api/revisions?${params}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            renderRevisionsTable(data.data);
+        } else {
+            showAlert('error', data.error || 'Ошибка при загрузке правок');
+        }
+    } catch (error) {
+        console.error('Error loading revisions:', error);
+        showAlert('error', 'Ошибка при загрузке правок');
+    }
+}
+
+// Отображение таблицы правок
+function renderRevisionsTable(revisions) {
+    const tbody = document.getElementById('revisionsTableBody');
+    tbody.innerHTML = '';
+    
+    if (revisions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center">Правки не найдены</td></tr>';
+        return;
+    }
+    
+    revisions.forEach(revision => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>#${revision.revision_number}</td>
+            <td>
+                ${revision.project ? revision.project.title : 'Неизвестно'}
+                <br><small class="text-muted">${revision.project ? revision.project.status : ''}</small>
+            </td>
+            <td>
+                <strong>${revision.title}</strong>
+                <br><small class="text-muted">${revision.description.substring(0, 100)}${revision.description.length > 100 ? '...' : ''}</small>
+            </td>
+            <td><span class="badge bg-secondary status-${revision.status}">${getStatusName(revision.status)}</span></td>
+            <td><span class="priority-${revision.priority}">${getPriorityName(revision.priority)}</span></td>
+            <td>${revision.created_by ? revision.created_by.first_name || 'Клиент' : 'Неизвестно'}</td>
+            <td>${revision.assigned_to ? revision.assigned_to.username : 'Не назначен'}</td>
+            <td>${formatDateTime(revision.created_at)}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="viewRevision(${revision.id})">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-secondary" onclick="editRevision(${revision.id})">
+                    <i class="fas fa-edit"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// Загрузка статистики
+async function loadStats() {
+    try {
+        const response = await fetch('/admin/api/revisions/stats');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('totalRevisions').textContent = data.data.total_revisions;
+            document.getElementById('pendingRevisions').textContent = data.data.pending_revisions;
+            document.getElementById('completedRevisions').textContent = data.data.completed_revisions;
+            document.getElementById('myRevisions').textContent = data.data.my_revisions;
+        }
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+// Создание правки
+async function createRevision() {
+    const form = document.getElementById('createRevisionForm');
+    const formData = {
+        project_id: parseInt(document.getElementById('revisionProject').value),
+        title: document.getElementById('revisionTitle').value,
+        description: document.getElementById('revisionDescription').value,
+        priority: document.getElementById('revisionPriority').value
+    };
+    
+    if (document.getElementById('revisionEstimatedTime').value) {
+        formData.estimated_time = parseInt(document.getElementById('revisionEstimatedTime').value);
+    }
+    
+    if (!formData.project_id || !formData.title || !formData.description) {
+        showAlert('error', 'Заполните все обязательные поля');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/admin/api/revisions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Правка создана успешно');
+            form.reset();
+            bootstrap.Modal.getInstance(document.getElementById('createRevisionModal')).hide();
+            loadRevisions();
+            loadStats();
+        } else {
+            showAlert('error', data.error || 'Ошибка при создании правки');
+        }
+    } catch (error) {
+        console.error('Error creating revision:', error);
+        showAlert('error', 'Ошибка при создании правки');
+    }
+}
+
+// Просмотр правки
+async function viewRevision(revisionId) {
+    try {
+        const response = await fetch(`/admin/api/revisions/${revisionId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            currentRevisionId = revisionId;
+            renderRevisionModal(data.data);
+            new bootstrap.Modal(document.getElementById('viewRevisionModal')).show();
+        } else {
+            showAlert('error', data.error || 'Ошибка при загрузке правки');
+        }
+    } catch (error) {
+        console.error('Error loading revision:', error);
+        showAlert('error', 'Ошибка при загрузке правки');
+    }
+}
+
+// Отображение модального окна правки
+function renderRevisionModal(revision) {
+    document.getElementById('viewRevisionTitle').textContent = `Правка #${revision.revision_number} - ${revision.title}`;
+    
+    // Информация о правке
+    const revisionInfo = document.getElementById('revisionInfo');
+    revisionInfo.innerHTML = `
+        <p><strong>Проект:</strong> ${revision.project ? revision.project.title : 'Неизвестно'}</p>
+        <p><strong>Статус:</strong> <span class="badge bg-secondary status-${revision.status}">${getStatusName(revision.status)}</span></p>
+        <p><strong>Приоритет:</strong> <span class="priority-${revision.priority}">${getPriorityName(revision.priority)}</span></p>
+        <p><strong>Создал:</strong> ${revision.created_by ? revision.created_by.first_name || 'Клиент' : 'Неизвестно'}</p>
+        <p><strong>Исполнитель:</strong> ${revision.assigned_to ? revision.assigned_to.username : 'Не назначен'}</p>
+        <p><strong>Создано:</strong> ${formatDateTime(revision.created_at)}</p>
+        ${revision.estimated_time ? `<p><strong>Оценка:</strong> ${revision.estimated_time} ч.</p>` : ''}
+        ${revision.actual_time ? `<p><strong>Факт:</strong> ${revision.actual_time} ч.</p>` : ''}
+        <hr>
+        <p><strong>Описание:</strong></p>
+        <p>${revision.description}</p>
+    `;
+    
+    // Кнопки управления статусом
+    const completeBtn = document.getElementById('completeRevisionBtn');
+    const inProgressBtn = document.getElementById('inProgressRevisionBtn');
+    
+    completeBtn.style.display = revision.status === 'completed' ? 'none' : 'inline-block';
+    inProgressBtn.style.display = revision.status === 'pending' ? 'inline-block' : 'none';
+    
+    // Загрузка файлов и сообщений
+    loadRevisionFiles(revision.id);
+    loadRevisionMessages(revision.id);
+}
+
+// Загрузка файлов правки
+async function loadRevisionFiles(revisionId) {
+    try {
+        const response = await fetch(`/admin/api/revisions/${revisionId}/files`);
+        const data = await response.json();
+        
+        const filesContainer = document.getElementById('revisionFiles');
+        if (data.success && data.data.length > 0) {
+            filesContainer.innerHTML = data.data.map(file => `
+                <div class="file-item">
+                    <a href="/admin/api/revisions/files/${file.id}" target="_blank">
+                        <i class="fas fa-file"></i> ${file.original_filename}
+                    </a>
+                    <small class="text-muted d-block">${formatFileSize(file.file_size)}</small>
+                </div>
+            `).join('');
+        } else {
+            filesContainer.innerHTML = '<p class="text-muted">Файлы не прикреплены</p>';
+        }
+    } catch (error) {
+        console.error('Error loading revision files:', error);
+    }
+}
+
+// Загрузка сообщений правки
+async function loadRevisionMessages(revisionId) {
+    try {
+        const response = await fetch(`/admin/api/revisions/${revisionId}/messages`);
+        const data = await response.json();
+        
+        const messagesContainer = document.getElementById('revisionMessages');
+        if (data.success && data.data.length > 0) {
+            messagesContainer.innerHTML = data.data.map(message => `
+                <div class="message-item ${message.is_internal ? 'internal' : ''} ${message.sender_type}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <strong>${message.sender_name}</strong>
+                        <small class="text-muted">${formatDateTime(message.created_at)}</small>
+                    </div>
+                    <div class="mt-2">${message.message}</div>
+                    ${message.files && message.files.length > 0 ? `
+                        <div class="mt-2">
+                            ${message.files.map(file => `
+                                <div class="file-item">
+                                    <a href="/admin/api/revisions/files/${file.id}" target="_blank">
+                                        <i class="fas fa-file"></i> ${file.original_filename}
+                                    </a>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    ${message.is_internal ? '<small class="text-warning"><i class="fas fa-eye-slash"></i> Внутреннее сообщение</small>' : ''}
+                </div>
+            `).join('');
+        } else {
+            messagesContainer.innerHTML = '<p class="text-muted">Сообщений пока нет</p>';
+        }
+    } catch (error) {
+        console.error('Error loading revision messages:', error);
+    }
+}
+
+// Показать форму добавления сообщения
+function showAddMessageForm() {
+    document.getElementById('addMessageForm').style.display = 'block';
+    document.getElementById('messageText').focus();
+}
+
+// Скрыть форму добавления сообщения
+function hideAddMessageForm() {
+    document.getElementById('addMessageForm').style.display = 'none';
+    document.getElementById('messageForm').reset();
+}
+
+// Добавить сообщение
+async function addMessage() {
+    const messageText = document.getElementById('messageText').value.trim();
+    const isInternal = document.getElementById('messageInternal').checked;
+    const files = document.getElementById('messageFiles').files;
+    
+    if (!messageText) {
+        showAlert('error', 'Введите текст сообщения');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('revision_id', currentRevisionId);
+    formData.append('message', messageText);
+    formData.append('is_internal', isInternal);
+    
+    for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+    }
+    
+    try {
+        const response = await fetch('/admin/api/revisions/messages', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Сообщение добавлено');
+            hideAddMessageForm();
+            loadRevisionMessages(currentRevisionId);
+        } else {
+            showAlert('error', data.error || 'Ошибка при добавлении сообщения');
+        }
+    } catch (error) {
+        console.error('Error adding message:', error);
+        showAlert('error', 'Ошибка при добавлении сообщения');
+    }
+}
+
+// Обновить статус правки
+async function updateRevisionStatus(status) {
+    try {
+        const response = await fetch(`/admin/api/revisions/${currentRevisionId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: status })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Статус правки обновлен');
+            loadRevisions();
+            loadStats();
+            viewRevision(currentRevisionId); // Обновляем модальное окно
+        } else {
+            showAlert('error', data.error || 'Ошибка при обновлении статуса');
+        }
+    } catch (error) {
+        console.error('Error updating revision status:', error);
+        showAlert('error', 'Ошибка при обновлении статуса');
+    }
+}
+
+// Вспомогательные функции
+function getStatusName(status) {
+    const statuses = {
+        'pending': 'В ожидании',
+        'in_progress': 'В работе',
+        'completed': 'Выполнено',
+        'rejected': 'Отклонено'
+    };
+    return statuses[status] || status;
+}
+
+function getPriorityName(priority) {
+    const priorities = {
+        'low': 'Низкий',
+        'normal': 'Обычный',
+        'high': 'Высокий',
+        'urgent': 'Срочный'
+    };
+    return priorities[priority] || priority;
+}
+
+function formatDateTime(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleString('ru-RU');
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Б';
+    const k = 1024;
+    const sizes = ['Б', 'КБ', 'МБ', 'ГБ'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function showAlert(type, message) {
+    // Простая реализация уведомлений
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show`;
+    alertDiv.style.position = 'fixed';
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.parentNode.removeChild(alertDiv);
+        }
+    }, 5000);
+}
+
+function editRevision(revisionId) {
+    // TODO: Реализовать редактирование правки
+    showAlert('info', 'Функция редактирования в разработке');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,1163 @@
+{% extends "base.html" %}
+
+{% block title %}Аналитика - Админ-панель{% endblock %}
+
+{% block page_title %}📈 Аналитика и отчеты{% endblock %}
+
+{% block header_actions %}
+<div class="btn-group">
+    <button class="btn btn-primary btn-custom" onclick="refreshAnalytics()">
+        <i class="fas fa-sync-alt me-1"></i> Обновить
+    </button>
+    <button class="btn btn-success btn-custom" onclick="exportReport()">
+        <i class="fas fa-download me-1"></i> Экспорт отчета
+    </button>
+    <button class="btn btn-info btn-custom" onclick="scheduledReport()">
+        <i class="fas fa-clock me-1"></i> Отчет по расписанию
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Time Period Selector -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <h5 class="mb-0">Период анализа</h5>
+                <small class="text-muted">Выберите период для отображения статистики</small>
+            </div>
+            <div class="col-md-6">
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="period" id="period7" value="7" checked>
+                    <label class="btn btn-outline-primary" for="period7">7 дней</label>
+                    
+                    <input type="radio" class="btn-check" name="period" id="period30" value="30">
+                    <label class="btn btn-outline-primary" for="period30">30 дней</label>
+                    
+                    <input type="radio" class="btn-check" name="period" id="period90" value="90">
+                    <label class="btn btn-outline-primary" for="period90">90 дней</label>
+                    
+                    <input type="radio" class="btn-check" name="period" id="periodAll" value="365">
+                    <label class="btn btn-outline-primary" for="periodAll">Год</label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card primary">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-users fa-3x me-3"></i>
+                <div class="flex-grow-1">
+                    <div class="h3 mb-1">{{ report.user_statistics.total_users or 0 }}</div>
+                    <div class="text-white-75">Всего пользователей</div>
+                    <small class="text-white-50">
+                        +{{ report.user_statistics.new_users or 0 }} за период
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card success">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-chart-line fa-3x me-3"></i>
+                <div class="flex-grow-1">
+                    <div class="h3 mb-1">{{ "%.1f"|format(report.conversion_funnel.overall_conversion or 0) }}%</div>
+                    <div class="text-white-75">Общая конверсия</div>
+                    <small class="text-white-50">
+                        Пользователи → Клиенты
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card info">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-ruble-sign fa-3x me-3"></i>
+                <div class="flex-grow-1">
+                    <div class="h3 mb-1">{{ "{:,.0f}"|format(report.financial_report.total_revenue or 0) }}</div>
+                    <div class="text-white-75">Доход (₽)</div>
+                    <small class="text-white-50">
+                        Средний чек: {{ "{:,.0f}"|format(report.financial_report.avg_check or 0) }}₽
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card warning">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-star fa-3x me-3"></i>
+                <div class="flex-grow-1">
+                    <div class="h3 mb-1">{{ "%.1f"|format(report.consultant_statistics.avg_rating or 0) }}</div>
+                    <div class="text-white-75">Средняя оценка</div>
+                    <small class="text-white-50">
+                        AI консультант
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 1 -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-area me-2"></i>
+                    Динамика роста
+                </h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-primary active" onclick="switchChart('users')">Пользователи</button>
+                    <button class="btn btn-outline-primary" onclick="switchChart('projects')">Проекты</button>
+                    <button class="btn btn-outline-primary" onclick="switchChart('revenue')">Доходы</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="growthChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-funnel-dollar me-2"></i>
+                    Воронка конверсии
+                </h5>
+            </div>
+                   <div class="card-body">
+                       <div class="conversion-funnel">
+                           <div class="funnel-stage" data-stage="1">
+                               <div class="stage-bar" style="width: 100%;">
+                                   <span class="stage-label">Пользователи</span>
+                                   <span class="stage-value">{{ report.conversion_funnel.total_users or 0 }}</span>
+                               </div>
+                           </div>
+                           <div class="funnel-stage" data-stage="2">
+                               <div class="stage-bar" style="width: {{ report.conversion_funnel.project_creation_rate|default(0) }}%;">
+                                   <span class="stage-label">Создали проекты</span>
+                                   <span class="stage-value">{{ report.conversion_funnel.users_with_projects or 0 }}</span>
+                               </div>
+                           </div>
+                           <div class="funnel-stage" data-stage="3">
+                               <div class="stage-bar" style="width: {{ report.conversion_funnel.project_acceptance_rate|default(0) }}%;">
+                                   <span class="stage-label">Приняли предложение</span>
+                                   <span class="stage-value">{{ report.conversion_funnel.users_with_accepted_projects or 0 }}</span>
+                               </div>
+                           </div>
+                           <div class="funnel-stage" data-stage="4">
+                               <div class="stage-bar" style="width: {{ report.conversion_funnel.project_completion_rate|default(0) }}%;">
+                                   <span class="stage-label">Завершили проекты</span>
+                                   <span class="stage-value">{{ report.conversion_funnel.users_with_completed_projects or 0 }}</span>
+                               </div>
+                           </div>
+                       </div>
+                   </div>
+                </div>
+            </div>
+        </div>
+
+
+<!-- Charts Row 2 -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-pie me-2"></i>
+                    Статусы проектов
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="projectStatusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-layer-group me-2"></i>
+                    Сложность проектов
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="complexityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Performance Metrics -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tachometer-alt me-2"></i>
+                    Метрики производительности
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6 mb-3">
+                        <div class="metric-item">
+                            <div class="metric-value">{{ "%.1f"|format(report.performance_metrics.avg_response_time or 0) }}с</div>
+                            <div class="metric-label">Время ответа AI</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="metric-item">
+                            <div class="metric-value">{{ "%.1f"|format(report.performance_metrics.avg_acceptance_time or 0) }}ч</div>
+                            <div class="metric-label">До принятия заявки</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="metric-item">
+                            <div class="metric-value">{{ "%.1f"|format(report.performance_metrics.avg_development_time or 0) }}ч</div>
+                            <div class="metric-label">Время разработки</div>
+                        </div>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <div class="metric-item">
+                            <div class="metric-value">{{ "%.1f"|format(report.performance_metrics.time_estimation_accuracy or 0) }}%</div>
+                            <div class="metric-label">Точность оценок</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="progress-metrics mt-3" style="
+                    --quality-width: {{ report.consultant_statistics.avg_rating * 20 or 0 }}%;
+                    --conversion-width: {{ report.conversion_funnel.overall_conversion or 0 }}%;
+                    --retention-width: {{ report.engagement_metrics.retention_rate or 0 }}%;
+                ">
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>Качество ответов AI</span>
+                            <span>{{ "%.1f"|format(report.consultant_statistics.avg_rating * 20 or 0) }}%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-success" style="width: var(--quality-width)"></div>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between">
+                            <span>Конверсия в клиентов</span>
+                            <span>{{ "%.1f"|format(report.conversion_funnel.overall_conversion or 0) }}%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-primary" style="width: var(--conversion-width)"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="d-flex justify-content-between">
+                            <span>Удержание пользователей</span>
+                            <span>{{ "%.1f"|format(report.engagement_metrics.retention_rate or 0) }}%</span>
+                        </div>
+                        <div class="progress">
+                            <div class="progress-bar bg-info" style="width: var(--retention-width)"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>
+                    Топ метрики
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="metric-comparison">
+                    <div class="metric-row">
+                        <div class="metric-label">Активные пользователи (DAU)</div>
+                        <div class="metric-bar">
+                            <div class="bar-fill" style="width: 75%"></div>
+                            <span class="metric-number">{{ report.engagement_metrics.daily_active_users or 0 }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-row">
+                        <div class="metric-label">Новые проекты за период</div>
+                        <div class="metric-bar">
+                            <div class="bar-fill" style="width: 60%"></div>
+                            <span class="metric-number">{{ report.project_statistics.new_projects or 0 }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-row">
+                        <div class="metric-label">Завершенные проекты</div>
+                        <div class="metric-bar">
+                            <div class="bar-fill" style="width: 45%"></div>
+                            <span class="metric-number">{{ report.project_statistics.completed_projects or 0 }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-row">
+                        <div class="metric-label">Консультаций проведено</div>
+                        <div class="metric-bar">
+                            <div class="bar-fill" style="width: 85%"></div>
+                            <span class="metric-number">{{ report.consultant_statistics.new_sessions or 0 }}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="metric-row">
+                        <div class="metric-label">Средний доход с клиента</div>
+                        <div class="metric-bar">
+                            <div class="bar-fill" style="width: 70%"></div>
+                            <span class="metric-number">{{ "{:,.0f}"|format(report.financial_report.avg_check or 0) }}₽</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Tables -->
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-trophy me-2"></i>
+                    Топ клиенты по доходу
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Клиент</th>
+                                <th>Проекты</th>
+                                <th>Доход</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topClientsTable">
+                            <!-- Will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-question-circle me-2"></i>
+                    Популярные вопросы консультанту
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="topic-list">
+                    {% if report.consultant_statistics.popular_topics %}
+                    {% for topic, count in report.consultant_statistics.popular_topics.items() %}
+                    <div class="topic-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="topic-name">{{ topic }}</span>
+                            <span class="badge bg-primary">{{ count }}</span>
+                        </div>
+                        <div class="topic-bar">
+                            <div class="topic-fill" style="width: {{ (count / (report.consultant_statistics.popular_topics.values()|max)) * 100 }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-muted text-center">Нет данных о консультациях</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block styles %}
+<style>
+/* Conversion Funnel Styles */
+.conversion-funnel {
+    padding: 20px 0;
+}
+
+.funnel-stage {
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.stage-bar {
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    padding: 12px 15px;
+    color: white;
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 45px;
+    transition: all 0.3s ease;
+}
+
+.stage-bar:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.stage-label {
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.stage-value {
+    font-weight: 700;
+    font-size: 16px;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* Metric Items */
+.metric-item {
+    text-align: center;
+    padding: 15px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.metric-item:hover {
+    background: #e9ecef;
+    transform: translateY(-2px);
+}
+
+.metric-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+.metric-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* Progress Metrics */
+.progress-metrics .progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #e9ecef;
+}
+
+.progress-metrics .progress-bar {
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+/* Metric Comparison */
+.metric-comparison {
+    margin-bottom: 15px;
+}
+
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.metric-row:last-child {
+    border-bottom: none;
+}
+
+.metric-label {
+    font-size: 14px;
+    color: #495057;
+    font-weight: 500;
+    flex: 1;
+}
+
+.metric-bar {
+    position: relative;
+    width: 120px;
+    height: 25px;
+    background: #e9ecef;
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 0 15px;
+}
+
+.bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 12px;
+    transition: width 0.6s ease;
+}
+
+.metric-number {
+    font-weight: 600;
+    color: #495057;
+    min-width: 50px;
+    text-align: right;
+}
+
+/* Topic List */
+.topic-list {
+    margin-bottom: 15px;
+}
+
+.topic-item {
+    margin-bottom: 15px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.topic-item:last-child {
+    border-bottom: none;
+}
+
+.topic-name {
+    font-size: 14px;
+    color: #495057;
+    font-weight: 500;
+}
+
+.topic-bar {
+    margin-top: 5px;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.topic-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #6610f2);
+    border-radius: 3px;
+    transition: width 0.6s ease;
+}
+
+/* Chart Container */
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin: 10px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .metric-row {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .metric-bar {
+        width: 100%;
+        margin: 10px 0;
+    }
+    
+    .metric-number {
+        align-self: flex-end;
+    }
+    
+    .stage-bar {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .stage-value {
+        margin-top: 5px;
+    }
+}
+
+/* Animation Classes */
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentChart = 'users';
+    let currentPeriod = 7;
+    let reportData = JSON.parse('{{ report|tojson|escapejs }}');
+
+    // Initialize charts when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        initGrowthChart();
+        initProjectStatusChart();
+        initComplexityChart();
+        loadTopClients();
+        
+        // Add event listeners for period selection
+        document.querySelectorAll('input[name="period"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                currentPeriod = parseInt(this.value);
+                refreshAnalytics();
+            });
+        });
+    });
+
+    // Growth Chart
+    function initGrowthChart() {
+        const ctx = document.getElementById('growthChart').getContext('2d');
+        window.growthChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: generateDateLabels(currentPeriod),
+                datasets: [{
+                    label: 'Новые пользователи',
+                    data: generateSampleData(currentPeriod, 'users'),
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Project Status Chart
+    function initProjectStatusChart() {
+        const ctx = document.getElementById('projectStatusChart').getContext('2d');
+        const statusData = reportData.project_statistics?.status_distribution || {};
+        
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Новые', 'Рассмотрение', 'Принятые', 'В работе', 'Тестирование', 'Завершенные', 'Отмененные'],
+                datasets: [{
+                    data: [
+                        statusData.new || 0,
+                        statusData.review || 0,
+                        statusData.accepted || 0,
+                        statusData.in_progress || 0,
+                        statusData.testing || 0,
+                        statusData.completed || 0,
+                        statusData.cancelled || 0
+                    ],
+                    backgroundColor: [
+                        '#17a2b8',
+                        '#ffc107',
+                        '#28a745',
+                        '#007bff',
+                        '#6f42c1',
+                        '#20c997',
+                        '#dc3545'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    }
+                }
+            }
+        });
+    }
+
+    // Complexity Chart
+    function initComplexityChart() {
+        const ctx = document.getElementById('complexityChart').getContext('2d');
+        const complexityData = reportData.project_statistics?.complexity_distribution || {};
+        
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Простые', 'Средние', 'Сложные', 'Премиум'],
+                datasets: [{
+                    label: 'Количество проектов',
+                    data: [
+                        complexityData.simple || 0,
+                        complexityData.medium || 0,
+                        complexityData.complex || 0,
+                        complexityData.premium || 0
+                    ],
+                    backgroundColor: [
+                        '#28a745',
+                        '#ffc107',
+                        '#fd7e14',
+                        '#dc3545'
+                    ],
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    // Switch chart data
+    function switchChart(type) {
+        currentChart = type;
+        
+        // Update button states
+        document.querySelectorAll('.btn-group button').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+        
+        // Update chart data
+        let newData, newLabel;
+        switch(type) {
+            case 'users':
+                newData = generateSampleData(currentPeriod, 'users');
+                newLabel = 'Новые пользователи';
+                break;
+            case 'projects':
+                newData = generateSampleData(currentPeriod, 'projects');
+                newLabel = 'Новые проекты';
+                break;
+            case 'revenue':
+                newData = generateSampleData(currentPeriod, 'revenue');
+                newLabel = 'Доход (₽)';
+                break;
+        }
+        
+        window.growthChart.data.datasets[0].data = newData;
+        window.growthChart.data.datasets[0].label = newLabel;
+        window.growthChart.data.labels = generateDateLabels(currentPeriod);
+        window.growthChart.update();
+    }
+
+    // Generate date labels for charts
+    function generateDateLabels(days) {
+        const labels = [];
+        const today = new Date();
+        
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(today.getDate() - i);
+            
+            if (days <= 7) {
+                labels.push(date.toLocaleDateString('ru-RU', { weekday: 'short' }));
+            } else if (days <= 30) {
+                labels.push(date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }));
+            } else {
+                labels.push(date.toLocaleDateString('ru-RU', { month: 'short', year: '2-digit' }));
+            }
+        }
+        
+        return labels;
+    }
+
+    // Generate sample data for charts
+    function generateSampleData(days, type) {
+        const data = [];
+        const baseValue = type === 'revenue' ? 50000 : type === 'projects' ? 5 : 15;
+        
+        for (let i = 0; i < days; i++) {
+            let value = baseValue + Math.random() * baseValue * 0.5;
+            
+            // Add some trend
+            if (type === 'users') {
+                value += i * 0.3; // Slight growth trend
+            } else if (type === 'revenue') {
+                value += i * 500; // Revenue growth
+            }
+            
+            data.push(Math.round(value));
+        }
+        
+        return data;
+    }
+
+    // Load top clients table
+    function loadTopClients() {
+        const tableBody = document.getElementById('topClientsTable');
+        
+        // Sample data - in real app this would come from API
+        const topClients = [
+            { name: '@user123', projects: 3, revenue: 150000 },
+            { name: '@company_bot', projects: 2, revenue: 120000 },
+            { name: '@startup_xyz', projects: 1, revenue: 80000 },
+            { name: '@ecommerce_pro', projects: 2, revenue: 75000 },
+            { name: '@crypto_trader', projects: 1, revenue: 60000 }
+        ];
+        
+        tableBody.innerHTML = '';
+        topClients.forEach((client, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-primary me-2">${index + 1}</span>
+                        ${client.name}
+                    </div>
+                </td>
+                <td>
+                    <span class="badge bg-info">${client.projects}</span>
+                </td>
+                <td>
+                    <strong>${client.revenue.toLocaleString('ru-RU')}₽</strong>
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+    }
+
+    // Refresh analytics data
+    function refreshAnalytics() {
+        const cards = document.querySelectorAll('.card');
+        cards.forEach(card => card.classList.add('loading'));
+        
+        // Show loading animation
+        setTimeout(() => {
+            // Simulate API call
+            fetch(`/admin/api/analytics?period=${currentPeriod}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Update reportData
+                    reportData = data;
+                    
+                    // Refresh charts
+                    window.growthChart.data.labels = generateDateLabels(currentPeriod);
+                    window.growthChart.data.datasets[0].data = generateSampleData(currentPeriod, currentChart);
+                    window.growthChart.update();
+                    
+                    // Refresh other components
+                    loadTopClients();
+                    
+                    // Update metrics
+                    updateMetrics(data);
+                    
+                    cards.forEach(card => card.classList.remove('loading'));
+                    
+                    // Show success message
+                    showNotification('Данные обновлены', 'success');
+                })
+                .catch(error => {
+                    console.error('Error refreshing analytics:', error);
+                    cards.forEach(card => card.classList.remove('loading'));
+                    showNotification('Ошибка обновления данных', 'error');
+                });
+        }, 1000);
+    }
+
+    // Export report
+    function exportReport() {
+        const exportButton = event.target;
+        const originalText = exportButton.innerHTML;
+        
+        exportButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Экспорт...';
+        exportButton.disabled = true;
+        
+        // Create export data
+        const exportData = {
+            period: currentPeriod,
+            generated_at: new Date().toISOString(),
+            metrics: reportData,
+            charts: {
+                growth: window.growthChart.data,
+                status: document.getElementById('projectStatusChart')?._chart?.data,
+                complexity: document.getElementById('complexityChart')?._chart?.data
+            }
+        };
+        
+        // Generate CSV content
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Метрика,Значение\n";
+        csvContent += `Всего пользователей,${reportData.user_statistics?.total_users || 0}\n`;
+        csvContent += `Новые пользователи,${reportData.user_statistics?.new_users || 0}\n`;
+        csvContent += `Общая конверсия,${reportData.conversion_funnel?.overall_conversion || 0}%\n`;
+        csvContent += `Общий доход,${reportData.financial_report?.total_revenue || 0}₽\n`;
+        csvContent += `Средний чек,${reportData.financial_report?.avg_check || 0}₽\n`;
+        csvContent += `Средняя оценка AI,${reportData.consultant_statistics?.avg_rating || 0}\n`;
+        
+        // Create and download file
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `analytics_report_${currentPeriod}days_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => {
+            exportButton.innerHTML = originalText;
+            exportButton.disabled = false;
+            showNotification('Отчет экспортирован', 'success');
+        }, 1500);
+    }
+
+    // Scheduled report modal
+    function scheduledReport() {
+        const modalHTML = `
+            <div class="modal fade" id="scheduledReportModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                <i class="fas fa-clock me-2"></i>
+                                Настройка автоматических отчетов
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="scheduledReportForm">
+                                <div class="mb-3">
+                                    <label class="form-label">Частота отправки</label>
+                                    <select class="form-select" name="frequency">
+                                        <option value="daily">Ежедневно</option>
+                                        <option value="weekly" selected>Еженедельно</option>
+                                        <option value="monthly">Ежемесячно</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Email для отправки</label>
+                                    <input type="email" class="form-control" name="email" 
+                                           placeholder="admin@example.com" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Время отправки</label>
+                                    <input type="time" class="form-control" name="time" value="09:00">
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="includeCharts" checked>
+                                    <label class="form-check-label">
+                                        Включать графики в отчет
+                                    </label>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                Отмена
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="saveScheduledReport()">
+                                <i class="fas fa-save me-1"></i>
+                                Сохранить настройки
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Remove existing modal if any
+        const existingModal = document.getElementById('scheduledReportModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('scheduledReportModal'));
+        modal.show();
+    }
+
+    // Save scheduled report settings
+    function saveScheduledReport() {
+        const form = document.getElementById('scheduledReportForm');
+        const formData = new FormData(form);
+        
+        const settings = {
+            frequency: formData.get('frequency'),
+            email: formData.get('email'),
+            time: formData.get('time'),
+            includeCharts: formData.has('includeCharts')
+        };
+        
+        // Simulate API call
+        fetch('/admin/api/scheduled-reports', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(settings)
+        })
+        .then(response => response.json())
+        .then(data => {
+            showNotification('Настройки автоматических отчетов сохранены', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('scheduledReportModal')).hide();
+        })
+        .catch(error => {
+            console.error('Error saving scheduled report:', error);
+            showNotification('Ошибка сохранения настроек', 'error');
+        });
+    }
+
+    // Update metrics in cards
+    function updateMetrics(data) {
+        // Update stat cards
+        const statCards = document.querySelectorAll('.stat-card');
+        statCards.forEach(card => {
+            card.classList.add('fade-in');
+        });
+        
+        // Update progress bars
+        const progressBars = document.querySelectorAll('.progress-bar');
+        progressBars.forEach(bar => {
+            const width = bar.style.width;
+            bar.style.width = '0%';
+            setTimeout(() => {
+                bar.style.width = width;
+            }, 100);
+        });
+        
+        // Update metric bars
+        const metricBars = document.querySelectorAll('.bar-fill');
+        metricBars.forEach(bar => {
+            const width = bar.style.width;
+            bar.style.width = '0%';
+            setTimeout(() => {
+                bar.style.width = width;
+            }, 200);
+        });
+    }
+
+    // Show notification
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 3000);
+    }
+
+    // Real-time updates (WebSocket simulation)
+    function initRealTimeUpdates() {
+        setInterval(() => {
+            // Simulate real-time data updates
+            const dau = document.querySelector('.metric-number');
+            if (dau) {
+                const currentValue = parseInt(dau.textContent);
+                const newValue = currentValue + Math.floor(Math.random() * 3);
+                dau.textContent = newValue;
+            }
+        }, 30000); // Update every 30 seconds
+    }
+
+    // Initialize real-time updates
+    setTimeout(initRealTimeUpdates, 5000);
+
+    // Handle window resize for charts
+    window.addEventListener('resize', function() {
+        if (window.growthChart) {
+            window.growthChart.resize();
+        }
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+            switch(e.key) {
+                case 'r':
+                    e.preventDefault();
+                    refreshAnalytics();
+                    break;
+                case 'e':
+                    e.preventDefault();
+                    exportReport();
+                    break;
+                case 's':
+                    e.preventDefault();
+                    scheduledReport();
+                    break;
+            }
+        }
+    });
+</script>
+{% endblock %}

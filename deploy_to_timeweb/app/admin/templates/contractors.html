@@ -1,0 +1,877 @@
+{% extends "base.html" %}
+
+{% block title %}Исполнители - Админ-панель{% endblock %}
+
+{% block page_title %}👥 Управление исполнителями{% endblock %}
+
+{% block extra_css %}
+<style>
+.contractor-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    margin-bottom: 20px;
+}
+
+.contractor-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.contractor-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px 15px 0 0;
+    padding: 20px;
+}
+
+.contractor-info {
+    padding: 20px;
+}
+
+.contractor-stats {
+    display: flex;
+    justify-content: space-around;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 0 0 15px 15px;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #495057;
+}
+
+.stat-label {
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.specialization-badge {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.contract-type-badge {
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.contract-freelance {
+    background: #e7f3ff;
+    color: #0066cc;
+}
+
+.contract-employee {
+    background: #e8f5e8;
+    color: #28a745;
+}
+
+.contract-agency {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.rating-stars {
+    color: #ffc107;
+}
+
+.payment-status {
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-paid {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-overdue {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.assignment-item {
+    border-left: 4px solid #dee2e6;
+    padding: 15px;
+    margin-bottom: 10px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.assignment-active {
+    border-left-color: #007bff;
+}
+
+.assignment-completed {
+    border-left-color: #28a745;
+}
+
+.filter-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block header_actions %}
+<div class="d-flex gap-2">
+    <button class="btn btn-primary" onclick="openAddContractorModal()">
+        <i class="fas fa-plus me-1"></i> Добавить исполнителя
+    </button>
+    <button class="btn btn-outline-success" onclick="exportContractors()">
+        <i class="fas fa-download me-1"></i> Экспорт
+    </button>
+    <button class="btn btn-outline-info" onclick="showStats()">
+        <i class="fas fa-chart-bar me-1"></i> Статистика
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- Фильтры -->
+<div class="filter-section">
+    <div class="row">
+        <div class="col-md-3">
+            <label class="form-label">Поиск</label>
+            <input type="text" class="form-control" id="searchFilter" placeholder="Имя, email, специализация...">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Специализация</label>
+            <select class="form-select" id="specializationFilter">
+                <option value="">Все специализации</option>
+                <option value="developer">Разработчик</option>
+                <option value="designer">Дизайнер</option>
+                <option value="tester">Тестировщик</option>
+                <option value="manager">Менеджер</option>
+                <option value="analyst">Аналитик</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Статус</label>
+            <select class="form-select" id="statusFilter">
+                <option value="">Все статусы</option>
+                <option value="active">Активные</option>
+                <option value="inactive">Неактивные</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Действия</label>
+            <div>
+                <button class="btn btn-outline-primary" onclick="applyFilters()">
+                    <i class="fas fa-filter me-1"></i> Применить
+                </button>
+                <button class="btn btn-outline-secondary" onclick="clearFilters()">
+                    <i class="fas fa-times me-1"></i> Очистить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Список исполнителей -->
+<div id="contractorsList" class="row">
+    <!-- Контент будет загружен через JavaScript -->
+</div>
+
+<!-- Пагинация -->
+<nav aria-label="Навигация по страницам">
+    <ul class="pagination justify-content-center" id="pagination">
+        <!-- Пагинация будет добавлена через JavaScript -->
+    </ul>
+</nav>
+
+<!-- Модальное окно добавления исполнителя -->
+<div class="modal fade" id="addContractorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить исполнителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addContractorForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Имя *</label>
+                            <input type="text" class="form-control" id="contractorName" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="contractorEmail">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Телефон</label>
+                            <input type="tel" class="form-control" id="contractorPhone">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Telegram ID</label>
+                            <input type="number" class="form-control" id="contractorTelegramId">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Специализация</label>
+                            <select class="form-select" id="contractorSpecialization">
+                                <option value="">Выберите специализацию</option>
+                                <option value="developer">Разработчик</option>
+                                <option value="designer">Дизайнер</option>
+                                <option value="tester">Тестировщик</option>
+                                <option value="manager">Менеджер</option>
+                                <option value="analyst">Аналитик</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Ставка за час (₽)</label>
+                            <input type="number" class="form-control" id="contractorHourlyRate" min="0" step="100">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Тип договора</label>
+                            <select class="form-select" id="contractorType">
+                                <option value="freelance">Фриланс</option>
+                                <option value="employee">Сотрудник</option>
+                                <option value="agency">Агентство</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">ИНН</label>
+                            <input type="text" class="form-control" id="contractorTaxId">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Банковские реквизиты</label>
+                        <textarea class="form-control" id="contractorBankDetails" rows="3" placeholder="Банк, БИК, номер счета..."></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Заметки</label>
+                        <textarea class="form-control" id="contractorNotes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveContractor()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно деталей исполнителя -->
+<div class="modal fade" id="contractorDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Детали исполнителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="contractorDetailsContent">
+                <!-- Контент будет загружен через JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-primary" onclick="editContractor()">Редактировать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно создания выплаты -->
+<div class="modal fade" id="createPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Создать выплату</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createPaymentForm">
+                    <input type="hidden" id="paymentContractorId">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Сумма (₽) *</label>
+                            <input type="number" class="form-control" id="paymentAmount" min="0" step="0.01" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Тип выплаты</label>
+                            <select class="form-select" id="paymentType" required>
+                                <option value="hourly">Почасовая оплата</option>
+                                <option value="fixed">Фиксированная сумма</option>
+                                <option value="bonus">Бонус</option>
+                                <option value="penalty">Штраф</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Дата выплаты *</label>
+                            <input type="date" class="form-control" id="paymentDate" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Срок выплаты</label>
+                            <input type="date" class="form-control" id="paymentDueDate">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Способ оплаты</label>
+                            <select class="form-select" id="paymentMethod">
+                                <option value="bank_transfer">Банковский перевод</option>
+                                <option value="cash">Наличные</option>
+                                <option value="card">Карта</option>
+                                <option value="crypto">Криптовалюта</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Налоговая ставка (%)</label>
+                            <input type="number" class="form-control" id="paymentTaxRate" min="0" max="100" step="0.1" value="13">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="withholdTax">
+                            <label class="form-check-label" for="withholdTax">
+                                Удержать налог
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание выплаты *</label>
+                        <textarea class="form-control" id="paymentDescription" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="savePayment()">Создать выплату</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно статистики -->
+<div class="modal fade" id="statsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Статистика по исполнителям</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="statsContent">
+                <!-- Контент будет загружен через JavaScript -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPage = 1;
+let currentContractorId = null;
+const itemsPerPage = 12;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadContractors();
+    
+    // Обработчики событий для фильтров
+    document.getElementById('searchFilter').addEventListener('input', applyFilters);
+    document.getElementById('specializationFilter').addEventListener('change', applyFilters);
+    document.getElementById('statusFilter').addEventListener('change', applyFilters);
+});
+
+async function loadContractors(page = 1) {
+    try {
+        const searchParams = new URLSearchParams({
+            page: page,
+            limit: itemsPerPage,
+            search: document.getElementById('searchFilter').value,
+            specialization: document.getElementById('specializationFilter').value,
+            status: document.getElementById('statusFilter').value
+        });
+        
+        const response = await fetch(`/admin/api/contractors?${searchParams}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayContractors(data.contractors);
+            updatePagination(data.page, data.pages, data.total);
+        } else {
+            showNotification('Ошибка при загрузке исполнителей: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка при загрузке исполнителей: ' + error.message, 'danger');
+    }
+}
+
+function displayContractors(contractors) {
+    const containerHtml = contractors.map(contractor => `
+        <div class="col-lg-4 col-md-6">
+            <div class="contractor-card">
+                <div class="contractor-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="mb-1">${contractor.name}</h5>
+                            <div class="d-flex gap-2 mb-2">
+                                ${contractor.specialization ? `<span class="specialization-badge">${contractor.specialization}</span>` : ''}
+                                <span class="contract-type-badge contract-${contractor.contract_type}">${contractor.contract_type}</span>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <div class="rating-stars">
+                                ${generateStars(contractor.rating)}
+                            </div>
+                            <small>${contractor.rating}/5</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="contractor-info">
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Email:</small><br>
+                            <span>${contractor.email || 'Не указан'}</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Телефон:</small><br>
+                            <span>${contractor.phone || 'Не указан'}</span>
+                        </div>
+                    </div>
+                    <div class="row mt-2">
+                        <div class="col-6">
+                            <small class="text-muted">Ставка:</small><br>
+                            <span>${contractor.hourly_rate ? contractor.hourly_rate + '₽/час' : 'Не указана'}</span>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Статус:</small><br>
+                            <span class="badge ${contractor.is_active ? 'bg-success' : 'bg-secondary'}">
+                                ${contractor.is_active ? 'Активен' : 'Неактивен'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div class="contractor-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">${contractor.statistics.total_projects}</div>
+                        <div class="stat-label">Проектов</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${contractor.statistics.active_projects}</div>
+                        <div class="stat-label">Активных</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">${formatCurrency(contractor.statistics.total_payments)}</div>
+                        <div class="stat-label">Выплачено</div>
+                    </div>
+                </div>
+                <div class="p-3 border-top">
+                    <div class="d-flex justify-content-between">
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewContractor(${contractor.id})">
+                            <i class="fas fa-eye"></i> Детали
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="createPayment(${contractor.id})">
+                            <i class="fas fa-money-bill"></i> Выплата
+                        </button>
+                        <button class="btn btn-sm btn-outline-warning" onclick="editContractor(${contractor.id})">
+                            <i class="fas fa-edit"></i> Редактировать
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    document.getElementById('contractorsList').innerHTML = containerHtml;
+}
+
+function generateStars(rating) {
+    const fullStars = Math.floor(rating);
+    const halfStar = rating % 1 >= 0.5;
+    const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
+    
+    return '★'.repeat(fullStars) + (halfStar ? '☆' : '') + '☆'.repeat(emptyStars);
+}
+
+function updatePagination(currentPage, totalPages, totalItems) {
+    const pagination = document.getElementById('pagination');
+    let paginationHtml = '';
+    
+    if (totalPages > 1) {
+        // Предыдущая страница
+        if (currentPage > 1) {
+            paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadContractors(${currentPage - 1})">‹</a></li>`;
+        }
+        
+        // Номера страниц
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === currentPage) {
+                paginationHtml += `<li class="page-item active"><span class="page-link">${i}</span></li>`;
+            } else {
+                paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadContractors(${i})">${i}</a></li>`;
+            }
+        }
+        
+        // Следующая страница
+        if (currentPage < totalPages) {
+            paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadContractors(${currentPage + 1})">›</a></li>`;
+        }
+    }
+    
+    pagination.innerHTML = paginationHtml;
+}
+
+function applyFilters() {
+    currentPage = 1;
+    loadContractors(currentPage);
+}
+
+function clearFilters() {
+    document.getElementById('searchFilter').value = '';
+    document.getElementById('specializationFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    applyFilters();
+}
+
+function openAddContractorModal() {
+    const modal = new bootstrap.Modal(document.getElementById('addContractorModal'));
+    modal.show();
+}
+
+async function saveContractor() {
+    try {
+        const contractorData = {
+            name: document.getElementById('contractorName').value,
+            email: document.getElementById('contractorEmail').value,
+            phone: document.getElementById('contractorPhone').value,
+            telegram_id: document.getElementById('contractorTelegramId').value,
+            specialization: document.getElementById('contractorSpecialization').value,
+            hourly_rate: parseFloat(document.getElementById('contractorHourlyRate').value) || null,
+            contract_type: document.getElementById('contractorType').value,
+            tax_id: document.getElementById('contractorTaxId').value,
+            bank_details: document.getElementById('contractorBankDetails').value,
+            notes: document.getElementById('contractorNotes').value
+        };
+        
+        const response = await fetch('/admin/api/contractors', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify(contractorData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Исполнитель успешно добавлен!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addContractorModal'));
+            modal.hide();
+            loadContractors(currentPage);
+        } else {
+            showNotification('Ошибка при добавлении исполнителя: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка при добавлении исполнителя: ' + error.message, 'danger');
+    }
+}
+
+async function viewContractor(contractorId) {
+    try {
+        const response = await fetch(`/admin/api/contractors/${contractorId}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayContractorDetails(data.contractor, data.assignments, data.payments);
+        } else {
+            showNotification('Ошибка при загрузке данных исполнителя: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка при загрузке данных исполнителя: ' + error.message, 'danger');
+    }
+}
+
+function displayContractorDetails(contractor, assignments, payments) {
+    const content = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Основная информация</h6>
+                <table class="table table-sm">
+                    <tr><th>Имя:</th><td>${contractor.name}</td></tr>
+                    <tr><th>Email:</th><td>${contractor.email || 'Не указан'}</td></tr>
+                    <tr><th>Телефон:</th><td>${contractor.phone || 'Не указан'}</td></tr>
+                    <tr><th>Telegram:</th><td>${contractor.telegram_id || 'Не указан'}</td></tr>
+                    <tr><th>Специализация:</th><td>${contractor.specialization || 'Не указана'}</td></tr>
+                    <tr><th>Ставка:</th><td>${contractor.hourly_rate ? contractor.hourly_rate + '₽/час' : 'Не указана'}</td></tr>
+                    <tr><th>Тип договора:</th><td>${contractor.contract_type}</td></tr>
+                    <tr><th>Рейтинг:</th><td>${contractor.rating}/5</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <h6>Статистика</h6>
+                <table class="table table-sm">
+                    <tr><th>Всего проектов:</th><td>${contractor.total_projects}</td></tr>
+                    <tr><th>Общий заработок:</th><td>${formatCurrency(contractor.total_earnings)}</td></tr>
+                    <tr><th>Дата регистрации:</th><td>${new Date(contractor.created_at).toLocaleDateString('ru-RU')}</td></tr>
+                    <tr><th>Статус:</th><td><span class="badge ${contractor.is_active ? 'bg-success' : 'bg-secondary'}">${contractor.is_active ? 'Активен' : 'Неактивен'}</span></td></tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <h6>Проекты</h6>
+                <div class="assignments-list" style="max-height: 300px; overflow-y: auto;">
+                    ${assignments.map(assignment => `
+                        <div class="assignment-item assignment-${assignment.status}">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <strong>${assignment.project ? assignment.project.title : 'Проект не найден'}</strong>
+                                    <div class="text-muted small">${assignment.role}</div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="badge bg-${assignment.status === 'completed' ? 'success' : assignment.status === 'in_progress' ? 'primary' : 'secondary'}">${assignment.status}</span>
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-1">
+                                ${assignment.hourly_rate ? assignment.hourly_rate + '₽/час' : 'Фиксированная оплата'}
+                                ${assignment.estimated_hours ? ` • ${assignment.estimated_hours}ч (план)` : ''}
+                                ${assignment.actual_hours ? ` • ${assignment.actual_hours}ч (факт)` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h6>Выплаты</h6>
+                <div class="payments-list" style="max-height: 300px; overflow-y: auto;">
+                    ${payments.map(payment => `
+                        <div class="payment-item p-2 border-bottom">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <strong>${formatCurrency(payment.net_amount)}</strong>
+                                    <div class="text-muted small">${payment.description}</div>
+                                </div>
+                                <div class="text-end">
+                                    <span class="payment-status status-${payment.status}">${payment.status}</span>
+                                    <div class="small text-muted">${new Date(payment.payment_date).toLocaleDateString('ru-RU')}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('contractorDetailsContent').innerHTML = content;
+    currentContractorId = contractor.id;
+    
+    const modal = new bootstrap.Modal(document.getElementById('contractorDetailsModal'));
+    modal.show();
+}
+
+function createPayment(contractorId) {
+    currentContractorId = contractorId;
+    document.getElementById('paymentContractorId').value = contractorId;
+    document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
+    
+    const modal = new bootstrap.Modal(document.getElementById('createPaymentModal'));
+    modal.show();
+}
+
+async function savePayment() {
+    try {
+        const paymentData = {
+            amount: parseFloat(document.getElementById('paymentAmount').value),
+            payment_type: document.getElementById('paymentType').value,
+            description: document.getElementById('paymentDescription').value,
+            payment_date: document.getElementById('paymentDate').value + 'T00:00:00',
+            due_date: document.getElementById('paymentDueDate').value ? document.getElementById('paymentDueDate').value + 'T00:00:00' : null,
+            payment_method: document.getElementById('paymentMethod').value,
+            tax_rate: parseFloat(document.getElementById('paymentTaxRate').value) / 100,
+            withhold_tax: document.getElementById('withholdTax').checked
+        };
+        
+        const response = await fetch(`/admin/api/contractors/${currentContractorId}/payments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify(paymentData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('Выплата успешно создана!', 'success');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createPaymentModal'));
+            modal.hide();
+            loadContractors(currentPage);
+        } else {
+            showNotification('Ошибка при создании выплаты: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка при создании выплаты: ' + error.message, 'danger');
+    }
+}
+
+async function showStats() {
+    try {
+        const response = await fetch('/admin/api/contractors/stats', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayStats(data.statistics);
+        } else {
+            showNotification('Ошибка при загрузке статистики: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка при загрузке статистики: ' + error.message, 'danger');
+    }
+}
+
+function displayStats(stats) {
+    const content = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Общая статистика</h6>
+                <ul class="list-group">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Всего исполнителей:</span>
+                        <strong>${stats.total_contractors}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Активных:</span>
+                        <strong>${stats.active_contractors}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Выплачено за месяц:</span>
+                        <strong>${formatCurrency(stats.total_payments)}</strong>
+                    </li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <h6>Топ исполнители</h6>
+                <ul class="list-group">
+                    ${stats.top_contractors.map(contractor => `
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>${contractor.name}</span>
+                            <strong>${formatCurrency(contractor.total_earned)}</strong>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h6>По специализациям</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Специализация</th>
+                                <th>Количество</th>
+                                <th>Средняя ставка</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stats.specializations.map(spec => `
+                                <tr>
+                                    <td>${spec.specialization}</td>
+                                    <td>${spec.count}</td>
+                                    <td>${formatCurrency(spec.avg_rate)}/час</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('statsContent').innerHTML = content;
+    
+    const modal = new bootstrap.Modal(document.getElementById('statsModal'));
+    modal.show();
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount || 0);
+}
+
+async function exportContractors() {
+    try {
+        showNotification('Экспортируем исполнителей...', 'info');
+        
+        const response = await fetch('/admin/api/contractors?limit=1000', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            const blob = new Blob([JSON.stringify(data.contractors, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `contractors_export_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showNotification('Исполнители экспортированы!', 'success');
+        } else {
+            showNotification('Ошибка экспорта исполнителей', 'danger');
+        }
+    } catch (error) {
+        showNotification('Критическая ошибка экспорта: ' + error.message, 'danger');
+    }
+}
+</script>
+{% endblock %}
