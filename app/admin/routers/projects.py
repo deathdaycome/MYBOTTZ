@@ -614,6 +614,16 @@ async def update_project(
             "message": f"Ошибка обновления проекта: {str(e)}"
         }
 
+@router.post("/")
+async def create_project_root(
+    project_data: ProjectCreateModel,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Создать новый проект через корневой POST endpoint"""
+    # Используем ту же логику что и в /create
+    return await create_project(project_data, current_user, db)
+
 @router.post("/create")
 async def create_project(
     project_data: ProjectCreateModel,

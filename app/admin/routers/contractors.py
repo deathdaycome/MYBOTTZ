@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, desc, asc, func
 from pydantic import BaseModel
 
 from ...database.database import get_db
-from ...database.models import User, AdminUser
+from ...database.models import User, AdminUser, ContractorPayment
 from ...config.logging import get_logger
 from ..middleware.auth import get_current_admin_user
 
@@ -45,6 +45,11 @@ async def get_contractors(
         
         contractors_data = []
         for contractor in contractors:
+            # Подсчитываем общую сумму выплат
+            total_payments = db.query(func.sum(ContractorPayment.amount)).filter(
+                ContractorPayment.contractor_id == contractor.id
+            ).scalar() or 0
+            
             contractors_data.append({
                 "id": contractor.id,
                 "username": contractor.username,
@@ -54,7 +59,8 @@ async def get_contractors(
                 "role": contractor.role,
                 "is_active": contractor.is_active,
                 "created_at": contractor.created_at.isoformat() if contractor.created_at else None,
-                "last_login": contractor.last_login.isoformat() if contractor.last_login else None
+                "last_login": contractor.last_login.isoformat() if contractor.last_login else None,
+                "total_payments": total_payments
             })
         
         return {
@@ -101,11 +107,27 @@ async def get_contractor(
             "last_login": contractor.last_login.isoformat() if contractor.last_login else None
         }
         
+        # Получаем выплаты исполнителя
+        payments = db.query(ContractorPayment).filter(
+            ContractorPayment.contractor_id == contractor_id
+        ).order_by(desc(ContractorPayment.created_at)).all()
+        
+        payments_data = []
+        for payment in payments:
+            payments_data.append({
+                "id": payment.id,
+                "amount": payment.amount,
+                "description": payment.description,
+                "payment_date": payment.payment_date.isoformat() if payment.payment_date else None,
+                "status": payment.status,
+                "created_at": payment.created_at.isoformat() if payment.created_at else None
+            })
+        
         return {
             "success": True,
             "contractor": contractor_data,
             "assignments": [],  # TODO: добавить реальные назначения
-            "payments": []      # TODO: добавить реальные выплаты
+            "payments": payments_data
         }
         
     except HTTPException:
@@ -297,16 +319,36 @@ async def create_payment(
             logger.warning(f"Исполнитель с ID {contractor_id} не найден")
             return {"success": False, "message": "Исполнитель не найден"}
         
-        # TODO: Здесь должна быть логика создания выплаты в базе данных
-        # Пока просто возвращаем успех для демонстрации
+        # Создаем выплату в базе данных
+        new_payment = ContractorPayment(
+            contractor_id=contractor_id,
+            amount=payment_data.get('amount'),
+            description=payment_data.get('description', ''),
+            payment_type='project',
+            status='pending',
+            created_at=datetime.utcnow(),
+            created_by_id=current_user.id
+        )
         
-        logger.info(f"Выплата для исполнителя {contractor_id} создана успешно")
+        db.add(new_payment)
+        db.commit()
+        db.refresh(new_payment)
+        
+        logger.info(f"Выплата для исполнителя {contractor_id} создана успешно: ID={new_payment.id}, сумма={new_payment.amount}")
         
         return {
             "success": True,
-            "message": f"Выплата для {contractor.username} успешно создана"
+            "message": f"Выплата {new_payment.amount}₽ для {contractor.username} успешно создана",
+            "payment": {
+                "id": new_payment.id,
+                "amount": new_payment.amount,
+                "description": new_payment.description,
+                "status": new_payment.status,
+                "created_at": new_payment.created_at.isoformat()
+            }
         }
         
     except Exception as e:
         logger.error(f"Ошибка при создании выплаты для исполнителя {contractor_id}: {str(e)}", exc_info=True)
+        db.rollback()
         return {"success": False, "message": str(e)}

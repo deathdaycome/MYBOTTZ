@@ -442,7 +442,7 @@ function displayContractors(contractors) {
                         <div class="stat-label">Активных</div>
                     </div>
                     <div class="stat-item">
-                        <div class="stat-value">0₽</div>
+                        <div class="stat-value">${contractor.total_payments ? contractor.total_payments.toLocaleString('ru-RU') + '₽' : '0₽'}</div>
                         <div class="stat-label">Выплачено</div>
                     </div>
                 </div>
