@@ -447,7 +447,7 @@ function displayContractors(contractors) {
                     </div>
                 </div>
                 <div class="p-3 border-top">
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between flex-wrap gap-1">
                         <button class="btn btn-sm btn-outline-primary" onclick="viewContractor(${contractor.id})">
                             <i class="fas fa-eye"></i> Детали
                         </button>
@@ -456,6 +456,9 @@ function displayContractors(contractors) {
                         </button>
                         <button class="btn btn-sm btn-outline-warning" onclick="editContractor(${contractor.id})">
                             <i class="fas fa-edit"></i> Редактировать
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteContractor(${contractor.id})" title="Удалить исполнителя">
+                            <i class="fas fa-trash"></i> Удалить
                         </button>
                     </div>
                 </div>
@@ -475,6 +478,261 @@ function displayContractors(contractors) {
     console.log('=== КОНЕЦ displayContractors ===');
 }
 console.log('Функция displayContractors определена успешно');
+
+// ОПРЕДЕЛЯЕМ ВСЕ ФУНКЦИИ КНОПОК ПЕРЕД ИСПОЛЬЗОВАНИЕМ
+console.log('Определяем функции кнопок...');
+
+// Функция просмотра деталей исполнителя
+async function viewContractor(contractorId) {
+    try {
+        console.log('Просмотр исполнителя:', contractorId);
+        const response = await fetch(`/admin/api/contractors/${contractorId}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayContractorDetails(data.contractor);
+        } else {
+            alert('Ошибка при загрузке данных исполнителя: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Ошибка при просмотре исполнителя:', error);
+        alert('Ошибка при просмотре исполнителя');
+    }
+}
+
+// Функция отображения деталей исполнителя
+function displayContractorDetails(contractor) {
+    const detailsHtml = `
+        <div class="contractor-details">
+            <h5>Детали исполнителя</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>ID:</strong> ${contractor.id}</p>
+                    <p><strong>Имя:</strong> ${contractor.first_name || 'Не указано'}</p>
+                    <p><strong>Фамилия:</strong> ${contractor.last_name || 'Не указано'}</p>
+                    <p><strong>Email:</strong> ${contractor.email || 'Не указан'}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Username:</strong> ${contractor.username || 'Не указан'}</p>
+                    <p><strong>Роль:</strong> ${contractor.role || 'Не указана'}</p>
+                    <p><strong>Статус:</strong> ${contractor.is_active ? 'Активен' : 'Неактивен'}</p>
+                    <p><strong>Дата создания:</strong> ${contractor.created_at ? new Date(contractor.created_at).toLocaleDateString('ru-RU') : 'Не указана'}</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Показываем в модальном окне
+    const modalBody = document.querySelector('#contractorModal .modal-body');
+    if (modalBody) {
+        modalBody.innerHTML = detailsHtml;
+        const modal = new bootstrap.Modal(document.getElementById('contractorModal'));
+        modal.show();
+    } else {
+        alert(detailsHtml.replace(/<[^>]*>/g, ' '));
+    }
+}
+
+// Функция создания выплаты
+function createPayment(contractorId) {
+    console.log('Создание выплаты для исполнителя:', contractorId);
+    
+    const amount = prompt('Введите сумму выплаты (в рублях):');
+    if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+        alert('Неверная сумма выплаты');
+        return;
+    }
+    
+    const description = prompt('Введите описание выплаты:') || '';
+    
+    if (confirm(`Создать выплату ${amount}₽ для исполнителя?`)) {
+        fetch(`/admin/api/contractors/${contractorId}/payments`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            },
+            body: JSON.stringify({
+                amount: parseFloat(amount),
+                description: description
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Выплата успешно создана!');
+                loadContractors(); // Перезагружаем список
+            } else {
+                alert('Ошибка при создании выплаты: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Ошибка при создании выплаты:', error);
+            alert('Ошибка при создании выплаты');
+        });
+    }
+}
+
+// Функция редактирования исполнителя
+async function editContractor(contractorId) {
+    try {
+        console.log('Редактирование исполнителя:', contractorId);
+        
+        // Загружаем данные исполнителя
+        const response = await fetch(`/admin/api/contractors/${contractorId}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showEditContractorModal(data.contractor);
+        } else {
+            alert('Ошибка при загрузке данных исполнителя: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Ошибка при редактировании исполнителя:', error);
+        alert('Ошибка при редактировании исполнителя');
+    }
+}
+
+// Функция отображения модального окна редактирования
+function showEditContractorModal(contractor) {
+    const editModalHtml = `
+        <div class="modal fade" id="editContractorModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Редактировать исполнителя</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="editContractorForm">
+                            <div class="mb-3">
+                                <label class="form-label">Имя</label>
+                                <input type="text" class="form-control" id="editFirstName" value="${contractor.first_name || ''}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Фамилия</label>
+                                <input type="text" class="form-control" id="editLastName" value="${contractor.last_name || ''}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="editEmail" value="${contractor.email || ''}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Username</label>
+                                <input type="text" class="form-control" id="editUsername" value="${contractor.username || ''}">
+                            </div>
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input" id="editIsActive" ${contractor.is_active ? 'checked' : ''}>
+                                    <label class="form-check-label">Активен</label>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-primary" onclick="saveEditedContractor(${contractor.id})">Сохранить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Удаляем старое модальное окно, если есть
+    const oldModal = document.getElementById('editContractorModal');
+    if (oldModal) {
+        oldModal.remove();
+    }
+    
+    // Добавляем новое модальное окно
+    document.body.insertAdjacentHTML('beforeend', editModalHtml);
+    
+    // Показываем модальное окно
+    const modal = new bootstrap.Modal(document.getElementById('editContractorModal'));
+    modal.show();
+}
+
+// Функция сохранения отредактированного исполнителя
+async function saveEditedContractor(contractorId) {
+    try {
+        const contractorData = {
+            first_name: document.getElementById('editFirstName').value,
+            last_name: document.getElementById('editLastName').value,
+            email: document.getElementById('editEmail').value,
+            username: document.getElementById('editUsername').value,
+            is_active: document.getElementById('editIsActive').checked
+        };
+        
+        const response = await fetch(`/admin/api/contractors/${contractorId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            },
+            body: JSON.stringify(contractorData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Исполнитель успешно обновлен!');
+            
+            // Закрываем модальное окно
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editContractorModal'));
+            modal.hide();
+            
+            // Перезагружаем список исполнителей
+            loadContractors();
+        } else {
+            alert('Ошибка при обновлении исполнителя: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Ошибка при сохранении исполнителя:', error);
+        alert('Ошибка при сохранении исполнителя');
+    }
+}
+
+// Функция удаления исполнителя
+async function deleteContractor(contractorId) {
+    if (!confirm('Вы уверены, что хотите удалить этого исполнителя? Это действие нельзя отменить.')) {
+        return;
+    }
+    
+    try {
+        console.log('Удаление исполнителя:', contractorId);
+        
+        const response = await fetch(`/admin/api/contractors/${contractorId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Исполнитель успешно удален!');
+            loadContractors(); // Перезагружаем список
+        } else {
+            alert('Ошибка при удалении исполнителя: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Ошибка при удалении исполнителя:', error);
+        alert('Ошибка при удалении исполнителя');
+    }
+}
+
+console.log('Все функции кнопок определены успешно');
 
 console.log('Определяем функцию handleSaveContractor...');
 // ГЛАВНАЯ ФУНКЦИЯ - СОХРАНЕНИЕ ИСПОЛНИТЕЛЯ - ОПРЕДЕЛЯЕМ В HEAD
@@ -590,11 +848,13 @@ setTimeout(function() {
     const addBtn = document.getElementById('addContractorBtn');
     const reloadBtn = document.getElementById('reloadBtn');
     const saveBtn = document.getElementById('saveContractorBtn');
+    const saveEditBtn = document.getElementById('saveEditContractorBtn');
     
     console.log('Кнопки найдены:', {
         addBtn: !!addBtn,
         reloadBtn: !!reloadBtn,
-        saveBtn: !!saveBtn
+        saveBtn: !!saveBtn,
+        saveEditBtn: !!saveEditBtn
     });
     
     if (addBtn) {
@@ -615,6 +875,13 @@ setTimeout(function() {
         saveBtn.onclick = function() {
             console.log('Кнопка сохранения нажата');
             handleSaveContractor();
+        };
+    }
+    
+    if (saveEditBtn) {
+        saveEditBtn.onclick = function() {
+            console.log('Кнопка сохранения изменений нажата');
+            saveEditContractor();
         };
     }
     
@@ -862,6 +1129,55 @@ setTimeout(function() {
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                 <button type="button" class="btn btn-primary" id="saveContractorBtn">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования исполнителя -->
+<div class="modal fade" id="editContractorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать исполнителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editContractorForm">
+                    <input type="hidden" id="editContractorId">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Username *</label>
+                            <input type="text" class="form-control" id="editContractorUsername" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="editContractorEmail" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Имя</label>
+                            <input type="text" class="form-control" id="editContractorFirstName">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Фамилия</label>
+                            <input type="text" class="form-control" id="editContractorLastName">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editContractorIsActive">
+                            <label class="form-check-label" for="editContractorIsActive">
+                                Активен
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" id="saveEditContractorBtn">Сохранить изменения</button>
             </div>
         </div>
     </div>
@@ -1227,274 +1543,5 @@ function clearFilters() {
 }
 
 
-async function viewContractor(contractorId) {
-    try {
-        const response = await fetch(`/admin/api/contractors/${contractorId}`, {
-            headers: {
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            displayContractorDetails(data.contractor, data.assignments, data.payments);
-        } else {
-            showNotification('Ошибка при загрузке данных исполнителя: ' + data.message, 'danger');
-        }
-    } catch (error) {
-        showNotification('Ошибка при загрузке данных исполнителя: ' + error.message, 'danger');
-    }
-}
-
-function displayContractorDetails(contractor, assignments, payments) {
-    const content = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>Основная информация</h6>
-                <table class="table table-sm">
-                    <tr><th>Имя:</th><td>${contractor.name}</td></tr>
-                    <tr><th>Email:</th><td>${contractor.email || 'Не указан'}</td></tr>
-                    <tr><th>Телефон:</th><td>${contractor.phone || 'Не указан'}</td></tr>
-                    <tr><th>Telegram:</th><td>${contractor.telegram_id || 'Не указан'}</td></tr>
-                    <tr><th>Специализация:</th><td>${contractor.specialization || 'Не указана'}</td></tr>
-                    <tr><th>Ставка:</th><td>${contractor.hourly_rate ? contractor.hourly_rate + '₽/час' : 'Не указана'}</td></tr>
-                    <tr><th>Тип договора:</th><td>${contractor.contract_type}</td></tr>
-                    <tr><th>Рейтинг:</th><td>${contractor.rating}/5</td></tr>
-                </table>
-            </div>
-            <div class="col-md-6">
-                <h6>Статистика</h6>
-                <table class="table table-sm">
-                    <tr><th>Всего проектов:</th><td>${contractor.total_projects}</td></tr>
-                    <tr><th>Общий заработок:</th><td>${formatCurrency(contractor.total_earnings)}</td></tr>
-                    <tr><th>Дата регистрации:</th><td>${new Date(contractor.created_at).toLocaleDateString('ru-RU')}</td></tr>
-                    <tr><th>Статус:</th><td><span class="badge ${contractor.is_active ? 'bg-success' : 'bg-secondary'}">${contractor.is_active ? 'Активен' : 'Неактивен'}</span></td></tr>
-                </table>
-            </div>
-        </div>
-        
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <h6>Проекты</h6>
-                <div class="assignments-list" style="max-height: 300px; overflow-y: auto;">
-                    ${assignments.map(assignment => `
-                        <div class="assignment-item assignment-${assignment.status}">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <strong>${assignment.project ? assignment.project.title : 'Проект не найден'}</strong>
-                                    <div class="text-muted small">${assignment.role}</div>
-                                </div>
-                                <div class="text-end">
-                                    <span class="badge bg-${assignment.status === 'completed' ? 'success' : assignment.status === 'in_progress' ? 'primary' : 'secondary'}">${assignment.status}</span>
-                                </div>
-                            </div>
-                            <div class="small text-muted mt-1">
-                                ${assignment.hourly_rate ? assignment.hourly_rate + '₽/час' : 'Фиксированная оплата'}
-                                ${assignment.estimated_hours ? ` • ${assignment.estimated_hours}ч (план)` : ''}
-                                ${assignment.actual_hours ? ` • ${assignment.actual_hours}ч (факт)` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            <div class="col-md-6">
-                <h6>Выплаты</h6>
-                <div class="payments-list" style="max-height: 300px; overflow-y: auto;">
-                    ${payments.map(payment => `
-                        <div class="payment-item p-2 border-bottom">
-                            <div class="d-flex justify-content-between">
-                                <div>
-                                    <strong>${formatCurrency(payment.net_amount)}</strong>
-                                    <div class="text-muted small">${payment.description}</div>
-                                </div>
-                                <div class="text-end">
-                                    <span class="payment-status status-${payment.status}">${payment.status}</span>
-                                    <div class="small text-muted">${new Date(payment.payment_date).toLocaleDateString('ru-RU')}</div>
-                                </div>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('contractorDetailsContent').innerHTML = content;
-    currentContractorId = contractor.id;
-    
-    const modal = new bootstrap.Modal(document.getElementById('contractorDetailsModal'));
-    modal.show();
-}
-
-function createPayment(contractorId) {
-    currentContractorId = contractorId;
-    document.getElementById('paymentContractorId').value = contractorId;
-    document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
-    
-    const modal = new bootstrap.Modal(document.getElementById('createPaymentModal'));
-    modal.show();
-}
-
-async function savePayment() {
-    try {
-        const paymentData = {
-            amount: parseFloat(document.getElementById('paymentAmount').value),
-            payment_type: document.getElementById('paymentType').value,
-            description: document.getElementById('paymentDescription').value,
-            payment_date: document.getElementById('paymentDate').value + 'T00:00:00',
-            due_date: document.getElementById('paymentDueDate').value ? document.getElementById('paymentDueDate').value + 'T00:00:00' : null,
-            payment_method: document.getElementById('paymentMethod').value,
-            tax_rate: parseFloat(document.getElementById('paymentTaxRate').value) / 100,
-            withhold_tax: document.getElementById('withholdTax').checked
-        };
-        
-        const response = await fetch(`/admin/api/contractors/${currentContractorId}/payments`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
-            },
-            body: JSON.stringify(paymentData)
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            showNotification('Выплата успешно создана!', 'success');
-            const modal = bootstrap.Modal.getInstance(document.getElementById('createPaymentModal'));
-            modal.hide();
-            loadContractors(currentPage);
-        } else {
-            showNotification('Ошибка при создании выплаты: ' + data.message, 'danger');
-        }
-    } catch (error) {
-        showNotification('Ошибка при создании выплаты: ' + error.message, 'danger');
-    }
-}
-
-async function showStats() {
-    try {
-        const response = await fetch('/admin/api/contractors/stats', {
-            headers: {
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            displayStats(data.statistics);
-        } else {
-            showNotification('Ошибка при загрузке статистики: ' + data.message, 'danger');
-        }
-    } catch (error) {
-        showNotification('Ошибка при загрузке статистики: ' + error.message, 'danger');
-    }
-}
-
-function displayStats(stats) {
-    const content = `
-        <div class="row">
-            <div class="col-md-6">
-                <h6>Общая статистика</h6>
-                <ul class="list-group">
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>Всего исполнителей:</span>
-                        <strong>${stats.total_contractors}</strong>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>Активных:</span>
-                        <strong>${stats.active_contractors}</strong>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        <span>Выплачено за месяц:</span>
-                        <strong>${formatCurrency(stats.total_payments)}</strong>
-                    </li>
-                </ul>
-            </div>
-            <div class="col-md-6">
-                <h6>Топ исполнители</h6>
-                <ul class="list-group">
-                    ${stats.top_contractors.map(contractor => `
-                        <li class="list-group-item d-flex justify-content-between">
-                            <span>${contractor.name}</span>
-                            <strong>${formatCurrency(contractor.total_earned)}</strong>
-                        </li>
-                    `).join('')}
-                </ul>
-            </div>
-        </div>
-        
-        <div class="row mt-4">
-            <div class="col-12">
-                <h6>По специализациям</h6>
-                <div class="table-responsive">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Специализация</th>
-                                <th>Количество</th>
-                                <th>Средняя ставка</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${stats.specializations.map(spec => `
-                                <tr>
-                                    <td>${spec.specialization}</td>
-                                    <td>${spec.count}</td>
-                                    <td>${formatCurrency(spec.avg_rate)}/час</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    document.getElementById('statsContent').innerHTML = content;
-    
-    const modal = new bootstrap.Modal(document.getElementById('statsModal'));
-    modal.show();
-}
-
-function formatCurrency(amount) {
-    return new Intl.NumberFormat('ru-RU', {
-        style: 'currency',
-        currency: 'RUB',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(amount || 0);
-}
-
-async function exportContractors() {
-    try {
-        showNotification('Экспортируем исполнителей...', 'info');
-        
-        const response = await fetch('/admin/api/contractors?limit=1000', {
-            headers: {
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
-            }
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            const blob = new Blob([JSON.stringify(data.contractors, null, 2)], { type: 'application/json' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `contractors_export_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            window.URL.revokeObjectURL(url);
-            showNotification('Исполнители экспортированы!', 'success');
-        } else {
-            showNotification('Ошибка экспорта исполнителей', 'danger');
-        }
-    } catch (error) {
-        showNotification('Критическая ошибка экспорта: ' + error.message, 'danger');
-    }
-}
 </script>
 {% endblock %}

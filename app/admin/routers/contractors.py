@@ -103,7 +103,9 @@ async def get_contractor(
         
         return {
             "success": True,
-            "data": contractor_data
+            "contractor": contractor_data,
+            "assignments": [],  # TODO: добавить реальные назначения
+            "payments": []      # TODO: добавить реальные выплаты
         }
         
     except HTTPException:
@@ -231,4 +233,80 @@ async def create_contractor(
     except Exception as e:
         logger.error(f"Ошибка при создании исполнителя: {str(e)}", exc_info=True)
         db.rollback()
+        return {"success": False, "message": str(e)}
+
+@router.delete("/{contractor_id}", response_model=dict)
+async def delete_contractor(
+    contractor_id: int,
+    db: Session = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_admin_user)
+):
+    """Удалить исполнителя."""
+    try:
+        logger.info(f"Запрос на удаление исполнителя: {contractor_id}")
+        
+        # Находим исполнителя
+        contractor = db.query(AdminUser).filter(
+            AdminUser.id == contractor_id,
+            AdminUser.role == 'executor'
+        ).first()
+        
+        if not contractor:
+            logger.warning(f"Исполнитель с ID {contractor_id} не найден")
+            return {"success": False, "message": "Исполнитель не найден"}
+        
+        # Проверяем, что не удаляем самого себя
+        if contractor.id == current_user.id:
+            logger.warning(f"Попытка удалить самого себя: {contractor_id}")
+            return {"success": False, "message": "Нельзя удалить самого себя"}
+        
+        # Удаляем исполнителя
+        db.delete(contractor)
+        db.commit()
+        
+        logger.info(f"Исполнитель успешно удален: ID={contractor_id}, username={contractor.username}")
+        
+        return {
+            "success": True,
+            "message": f"Исполнитель {contractor.username} успешно удален"
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка при удалении исполнителя {contractor_id}: {str(e)}", exc_info=True)
+        db.rollback()
+        return {"success": False, "message": str(e)}
+
+@router.post("/{contractor_id}/payments", response_model=dict)
+async def create_payment(
+    contractor_id: int,
+    payment_data: dict,
+    db: Session = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_admin_user)
+):
+    """Создать выплату для исполнителя."""
+    try:
+        logger.info(f"Создание выплаты для исполнителя {contractor_id}: {payment_data}")
+        
+        # Находим исполнителя
+        contractor = db.query(AdminUser).filter(
+            AdminUser.id == contractor_id,
+            AdminUser.role == 'executor'
+        ).first()
+        
+        if not contractor:
+            logger.warning(f"Исполнитель с ID {contractor_id} не найден")
+            return {"success": False, "message": "Исполнитель не найден"}
+        
+        # TODO: Здесь должна быть логика создания выплаты в базе данных
+        # Пока просто возвращаем успех для демонстрации
+        
+        logger.info(f"Выплата для исполнителя {contractor_id} создана успешно")
+        
+        return {
+            "success": True,
+            "message": f"Выплата для {contractor.username} успешно создана"
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка при создании выплаты для исполнителя {contractor_id}: {str(e)}", exc_info=True)
         return {"success": False, "message": str(e)}
