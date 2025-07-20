@@ -307,13 +307,21 @@ class ProjectsHandler:
         """Создание клавиатуры для списка проектов"""
         keyboard = []
         
-        # Показываем первые 5 проектов
+        # Показываем первые 5 проектов с полным набором кнопок
         for project_data in projects_data[:5]:
+            # Кнопка с названием проекта
             keyboard.append([
                 InlineKeyboardButton(
                     f"📋 {project_data['title'][:25]}{'...' if len(project_data['title']) > 25 else ''}",
                     callback_data=f"project_details_{project_data['id']}"
                 )
+            ])
+            
+            # Кнопки действий для каждого проекта
+            keyboard.append([
+                InlineKeyboardButton("💬 Чат", callback_data=f"project_chat_{project_data['id']}"),
+                InlineKeyboardButton("✏️ Правки", callback_data=f"project_revisions_{project_data['id']}"),
+                InlineKeyboardButton("📄 Скачать ТЗ", callback_data=f"project_download_{project_data['id']}")
             ])
         
         # Если проектов больше 5, добавляем кнопку "Показать все"

@@ -167,15 +167,40 @@ class TelegramBot:
         self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.confirm_create_revision, pattern="^confirm_revision_"))
         self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.show_revision_details, pattern="^revision_details_"))
         
-        # ОТКЛЮЧЕНЫ: Обработчики текстовых сообщений для правок - конфликтуют с настройками
-        # self.application.add_handler(MessageHandler(
-        #     filters.TEXT & ~filters.COMMAND, 
-        #     revisions_handler_instance.handle_revision_title
-        # ))
-        # self.application.add_handler(MessageHandler(
-        #     filters.TEXT & ~filters.COMMAND, 
-        #     revisions_handler_instance.handle_revision_description
-        # ))
+        # ВАЖНО: Обработчики кнопок в процессе создания правки
+        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.files_done, pattern="^files_done_"))
+        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.skip_revision_files, pattern="^skip_files_"))
+        
+        # ВАЖНО: Обработчики фото и файлов для правок (ВКЛЮЧАЕМ!)
+        self.application.add_handler(MessageHandler(
+            filters.PHOTO, 
+            common_handler_instance.handle_photo
+        ))
+        
+        self.application.add_handler(MessageHandler(
+            filters.ATTACHMENT, 
+            common_handler_instance.handle_document
+        ))
+        
+        # Обработчик текстовых сообщений для правок - УНИВЕРСАЛЬНЫЙ
+        async def revision_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Маршрутизация текстовых сообщений для правок"""
+            try:
+                step = context.user_data.get('creating_revision_step')
+                if step == 'title':
+                    await revisions_handler_instance.handle_revision_title(update, context)
+                elif step == 'description':
+                    await revisions_handler_instance.handle_revision_description(update, context)
+                else:
+                    # Если не в процессе создания правки - обычная обработка
+                    await common_handler_instance.handle_text_input(update, context)
+            except Exception as e:
+                logger.error(f"Ошибка в revision_text_router: {e}")
+        
+        self.application.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND & ~filters.PHOTO, 
+            revision_text_router
+        ))
         
         # Обработчики Timeweb (оставляем для совместимости)
         self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_timeweb_info, pattern="^timeweb_info"))

@@ -181,15 +181,21 @@ def setup_handlers(app: Application):
         common_handler.handle_video
     ))
     
-    # Message handlers - ТЕКСТ ОБРАБОТЧИК
+    # Message handlers - ДОКУМЕНТЫ ОБРАБОТЧИК  
     app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
+        filters.ATTACHMENT,
+        common_handler.handle_document
+    ))
+    
+    # Message handlers - ТЕКСТ ОБРАБОТЧИК (исключаем фото и видео)
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & ~filters.PHOTO & ~filters.VIDEO,
         common_handler.handle_text_input
     ))
     
     # Message handlers - УНИВЕРСАЛЬНЫЙ ОБРАБОТЧИК (ПОСЛЕДНИЙ)
     app.add_handler(MessageHandler(
-        filters.ALL & ~filters.COMMAND & ~filters.PHOTO & ~filters.VIDEO & ~filters.TEXT,
+        filters.ALL & ~filters.COMMAND & ~filters.PHOTO & ~filters.VIDEO & ~filters.ATTACHMENT,
         common_handler.handle_any_message
     ))
     

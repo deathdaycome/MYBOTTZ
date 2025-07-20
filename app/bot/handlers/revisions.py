@@ -734,7 +734,7 @@ class RevisionsHandler:
                 db.refresh(revision)
                 
                 # Сохраняем файлы правки
-                files_data = context.user_data.get('revision_files', [])
+                files_data = context.user_data.get('creating_revision_files', [])
                 logger.info(f"📁 Сохранение файлов правки: {len(files_data)} файлов")
                 
                 for file_data in files_data:
@@ -843,7 +843,7 @@ class RevisionsHandler:
             context.user_data.pop('creating_revision_description', None)
             context.user_data.pop('creating_revision_priority', None)
             context.user_data.pop('creating_revision_step', None)
-            context.user_data.pop('revision_files', None)
+            context.user_data.pop('creating_revision_files', None)
             
         except Exception as e:
             logger.error(f"Ошибка в confirm_create_revision: {e}")
@@ -1126,10 +1126,10 @@ class RevisionsHandler:
             await file.download_to_drive(str(file_path))
             
             # Сохраняем информацию о файле в context
-            if 'revision_files' not in context.user_data:
-                context.user_data['revision_files'] = []
+            if 'creating_revision_files' not in context.user_data:
+                context.user_data['creating_revision_files'] = []
             
-            context.user_data['revision_files'].append({
+            context.user_data['creating_revision_files'].append({
                 'filename': filename,
                 'original_filename': f"photo.{file_extension}",
                 'file_path': str(file_path),
@@ -1138,11 +1138,18 @@ class RevisionsHandler:
             })
             
             project_id = context.user_data.get('creating_revision_project_id')
+            
+            keyboard = [
+                [InlineKeyboardButton("➡️ Далее", callback_data=f"files_done_{project_id}")],
+                [InlineKeyboardButton("❌ Отмена", callback_data=f"project_revisions_{project_id}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
             await update.message.reply_text(
                 f"📷 Фотография добавлена!\n\n"
-                f"📎 Файлов прикреплено: {len(context.user_data['revision_files'])}\n\n"
-                f"Можете добавить еще файлы или нажать 'Завершить' для завершения создания правки.",
-                reply_markup=get_confirm_revision_keyboard(project_id)
+                f"📎 Файлов прикреплено: {len(context.user_data['creating_revision_files'])}\n\n"
+                f"Можете добавить еще файлы или нажать 'Далее' для перехода к выбору приоритета.",
+                reply_markup=reply_markup
             )
             
         except Exception as e:
@@ -1185,10 +1192,10 @@ class RevisionsHandler:
             file_type = self._get_file_type(document.file_name)
             
             # Сохраняем информацию о файле в context
-            if 'revision_files' not in context.user_data:
-                context.user_data['revision_files'] = []
+            if 'creating_revision_files' not in context.user_data:
+                context.user_data['creating_revision_files'] = []
             
-            context.user_data['revision_files'].append({
+            context.user_data['creating_revision_files'].append({
                 'filename': filename,
                 'original_filename': document.file_name,
                 'file_path': str(file_path),
@@ -1197,11 +1204,18 @@ class RevisionsHandler:
             })
             
             project_id = context.user_data.get('creating_revision_project_id')
+            
+            keyboard = [
+                [InlineKeyboardButton("➡️ Далее", callback_data=f"files_done_{project_id}")],
+                [InlineKeyboardButton("❌ Отмена", callback_data=f"project_revisions_{project_id}")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
             await update.message.reply_text(
                 f"📄 Документ '{document.file_name}' добавлен!\n\n"
-                f"📎 Файлов прикреплено: {len(context.user_data['revision_files'])}\n\n"
-                f"Можете добавить еще файлы или нажать 'Завершить' для завершения создания правки.",
-                reply_markup=get_confirm_revision_keyboard(project_id)
+                f"📎 Файлов прикреплено: {len(context.user_data['creating_revision_files'])}\n\n"
+                f"Можете добавить еще файлы или нажать 'Далее' для перехода к выбору приоритета.",
+                reply_markup=reply_markup
             )
             
         except Exception as e:
