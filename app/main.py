@@ -64,6 +64,8 @@ app.include_router(admin_router, prefix="/admin")
 
 # Подключаем статические файлы
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# Подключаем uploads для портфолио и файлов
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # --- Telegram Bot Initialization ---
 class TelegramBot:
@@ -131,8 +133,7 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("stats", stats_command))
         self.application.add_handler(CommandHandler("report", report_command))
         
-
-        # ConversationHandlers
+        # ConversationHandlers (ВАЖНО: должны быть ПЕРЕД другими обработчиками!)
         tz_conv_handler = self.create_tz_conversation_handler(tz_creation_handler_instance, start_handler)
         self.application.add_handler(tz_conv_handler)
 
@@ -145,8 +146,11 @@ class TelegramBot:
         self.application.add_handler(CallbackQueryHandler(projects_handler_instance.show_project_details, pattern="^project_details_"))
         self.application.add_handler(CallbackQueryHandler(consultant_handler_instance.start_consultation, pattern="^consultation"))
         
+        # Отдельный обработчик для кнопки create_tz (запускает ConversationHandler)
+        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^create_tz$"))
+        
         # Обработчики основных кнопок меню
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(main_menu|calculator|faq|consultation|contacts|my_projects|consultant|portfolio|settings)$"))
+        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(main_menu|calculator|faq|consultation|contacts|my_projects|consultant|portfolio|settings|create_bot_guide)$"))
         
         # Обработчики настроек
         self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(setup_timeweb|setup_bot_token)$"))
@@ -256,36 +260,6 @@ class TelegramBot:
         if self.application.updater and self.application.updater.running:
             await self.application.updater.stop()
         await self.application.stop()
-
-# --- FastAPI App Initialization ---
-app = FastAPI(
-    title="Bot Business Card Admin",
-    description="Панель управления для Telegram-бота визитки.",
-    version="0.1.0"
-)
-
-# Middleware для логирования запросов
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    import time
-    start_time = time.time()
-    
-    # Логируем входящий запрос
-    logger.info(f"HTTP {request.method} {request.url.path} - {request.client.host}")
-    
-    response = await call_next(request)
-    
-    # Логируем время выполнения
-    process_time = time.time() - start_time
-    logger.info(f"HTTP {request.method} {request.url.path} - {response.status_code} - {process_time:.2f}s")
-    
-    return response
-
-# Подключаем роутер админки
-app.include_router(admin_router, prefix="/admin")
-
-# Подключаем статические файлы
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # --- Telegram Bot Initialization ---
 bot_instance = TelegramBot()
