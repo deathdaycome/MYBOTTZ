@@ -136,6 +136,8 @@ class TelegramBot:
         # ConversationHandlers (ВАЖНО: должны быть ПЕРЕД другими обработчиками!)
         tz_conv_handler = self.create_tz_conversation_handler(tz_creation_handler_instance, start_handler)
         self.application.add_handler(tz_conv_handler)
+        
+        # Убираем отладочный обработчик - он мешал ConversationHandler
 
         # Отключаем portfolio conversation handler, так как используем прямые обработчики
         # portfolio_conv_handler = self.create_portfolio_conversation_handler(portfolio_handler_instance, start_handler)
@@ -146,11 +148,8 @@ class TelegramBot:
         self.application.add_handler(CallbackQueryHandler(projects_handler_instance.show_project_details, pattern="^project_details_"))
         self.application.add_handler(CallbackQueryHandler(consultant_handler_instance.start_consultation, pattern="^consultation"))
         
-        # Отдельный обработчик для кнопки create_tz (запускает ConversationHandler)
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^create_tz$"))
-        
-        # Обработчики основных кнопок меню
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(main_menu|calculator|faq|consultation|contacts|my_projects|consultant|portfolio|settings|create_bot_guide)$"))
+        # Обработчики основных кнопок меню (create_tz обрабатывается ConversationHandler выше, consultation обрабатывается consultant_handler)
+        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(main_menu|calculator|faq|contacts|my_projects|consultant|portfolio|settings|create_bot_guide)$"))
         
         # Обработчики настроек
         self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(setup_timeweb|setup_bot_token)$"))
@@ -228,7 +227,11 @@ class TelegramBot:
                 tz_handler.TZ_FILE_UPLOAD: [MessageHandler(filters.Document.ALL, tz_handler.handle_file_upload)],
                 tz_handler.TZ_REVIEW: [CallbackQueryHandler(tz_handler.handle_review_action, pattern="^review_")],
             },
-            fallbacks=[CommandHandler("cancel", start_handler.cancel)]
+            fallbacks=[
+                CommandHandler("cancel", start_handler.cancel),
+                CommandHandler("start", start_handler.start),  # КРИТИЧНО: /start завершает ConversationHandler
+                CallbackQueryHandler(start_handler.start, pattern="^main_menu$")  # Кнопка главного меню тоже завершает
+            ]
         )
 
     def create_portfolio_conversation_handler(self, portfolio_handler, start_handler):

@@ -196,6 +196,10 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             # Обработка различных callback'ов
             if callback_data == "main_menu":
                 logger.info(f"📱 Обрабатываем main_menu для пользователя {user_id}")
+                # ВАЖНО: Полностью сбрасываем состояние при переходе в главное меню
+                context.user_data.clear()
+                logger.info(f"🔄 Состояние пользователя {user_id} полностью сброшено")
+                
                 from ..handlers.start import StartHandler
                 start_handler = StartHandler()
                 await start_handler.start(update, context)
@@ -224,19 +228,9 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 logger.info(f"💼 Обрабатываем portfolio для пользователя {user_id}")
                 await self.show_portfolio_menu(update, context)
                 
-            elif callback_data == "portfolio":
-                logger.info(f"💼 Обрабатываем portfolio для пользователя {user_id}")
-                await self.show_portfolio_categories(update, context)
-                
             elif callback_data == "consultant":
                 logger.info(f"🤖 Обрабатываем consultant для пользователя {user_id}")
                 await self.show_consultant_menu(update, context)
-                
-            elif callback_data == "create_tz":
-                logger.info(f"🚀 Обрабатываем create_tz для пользователя {user_id}")
-                from ..handlers.tz_creation import TZCreationHandler
-                tz_handler = TZCreationHandler()
-                await tz_handler.show_tz_creation_menu(update, context)
                 
             elif callback_data == "create_bot_guide":
                 logger.info(f"🎯 Обрабатываем create_bot_guide для пользователя {user_id}")

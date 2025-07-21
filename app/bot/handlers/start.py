@@ -18,11 +18,13 @@ class StartHandler:
             user = update.effective_user
             user_id = user.id
             
-            # Сбрасываем все флаги настроек при старте
-            context.user_data.pop('waiting_bot_token_settings', None)
-            context.user_data.pop('waiting_timeweb_settings', None)
-            context.user_data.pop('waiting_bot_token', None)
-            context.user_data.pop('waiting_timeweb_credentials', None)
+            # ПОЛНЫЙ СБРОС СОСТОЯНИЯ - принудительно завершаем ConversationHandler
+            # Это критично для правильной работы кнопки "Создать ТЗ"
+            context.user_data.clear()
+            
+            # Принудительно сигнализируем завершение ConversationHandler
+            # Возвращаем ConversationHandler.END для любых активных диалогов
+            conversation_ended = True
             
             log_user_action(user_id, "start_command", f"Username: {user.username}")
             

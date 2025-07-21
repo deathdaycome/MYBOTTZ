@@ -100,6 +100,7 @@ AI автоматически структурирует ваше описани
                     parse_mode='HTML'
                 )
             
+            logger.info(f"🔄 ConversationHandler: переходим в состояние TZ_METHOD для пользователя {user_id}")
             return self.TZ_METHOD
             
         except Exception as e:

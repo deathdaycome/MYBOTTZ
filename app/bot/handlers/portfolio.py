@@ -30,7 +30,9 @@ class PortfolioHandler:
         """Получить полный URL изображения"""
         if not image_path:
             return ""
-        return urljoin(self.media_base_url + "/", image_path)
+        # Удаляем префикс uploads/ если он есть в пути
+        clean_path = image_path.replace("uploads/portfolio/", "").replace("uploads/", "")
+        return f"{self.base_url}/uploads/portfolio/{clean_path}"
     
     @standard_handler
     async def show_portfolio_categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -754,10 +756,10 @@ class PortfolioHandler:
             
             # Извлекаем категорию из callback_data
             category_map = {
-                "portfolio_telegram": "telegram",
+                "portfolio_telegram": "telegram_bot",
                 "portfolio_whatsapp": "whatsapp", 
                 "portfolio_web": "web",
-                "portfolio_integration": "integration",
+                "portfolio_integration": "ai_integration",
                 "portfolio_featured": "featured",
                 "portfolio_all": "all"
             }
@@ -768,11 +770,11 @@ class PortfolioHandler:
             
             # Получаем проекты из выбранной категории
             try:
-                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/projects", 
+                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/list", 
                                       params={"category": category}, timeout=5)
                 if response.status_code == 200:
                     data = response.json()
-                    projects = data.get("projects", [])
+                    projects = data.get("data", [])
                 else:
                     # Fallback: получаем из базы напрямую
                     projects = await self._get_projects_from_db(category)
@@ -782,12 +784,12 @@ class PortfolioHandler:
             
             if not projects:
                 category_names = {
-                    "telegram": "Telegram боты",
-                    "whatsapp": "WhatsApp боты",
-                    "web": "Веб-боты",
-                    "integration": "Интеграции",
-                    "featured": "Рекомендуемые",
-                    "all": "Все проекты"
+                    "telegram_bot": "🤖 Telegram боты",
+                    "whatsapp": "💬 WhatsApp боты",
+                    "web": "🌐 Веб-боты",
+                    "ai_integration": "🧠 AI интеграции",
+                    "featured": "⭐ Рекомендуемые",
+                    "all": "📊 Все проекты"
                 }
                 
                 text = f"""
@@ -865,10 +867,10 @@ class PortfolioHandler:
             page_projects = projects[start_idx:end_idx]
             
             category_names = {
-                "telegram": "🤖 Telegram боты",
+                "telegram_bot": "🤖 Telegram боты",
                 "whatsapp": "💬 WhatsApp боты", 
                 "web": "🌐 Веб-боты",
-                "integration": "🔗 Интеграции",
+                "ai_integration": "🧠 AI интеграции",
                 "featured": "⭐ Рекомендуемые",
                 "all": "📊 Все проекты"
             }
@@ -883,12 +885,17 @@ class PortfolioHandler:
             
             keyboard = []
             
+            # Добавляем проекты с изображениями
             for project in page_projects:
+                tech_str = ', '.join(project.get('technologies', [])[:3])
+                if not tech_str:
+                    tech_str = 'Не указаны'
+                    
                 text += f"""
 <b>{project['title']}</b>
 {project['description'][:100]}{'...' if len(project['description']) > 100 else ''}
 
-Технологии: {project.get('technologies', 'Не указаны')}
+🛠 Технологии: {tech_str}
 {'⭐ Рекомендуемый проект' if project.get('is_featured') else ''}
 
 """
@@ -896,6 +903,32 @@ class PortfolioHandler:
                 keyboard.append([
                     InlineKeyboardButton(f"👁 {project['title']}", callback_data=f"project_{project['id']}")
                 ])
+            
+            # Если у первого проекта есть изображение, отправляем с фото
+            first_project = page_projects[0] if page_projects else None
+            if first_project and first_project.get('main_image'):
+                image_url = self.get_image_url(first_project['main_image'])
+                try:
+                    await query.edit_message_media(
+                        media=InputMediaPhoto(
+                            media=image_url,
+                            caption=text,
+                            parse_mode='HTML'
+                        )
+                    )
+                    # Обновляем клавиатуру отдельно
+                    keyboard.append([
+                        InlineKeyboardButton("🔙 К категориям", callback_data="portfolio"),
+                        InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
+                    ])
+                    
+                    await query.edit_message_reply_markup(
+                        reply_markup=InlineKeyboardMarkup(keyboard)
+                    )
+                    return
+                except Exception as e:
+                    logger.error(f"Ошибка отправки изображения: {e}")
+                    # Продолжаем с текстовым сообщением
             
             # Кнопки навигации
             nav_buttons = []
