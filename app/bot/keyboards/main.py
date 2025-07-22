@@ -17,7 +17,6 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("❓ FAQ", callback_data="faq")
         ],
         [
-            InlineKeyboardButton("🎯 Создать бота", callback_data="create_bot_guide"),
             InlineKeyboardButton("💬 Консультация", callback_data="consultation")
         ],
         [

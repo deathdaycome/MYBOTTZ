@@ -279,8 +279,10 @@ class TelegramBot:
                        priority=50, description="AI консультант - вопросы")
         
         # ПРИОРИТЕТ 6: Настройки и служебное 
-        router.register(r"^(setup_timeweb|setup_bot_token)$", common_handler.handle_callback,
+        router.register(r"^(setup_timeweb|setup_telegram_id)$", common_handler.handle_callback,
                        priority=60, description="Настройки подключения")
+        router.register(r"^(bot_enter_token|bot_guide_steps)$", common_handler.handle_callback,
+                       priority=60, description="Функции создания бота")
         router.register(r"^timeweb_info$", common_handler.handle_timeweb_info,
                        priority=60, description="Информация о Timeweb")
         router.register(r"^timeweb_registered$", common_handler.handle_timeweb_registered,

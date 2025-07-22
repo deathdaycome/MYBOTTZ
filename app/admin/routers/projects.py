@@ -48,6 +48,7 @@ class ProjectUpdateModel(BaseModel):
     bot_token: Optional[str] = None  # API токен Telegram бота
     timeweb_login: Optional[str] = None  # Логин Timeweb
     timeweb_password: Optional[str] = None  # Пароль Timeweb
+    telegram_id: Optional[str] = None  # Telegram ID пользователя
 
     class Config:
         from_attributes = True
@@ -180,7 +181,17 @@ async def get_projects(
             # Добавляем информацию о пользователе
             user = db.query(User).filter(User.id == project.user_id).first()
             if user:
-                project_dict["user"] = user.to_dict()
+                user_dict = user.to_dict()
+                
+                # Добавляем Telegram ID из preferences или metadata проекта
+                telegram_id = ""
+                if user.preferences and user.preferences.get('telegram_id'):
+                    telegram_id = user.preferences.get('telegram_id', '')
+                elif project.project_metadata and project.project_metadata.get('user_telegram_id'):
+                    telegram_id = project.project_metadata.get('user_telegram_id', '')
+                    
+                user_dict["telegram_id"] = telegram_id
+                project_dict["user"] = user_dict
             
             # Добавляем читаемые названия статуса и приоритета
             project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)
@@ -274,7 +285,17 @@ async def get_project(
         # Добавляем информацию о пользователе
         user = db.query(User).filter(User.id == project.user_id).first()
         if user:
-            project_dict["user"] = user.to_dict()
+            user_dict = user.to_dict()
+            
+            # Добавляем Telegram ID из preferences или metadata проекта
+            telegram_id = ""
+            if user.preferences and user.preferences.get('telegram_id'):
+                telegram_id = user.preferences.get('telegram_id', '')
+            elif project.project_metadata and project.project_metadata.get('user_telegram_id'):
+                telegram_id = project.project_metadata.get('user_telegram_id', '')
+                
+            user_dict["telegram_id"] = telegram_id
+            project_dict["user"] = user_dict
         
         # Добавляем читаемые названия
         project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)
@@ -498,7 +519,7 @@ async def update_project(
         update_data = project_data.dict(exclude_unset=True, exclude={"comment"})
         
         # Специальные поля для metadata
-        metadata_fields = {"bot_token", "timeweb_login", "timeweb_password"}
+        metadata_fields = {"bot_token", "timeweb_login", "timeweb_password", "telegram_id"}
         
         for field_name, new_value in update_data.items():
             if new_value is not None:

@@ -258,9 +258,17 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 logger.info(f"🌐 Обрабатываем setup_timeweb для пользователя {user_id}")
                 await self.setup_timeweb(update, context)
                 
-            elif callback_data == "setup_bot_token":
-                logger.info(f"🤖 Обрабатываем setup_bot_token для пользователя {user_id}")
-                await self.setup_bot_token(update, context)
+            elif callback_data == "setup_telegram_id":
+                logger.info(f"📱 Обрабатываем setup_telegram_id для пользователя {user_id}")
+                await self.setup_telegram_id(update, context)
+                
+            elif callback_data == "bot_enter_token":
+                logger.info(f"🔑 Обрабатываем bot_enter_token для пользователя {user_id}")
+                await self.show_bot_token_projects(update, context)
+                
+            elif callback_data == "bot_guide_steps":
+                logger.info(f"📖 Обрабатываем bot_guide_steps для пользователя {user_id}")
+                await self.show_bot_guide_steps(update, context)
                 
             elif callback_data.startswith("project_chat_"):
                 logger.info(f"💬 Обрабатываем project_chat для пользователя {user_id}")
@@ -327,6 +335,7 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 context.user_data.pop('waiting_timeweb_settings', None)
                 context.user_data.pop('waiting_bot_token', None)
                 context.user_data.pop('waiting_timeweb_credentials', None)
+                context.user_data.pop('waiting_telegram_id', None)
                 # Для команд не делаем ничего - пусть обрабатывается CommandHandler
                 return
             
@@ -355,6 +364,12 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             if context.user_data.get('waiting_bot_token_settings'):
                 logger.info(f"🔑 Обрабатываем токен бота для пользователя {user_id}")
                 await self.save_bot_token_settings(update, context)
+                return
+                
+            # Проверяем, ожидаем ли мы Telegram ID
+            if context.user_data.get('waiting_telegram_id'):
+                logger.info(f"📱 Обрабатываем Telegram ID для пользователя {user_id}")
+                await self.save_telegram_id(update, context)
                 return
                 
             # Проверяем, ожидаем ли мы вопрос для AI консультанта
@@ -1551,7 +1566,10 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("🌐 Настроить Timeweb", callback_data="setup_timeweb"),
-                    InlineKeyboardButton("🤖 Настроить бота", callback_data="setup_bot_token")
+                    InlineKeyboardButton("📱 Telegram ID", callback_data="setup_telegram_id")
+                ],
+                [
+                    InlineKeyboardButton("🎯 Создать бота", callback_data="create_bot_guide"),
                 ],
                 [
                     InlineKeyboardButton("📊 Мои проекты", callback_data="my_projects"),
@@ -1823,3 +1841,232 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 )
             except:
                 pass
+
+    @standard_handler
+    async def setup_telegram_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Настройка Telegram ID пользователя"""
+        try:
+            user_id = update.effective_user.id
+            logger.info(f"📱 Настройка Telegram ID для пользователя {user_id}")
+            
+            # Получаем текущий Telegram ID из базы данных
+            with get_db_context() as db:
+                user = get_user_by_telegram_id(db, user_id)
+                current_telegram_id = ""
+                if user and user.preferences:
+                    current_telegram_id = user.preferences.get('telegram_id', '')
+            
+            text = f"""📱 <b>Настройка Telegram ID</b>
+
+<b>Ваш текущий Telegram ID:</b> {current_telegram_id or "не указан"}
+
+<b>📋 Инструкция для получения Telegram ID:</b>
+
+1️⃣ Перейдите к боту @infouserbot
+2️⃣ Нажмите кнопку "Start" или отправьте команду /start
+3️⃣ Бот автоматически пришлет ваш Telegram ID
+4️⃣ Скопируйте полученное число
+5️⃣ Отправьте его следующим сообщением
+
+<b>💡 Пример Telegram ID:</b> 123456789
+
+<b>⚡ Зачем нужен Telegram ID:</b>
+• Автоматическая привязка к проектам
+• Отображение в административной консоли
+• Упрощение связи с менеджером
+
+Отправьте ваш Telegram ID следующим сообщением:"""
+
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🤖 Открыть @infouserbot", url="https://t.me/infouserbot")],
+                [InlineKeyboardButton("⚙️ К настройкам", callback_data="settings")]
+            ])
+            
+            # Устанавливаем флаг ожидания Telegram ID
+            context.user_data['waiting_telegram_id'] = True
+            
+            await update.callback_query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в setup_telegram_id: {e}")
+
+    async def save_telegram_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Сохранение Telegram ID пользователя"""
+        try:
+            user_id = update.effective_user.id
+            telegram_id_input = update.message.text.strip()
+            
+            # Проверяем, ожидаем ли мы Telegram ID
+            if not context.user_data.get('waiting_telegram_id'):
+                return
+            
+            # Проверяем формат Telegram ID (должен быть числом)
+            try:
+                telegram_id_number = int(telegram_id_input)
+                if telegram_id_number <= 0:
+                    raise ValueError("ID должен быть положительным числом")
+            except ValueError:
+                await update.message.reply_text(
+                    "❌ Неверный формат Telegram ID. ID должен быть положительным числом.\n\n"
+                    "Пример: 123456789\n\n"
+                    "Попробуйте еще раз:",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🤖 Открыть @infouserbot", url="https://t.me/infouserbot")],
+                        [InlineKeyboardButton("⚙️ К настройкам", callback_data="settings")]
+                    ])
+                )
+                return
+            
+            # Сохраняем в базу данных
+            with get_db_context() as db:
+                user = get_user_by_telegram_id(db, user_id)
+                if user:
+                    if not user.preferences:
+                        user.preferences = {}
+                    
+                    user.preferences['telegram_id'] = str(telegram_id_number)
+                    user.preferences['telegram_id_added_at'] = datetime.utcnow().isoformat()
+                    
+                    # Также сохраняем в метаданные всех проектов пользователя
+                    projects = db.query(Project).filter(Project.user_id == user.id).all()
+                    for project in projects:
+                        if not project.project_metadata:
+                            project.project_metadata = {}
+                        project.project_metadata['user_telegram_id'] = str(telegram_id_number)
+                    
+                    db.commit()
+                    logger.info(f"📱 Telegram ID {telegram_id_number} сохранен для пользователя {user_id}")
+            
+            # Очищаем флаг ожидания
+            context.user_data.pop('waiting_telegram_id', None)
+            
+            await update.message.reply_text(
+                f"✅ <b>Telegram ID успешно сохранен!</b>\n\n"
+                f"📱 Ваш ID: <code>{telegram_id_number}</code>\n\n"
+                f"✨ ID добавлен во все ваши проекты и будет отображаться в административной консоли.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⚙️ К настройкам", callback_data="settings")]
+                ]),
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в save_telegram_id: {e}")
+
+    @standard_handler  
+    async def show_bot_token_projects(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Показать проекты для выбора при вводе API токена"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Получаем проекты пользователя
+            with get_db_context() as db:
+                user = get_user_by_telegram_id(db, user_id)
+                if not user:
+                    await update.callback_query.answer("Пользователь не найден")
+                    return
+                
+                projects = db.query(Project).filter(Project.user_id == user.id).order_by(Project.created_at.desc()).all()
+            
+            if not projects:
+                # Если нет проектов, создаем новый
+                text = """🔑 <b>Ввод API токена бота</b>
+
+У вас пока нет проектов. 
+Создадим новый проект для вашего бота!
+
+Отправьте API токен, полученный от @BotFather следующим сообщением:
+
+<b>Пример токена:</b>
+<code>1234567890:ABCdefGHIjklMNOpqrsTUVwxyz</code>"""
+                
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🤖 Открыть BotFather", url="https://t.me/BotFather")],
+                    [InlineKeyboardButton("🔙 К настройкам", callback_data="settings")]
+                ])
+                
+                # Устанавливаем флаг ожидания токена для нового проекта
+                context.user_data['waiting_bot_token_for'] = 'new_project'
+                
+            else:
+                # Показываем список проектов для выбора
+                text = """🔑 <b>Выбор проекта для API токена</b>
+
+Выберите проект, к которому хотите добавить API токен бота:"""
+                
+                keyboard_rows = []
+                for project in projects[:10]:  # Показываем только первые 10
+                    status_emoji = {
+                        'new': '🆕', 'review': '👀', 'accepted': '✅', 
+                        'in_progress': '🔄', 'testing': '🧪', 
+                        'completed': '✨', 'cancelled': '❌'
+                    }.get(project.status, '📋')
+                    
+                    title = project.title[:30] + "..." if len(project.title) > 30 else project.title
+                    keyboard_rows.append([
+                        InlineKeyboardButton(
+                            f"{status_emoji} {title}", 
+                            callback_data=f"bot_token_project_{project.id}"
+                        )
+                    ])
+                
+                keyboard_rows.extend([
+                    [InlineKeyboardButton("➕ Создать новый проект", callback_data="bot_token_new_project")],
+                    [InlineKeyboardButton("🔙 К настройкам", callback_data="settings")]
+                ])
+                
+                keyboard = InlineKeyboardMarkup(keyboard_rows)
+            
+            await update.callback_query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в show_bot_token_projects: {e}")
+
+    @standard_handler
+    async def show_bot_guide_steps(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Показать пошаговую инструкцию создания бота"""
+        try:
+            text = """📖 <b>Пошаговая инструкция создания бота</b>
+
+<b>Шаг 1:</b> Откройте @BotFather
+👆 Нажмите кнопку ниже или найдите @BotFather в поиске
+
+<b>Шаг 2:</b> Отправьте команду <code>/newbot</code>
+📱 BotFather попросит ввести имя бота
+
+<b>Шаг 3:</b> Введите имя вашего бота
+💬 Например: "Мой Первый Бот"
+
+<b>Шаг 4:</b> Введите username бота
+🔗 Должен заканчиваться на "bot", например: my_first_bot
+
+<b>Шаг 5:</b> Получите API токен
+🔑 BotFather пришлет вам токен вида: <code>123456789:ABCdef...</code>
+
+<b>Шаг 6:</b> Скопируйте токен и введите его здесь
+💾 Мы сохраним его в информации о вашем проекте
+
+⚠️ <b>Важно:</b> Никому не сообщайте ваш API токен!"""
+
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🤖 Открыть BotFather", url="https://t.me/BotFather")],
+                [InlineKeyboardButton("🔑 Ввести API токен", callback_data="bot_enter_token")],
+                [InlineKeyboardButton("🔙 К настройкам", callback_data="settings")]
+            ])
+
+            await update.callback_query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+
+        except Exception as e:
+            logger.error(f"Ошибка в show_bot_guide_steps: {e}")
