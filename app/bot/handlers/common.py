@@ -1862,7 +1862,7 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
 
 <b>📋 Инструкция для получения Telegram ID:</b>
 
-1️⃣ Перейдите к боту @infouserbot
+1️⃣ Перейдите к боту @InfousersTgbot
 2️⃣ Нажмите кнопку "Start" или отправьте команду /start
 3️⃣ Бот автоматически пришлет ваш Telegram ID
 4️⃣ Скопируйте полученное число
@@ -1878,7 +1878,7 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
 Отправьте ваш Telegram ID следующим сообщением:"""
 
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🤖 Открыть @infouserbot", url="https://t.me/infouserbot")],
+                [InlineKeyboardButton("🤖 Открыть @InfousersTgbot", url="https://t.me/InfousersTgbot")],
                 [InlineKeyboardButton("⚙️ К настройкам", callback_data="settings")]
             ])
             
@@ -1915,7 +1915,7 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                     "Пример: 123456789\n\n"
                     "Попробуйте еще раз:",
                     reply_markup=InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🤖 Открыть @infouserbot", url="https://t.me/infouserbot")],
+                        [InlineKeyboardButton("🤖 Открыть @InfousersTgbot", url="https://t.me/InfousersTgbot")],
                         [InlineKeyboardButton("⚙️ К настройкам", callback_data="settings")]
                     ])
                 )
