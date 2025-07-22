@@ -25,6 +25,7 @@ from app.bot.handlers.revisions import RevisionsHandler
 from app.bot.handlers.tz_creation import TZCreationHandler
 from app.bot.handlers.common import CommonHandler
 from app.bot.handlers.portfolio import PortfolioHandler
+from app.bot.routing import get_callback_router
 from app.admin.app import admin_router, templates
 from app.database.database import get_db, SessionLocal, init_db
 from app.utils.helpers import format_datetime, format_currency, time_ago
@@ -95,6 +96,16 @@ class TelegramBot:
         tz_creation_handler_instance = TZCreationHandler()
         common_handler_instance = CommonHandler()
         portfolio_handler_instance = PortfolioHandler()
+        
+        # Получаем централизованный роутер
+        router = get_callback_router()
+        
+        # Регистрируем все маршруты в роутере только если они еще не зарегистрированы
+        if len(router.routes) == 0:
+            self.register_callback_routes(router, start_handler, admin_handler_instance, 
+                                        consultant_handler_instance, projects_handler_instance,
+                                        revisions_handler_instance, tz_creation_handler_instance,
+                                        common_handler_instance, portfolio_handler_instance)
 
         # КРИТИЧЕСКИЙ ПРИОРИТЕТ: Специальный перехватчик (САМЫЙ ПЕРВЫЙ!)
         async def settings_interceptor(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -125,6 +136,9 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("menu", start_handler.menu))
         self.application.add_handler(CommandHandler("cancel", start_handler.cancel))
         
+        # ЕДИНЫЙ ОБРАБОТЧИК ВСЕХ CALLBACK'ОВ ЧЕРЕЗ РОУТЕР
+        self.application.add_handler(CallbackQueryHandler(router.route))
+        
         # MessageHandler для настроек (ВРЕМЕННО ОТКЛЮЧЕН для тестирования)
         # self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, settings_interceptor))
         
@@ -133,106 +147,166 @@ class TelegramBot:
         self.application.add_handler(CommandHandler("stats", stats_command))
         self.application.add_handler(CommandHandler("report", report_command))
         
-        # ConversationHandlers (ВАЖНО: должны быть ПЕРЕД другими обработчиками!)
-        tz_conv_handler = self.create_tz_conversation_handler(tz_creation_handler_instance, start_handler)
-        self.application.add_handler(tz_conv_handler)
-        
-        # Убираем отладочный обработчик - он мешал ConversationHandler
-
-        # Отключаем portfolio conversation handler, так как используем прямые обработчики
-        # portfolio_conv_handler = self.create_portfolio_conversation_handler(portfolio_handler_instance, start_handler)
-        # self.application.add_handler(portfolio_conv_handler)
-
-        # Обработчики колбэков
-        self.application.add_handler(CallbackQueryHandler(projects_handler_instance.show_user_projects, pattern="^list_projects"))
-        self.application.add_handler(CallbackQueryHandler(projects_handler_instance.show_project_details, pattern="^project_details_"))
-        self.application.add_handler(CallbackQueryHandler(consultant_handler_instance.start_consultation, pattern="^consultation"))
-        
-        # Обработчики основных кнопок меню (create_tz обрабатывается ConversationHandler выше, consultation обрабатывается consultant_handler)
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(main_menu|calculator|faq|contacts|my_projects|consultant|portfolio|settings|create_bot_guide)$"))
-        
-        # Обработчики настроек
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(setup_timeweb|setup_bot_token)$"))
-        
-        # Обработчики портфолио
-        self.application.add_handler(CallbackQueryHandler(portfolio_handler_instance.select_category, pattern="^portfolio_(telegram|whatsapp|web|integration|featured|all)$"))
-        self.application.add_handler(CallbackQueryHandler(portfolio_handler_instance.select_project, pattern=r"^project_\d+$"))
-        self.application.add_handler(CallbackQueryHandler(portfolio_handler_instance.handle_portfolio_navigation, pattern=r"^portfolio_page_\d+$"))
-        
-        # Обработчики AI консультанта
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_callback, pattern="^(ask_question|example_questions)$"))
-        
-        # Обработчики правок
-        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.show_project_revisions, pattern="^project_revisions_"))
-        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.list_project_revisions, pattern="^list_revisions_"))
-        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.start_create_revision, pattern="^create_revision_"))
-        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.handle_revision_priority, pattern="^priority_(low|normal|high|urgent)_"))
-        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.confirm_create_revision, pattern="^confirm_revision_"))
-        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.show_revision_details, pattern="^revision_details_"))
-        
-        # ВАЖНО: Обработчики кнопок в процессе создания правки
-        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.files_done, pattern="^files_done_"))
-        self.application.add_handler(CallbackQueryHandler(revisions_handler_instance.skip_revision_files, pattern="^skip_files_"))
-        
         # ВАЖНО: Обработчики фото и файлов для правок (ВКЛЮЧАЕМ!)
         self.application.add_handler(MessageHandler(
             filters.PHOTO, 
             common_handler_instance.handle_photo
         ))
         
-        self.application.add_handler(MessageHandler(
-            filters.ATTACHMENT, 
-            common_handler_instance.handle_document
-        ))
-        
-        # Обработчик текстовых сообщений для правок - УНИВЕРСАЛЬНЫЙ
-        async def revision_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-            """Маршрутизация текстовых сообщений для правок"""
+        # КРИТИЧНО: Обработчик документов для ТЗ и правок
+        async def document_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Маршрутизация документов"""
             try:
+                # Проверяем режим создания ТЗ документом
+                tz_data = context.user_data.get('tz_creation', {})
+                if tz_data.get('method') == 'upload':
+                    await tz_creation_handler_instance.handle_file_upload(update, context)
+                    return
+                
+                # Обычная обработка документов
+                await common_handler_instance.handle_document(update, context)
+            except Exception as e:
+                logger.error(f"Ошибка в document_router: {e}")
+        
+        self.application.add_handler(MessageHandler(filters.ATTACHMENT, document_router))
+        
+        # КРИТИЧНО: Обработчик голосовых сообщений для ТЗ
+        async def voice_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Маршрутизация голосовых сообщений"""
+            try:
+                # Проверяем находимся ли в режиме создания ТЗ голосом
+                tz_data = context.user_data.get('tz_creation', {})
+                if tz_data.get('method') == 'voice':
+                    await tz_creation_handler_instance.handle_voice_input(update, context)
+                    return
+                
+                # Если не в режиме ТЗ - передаем в общий обработчик
+                await common_handler_instance.handle_voice(update, context)
+            except Exception as e:
+                logger.error(f"Ошибка в voice_router: {e}")
+        
+        self.application.add_handler(MessageHandler(filters.VOICE, voice_router))
+        
+        # УНИВЕРСАЛЬНЫЙ текстовый роутер для ТЗ, правок и общих сообщений
+        async def universal_text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Маршрутизация текстовых сообщений"""
+            try:
+                # Проверяем режим создания ТЗ текстом
+                tz_data = context.user_data.get('tz_creation', {})
+                if tz_data.get('method') == 'text':
+                    await tz_creation_handler_instance.handle_text_input(update, context)
+                    return
+                
+                # Проверяем создание правок
                 step = context.user_data.get('creating_revision_step')
                 if step == 'title':
                     await revisions_handler_instance.handle_revision_title(update, context)
+                    return
                 elif step == 'description':
                     await revisions_handler_instance.handle_revision_description(update, context)
-                else:
-                    # Если не в процессе создания правки - обычная обработка
-                    await common_handler_instance.handle_text_input(update, context)
+                    return
+                
+                # Обычная обработка текста
+                await common_handler_instance.handle_text_input(update, context)
             except Exception as e:
-                logger.error(f"Ошибка в revision_text_router: {e}")
+                logger.error(f"Ошибка в universal_text_router: {e}")
         
         self.application.add_handler(MessageHandler(
             filters.TEXT & ~filters.COMMAND & ~filters.PHOTO, 
-            revision_text_router
+            universal_text_router
         ))
+    
+    def register_callback_routes(self, router, start_handler, admin_handler, consultant_handler, 
+                               projects_handler, revisions_handler, tz_handler, common_handler, portfolio_handler):
+        """Регистрирует все callback маршруты в централизованном роутере"""
         
-        # Обработчики Timeweb (оставляем для совместимости)
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_timeweb_info, pattern="^timeweb_info"))
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_timeweb_registered, pattern="^timeweb_registered"))
+        # ПРИОРИТЕТ 1 (САМЫЙ ВЫСОКИЙ): Специфичные ID-based маршруты
         
-        # Обработчики создания бота (оставляем для совместимости)
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_bot_creation_help, pattern="^bot_creation_help"))
-        self.application.add_handler(CallbackQueryHandler(common_handler_instance.handle_bot_creation_understood, pattern="^bot_creation_understood"))
+        # Проекты - детали (очень специфично)
+        router.register(r"^project_details_\d+$", projects_handler.show_project_details, 
+                       priority=10, description="Детали проекта по ID")
         
-        # MessageHandler для текста (В САМОМ КОНЦЕ - последний приоритет)
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, common_handler_instance.handle_text_input))
+        # Правки - специфичные действия
+        router.register(r"^project_revisions_\d+$", revisions_handler.show_project_revisions,
+                       priority=10, description="Правки проекта по ID")
+        router.register(r"^list_revisions_\d+$", revisions_handler.list_project_revisions,
+                       priority=10, description="Список правок проекта")
+        router.register(r"^create_revision_\d+$", revisions_handler.start_create_revision,
+                       priority=10, description="Создать правку для проекта")
+        router.register(r"^confirm_revision_\d+$", revisions_handler.confirm_create_revision,
+                       priority=10, description="Подтвердить создание правки")
+        router.register(r"^revision_details_\d+$", revisions_handler.show_revision_details,
+                       priority=10, description="Детали правки")
+        router.register(r"^files_done_\d+$", revisions_handler.files_done,
+                       priority=10, description="Завершить загрузку файлов правки")
+        router.register(r"^skip_files_\d+$", revisions_handler.skip_revision_files,
+                       priority=10, description="Пропустить загрузку файлов правки")
+        
+        # Приоритеты правок
+        router.register(r"^priority_(low|normal|high|urgent)_\d+$", revisions_handler.handle_revision_priority,
+                       priority=10, description="Установить приоритет правки")
+        
+        # ПРИОРИТЕТ 2: Проекты общие
+        router.register(r"^list_projects$", projects_handler.show_user_projects,
+                       priority=20, description="Показать проекты пользователя")
+        
+        # ПРИОРИТЕТ 3: Портфолио специфичное
+        router.register(r"^portfolio_(telegram|whatsapp|web|integration|featured|all)$", portfolio_handler.select_category,
+                       priority=30, description="Категории портфолио")
+        router.register(r"^project_\d+$", portfolio_handler.select_project,
+                       priority=30, description="Выбор проекта в портфолио") 
+        router.register(r"^portfolio_page_\d+$", portfolio_handler.handle_portfolio_navigation,
+                       priority=30, description="Навигация по страницам портфолио")
+        
+        # ПРИОРИТЕТ 4: ТЗ Creation (ConversationHandler маршруты)
+        router.register(r"^create_tz$", tz_handler.show_tz_creation_menu,
+                       priority=40, description="Создать техническое задание")
+        router.register(r"^tz_(text|voice|step_by_step|upload)$", tz_handler.select_tz_method,
+                       priority=40, description="Выбор метода создания ТЗ")
+        
+        # Пошаговое создание ТЗ - кнопки с ответами
+        router.register(r"^step_", tz_handler.handle_step_answer,
+                       priority=40, description="Ответы на пошаговые вопросы ТЗ")
+        
+        # Действия с готовым ТЗ
+        router.register(r"^review_", tz_handler.handle_review_action,
+                       priority=40, description="Действия с готовым ТЗ")
+        
+        # ПРИОРИТЕТ 5: Консультации
+        router.register(r"^consultation$", consultant_handler.start_consultation,
+                       priority=50, description="Начать консультацию")
+        router.register(r"^(ask_question|example_questions)$", common_handler.handle_callback,
+                       priority=50, description="AI консультант - вопросы")
+        
+        # ПРИОРИТЕТ 6: Настройки и служебное 
+        router.register(r"^(setup_timeweb|setup_bot_token)$", common_handler.handle_callback,
+                       priority=60, description="Настройки подключения")
+        router.register(r"^timeweb_info$", common_handler.handle_timeweb_info,
+                       priority=60, description="Информация о Timeweb")
+        router.register(r"^timeweb_registered$", common_handler.handle_timeweb_registered,
+                       priority=60, description="Регистрация на Timeweb")
+        router.register(r"^bot_creation_help$", common_handler.handle_bot_creation_help,
+                       priority=60, description="Помощь в создании бота")
+        router.register(r"^bot_creation_understood$", common_handler.handle_bot_creation_understood,
+                       priority=60, description="Понял инструкции по созданию бота")
+        
+        # ПРИОРИТЕТ 7 (САМЫЙ НИЗКИЙ): Основное меню и общие команды
+        router.register(r"^main_menu$", start_handler.start,
+                       priority=70, description="Главное меню")
+        router.register(r"^(calculator|faq|contacts|my_projects|consultant|portfolio|settings|create_bot_guide)$", 
+                       common_handler.handle_callback, priority=70, description="Основные разделы меню")
+        
+        # Логируем все зарегистрированные маршруты
+        logger.info(f"🔀 Зарегистрировано {len(router.routes)} callback маршрутов")
+        
+        # Проверяем конфликты
+        conflicts = router.validate_all_patterns()
+        if conflicts:
+            logger.warning(f"⚠️ Найдены конфликты в маршрутах: {conflicts}")
+        else:
+            logger.info("✅ Конфликты в маршрутах не найдены")
 
-    def create_tz_conversation_handler(self, tz_handler, start_handler):
-        return ConversationHandler(
-            entry_points=[CallbackQueryHandler(tz_handler.show_tz_creation_menu, pattern="^create_tz$")],
-            states={
-                tz_handler.TZ_METHOD: [CallbackQueryHandler(tz_handler.select_tz_method, pattern="^tz_(text|voice|step_by_step|upload)$")],
-                tz_handler.TZ_TEXT_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, tz_handler.handle_text_input)],
-                tz_handler.TZ_VOICE_INPUT: [MessageHandler(filters.VOICE, tz_handler.handle_voice_input)],
-                tz_handler.TZ_STEP_BY_STEP: [CallbackQueryHandler(tz_handler.handle_step_answer, pattern="^step_")],
-                tz_handler.TZ_FILE_UPLOAD: [MessageHandler(filters.Document.ALL, tz_handler.handle_file_upload)],
-                tz_handler.TZ_REVIEW: [CallbackQueryHandler(tz_handler.handle_review_action, pattern="^review_")],
-            },
-            fallbacks=[
-                CommandHandler("cancel", start_handler.cancel),
-                CommandHandler("start", start_handler.start),  # КРИТИЧНО: /start завершает ConversationHandler
-                CallbackQueryHandler(start_handler.start, pattern="^main_menu$")  # Кнопка главного меню тоже завершает
-            ]
-        )
+    # ConversationHandler для ТЗ теперь заменен на роутер - удален для предотвращения конфликтов
 
     def create_portfolio_conversation_handler(self, portfolio_handler, start_handler):
         return ConversationHandler(

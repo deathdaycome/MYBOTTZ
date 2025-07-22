@@ -356,6 +356,12 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 logger.info(f"🔑 Обрабатываем токен бота для пользователя {user_id}")
                 await self.save_bot_token_settings(update, context)
                 return
+                
+            # Проверяем, ожидаем ли мы вопрос для AI консультанта
+            if context.user_data.get('waiting_ai_question'):
+                logger.info(f"🤖 Обрабатываем вопрос для AI консультанта от пользователя {user_id}")
+                await self.handle_ai_question(update, context)
+                return
             
             # Проверяем, создает ли пользователь правку
             if context.user_data.get('creating_revision_step') == 'title':
@@ -1348,6 +1354,10 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
     async def show_ask_question(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Показать форму для вопроса"""
         try:
+            # Устанавливаем флаг ожидания вопроса
+            context.user_data['waiting_ai_question'] = True
+            log_user_action(update.effective_user.id, "show_ask_question", "Handler called")
+            
             text = """
 💬 <b>Задать вопрос AI консультанту</b>
 
@@ -1379,6 +1389,60 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             
         except Exception as e:
             logger.error(f"Ошибка в show_ask_question: {e}")
+
+    async def handle_ai_question(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработать вопрос для AI консультанта"""
+        try:
+            user_id = update.effective_user.id
+            question = update.message.text
+            
+            logger.info(f"🤖 AI консультант: получен вопрос от {user_id}: '{question[:100]}...'")
+            
+            # Убираем флаг ожидания
+            context.user_data.pop('waiting_ai_question', None)
+            
+            # Отправляем уведомление о том, что обрабатываем вопрос
+            processing_msg = await update.message.reply_text(
+                "🤖 AI консультант обрабатывает ваш вопрос...\n⏳ Пожалуйста, подождите..."
+            )
+            
+            # Импортируем AI сервис
+            from ...services.openai_service import ai_service
+            
+            # Получаем ответ от AI консультанта
+            result = await ai_service.consultant_response(question)
+            ai_response = result.get('response')
+            
+            if ai_response:
+                # Удаляем сообщение о загрузке
+                await processing_msg.delete()
+                
+                # Формируем финальное сообщение
+                final_text = f"🤖 <b>AI Консультант</b>\n\n{ai_response}"
+                
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("💬 Задать еще вопрос", callback_data="ask_question")],
+                    [InlineKeyboardButton("🔙 К консультанту", callback_data="consultant")],
+                    [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
+                ])
+                
+                await update.message.reply_text(
+                    final_text,
+                    reply_markup=keyboard,
+                    parse_mode='HTML'
+                )
+                
+                log_user_action(user_id, "ai_question_answered", question[:50])
+            else:
+                await processing_msg.edit_text(
+                    "❌ Извините, произошла ошибка при обработке вашего вопроса. Попробуйте еще раз."
+                )
+                
+        except Exception as e:
+            logger.error(f"Ошибка в handle_ai_question: {e}")
+            await update.message.reply_text(
+                "❌ Произошла ошибка при обработке вашего вопроса. Попробуйте позже."
+            )
 
     @standard_handler
     async def show_example_questions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

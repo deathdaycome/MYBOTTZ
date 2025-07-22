@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(pkill:*)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }

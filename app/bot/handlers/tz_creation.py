@@ -538,14 +538,22 @@ AI проанализирует ваше описание и создаст ст
         """Начать загрузку файла с ТЗ"""
         try:
             text = """
-📄 <b>Загрузка документа</b>
+📄 <b>Загрузка документа с описанием проекта</b>
 
-Загрузите файл с описанием проекта:
-• PDF, DOC, DOCX
-• TXT файлы
-• Изображения с текстом
+<b>Поддерживаемые форматы:</b>
+✅ <b>TXT</b> - текстовые файлы (полная поддержка)
+✅ <b>PDF</b> - документы Adobe PDF  
+✅ <b>DOC/DOCX</b> - документы Microsoft Word
+📷 <b>Изображения</b> - в разработке (OCR)
 
-<i>Отправьте файл:</i>
+<b>Требования:</b>
+• Максимальный размер: 20MB
+• Файл должен содержать описание проекта
+• Минимум 10 символов текста
+
+<i>💡 Совет: Для лучшего результата используйте TXT файлы с подробным описанием проекта</i>
+
+Отправьте ваш файл:
             """
             
             keyboard = InlineKeyboardMarkup([
@@ -574,14 +582,172 @@ AI проанализирует ваше описание и создаст ст
     async def handle_file_upload(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработать загрузку файла"""
         try:
-            await update.message.reply_text(
-                "📄 Обработка файлов временно недоступна. Попробуйте текстовое описание.",
-                reply_markup=get_main_menu_keyboard()
+            user_id = update.effective_user.id
+            message = update.message
+            
+            # Отправляем сообщение о начале обработки
+            processing_msg = await message.reply_text(
+                "📄 Обрабатываем ваш файл...\n⏳ Пожалуйста, подождите..."
             )
-            return ConversationHandler.END
+            
+            file_content = None
+            file_name = None
+            
+            # Обработка документов
+            if message.document:
+                file_name = message.document.file_name
+                file_id = message.document.file_id
+                file_size = message.document.file_size
+                
+                # Проверяем размер файла (максимум 20MB)
+                if file_size > 20 * 1024 * 1024:
+                    await processing_msg.edit_text(
+                        "❌ Файл слишком большой. Максимальный размер: 20MB\n\n"
+                        "Попробуйте загрузить файл поменьше или используйте текстовое описание.",
+                        reply_markup=get_main_menu_keyboard()
+                    )
+                    return ConversationHandler.END
+                
+                # Получаем файл
+                file = await context.bot.get_file(file_id)
+                file_bytes = await file.download_as_bytearray()
+                
+                # Извлекаем текст в зависимости от типа файла
+                file_extension = file_name.lower().split('.')[-1] if file_name and '.' in file_name else ''
+                
+                try:
+                    if file_extension in ['txt']:
+                        # Текстовые файлы
+                        file_content = file_bytes.decode('utf-8')
+                    elif file_extension in ['pdf']:
+                        # PDF файлы 
+                        try:
+                            import PyPDF2
+                            import io
+                            pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))
+                            file_content = ""
+                            for page in pdf_reader.pages:
+                                file_content += page.extract_text() + "\n"
+                        except ImportError:
+                            await processing_msg.edit_text(
+                                "❌ PDF обработка не настроена. Используйте TXT файл или текстовое описание.",
+                                reply_markup=get_main_menu_keyboard()
+                            )
+                            return ConversationHandler.END
+                    elif file_extension in ['doc', 'docx']:
+                        # Word документы
+                        try:
+                            from docx import Document
+                            import io
+                            doc = Document(io.BytesIO(file_bytes))
+                            file_content = ""
+                            for paragraph in doc.paragraphs:
+                                file_content += paragraph.text + "\n"
+                        except ImportError:
+                            await processing_msg.edit_text(
+                                "❌ DOC/DOCX обработка не настроена. Используйте TXT файл или текстовое описание.",
+                                reply_markup=get_main_menu_keyboard()
+                            )
+                            return ConversationHandler.END
+                    else:
+                        await processing_msg.edit_text(
+                            f"❌ Неподдерживаемый формат файла: {file_extension}\n\n"
+                            "Поддерживаемые форматы: TXT, PDF, DOC, DOCX\n"
+                            "Или используйте текстовое описание.",
+                            reply_markup=get_main_menu_keyboard()
+                        )
+                        return ConversationHandler.END
+                        
+                except Exception as e:
+                    logger.error(f"Ошибка извлечения текста из файла {file_extension}: {e}")
+                    await processing_msg.edit_text(
+                        f"❌ Не удалось обработать файл {file_name}\n\n"
+                        "Попробуйте другой файл или используйте текстовое описание.",
+                        reply_markup=get_main_menu_keyboard()
+                    )
+                    return ConversationHandler.END
+            
+            # Обработка изображений с текстом (OCR)
+            elif message.photo:
+                await processing_msg.edit_text(
+                    "📷 OCR обработка изображений в разработке.\n\n"
+                    "Пока используйте текстовые файлы или текстовое описание.",
+                    reply_markup=get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+            
+            else:
+                await processing_msg.edit_text(
+                    "❌ Неподдерживаемый тип файла\n\n"
+                    "Отправьте документ (TXT, PDF, DOC, DOCX) или используйте текстовое описание.",
+                    reply_markup=get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+            
+            # Проверяем, что удалось извлечь текст
+            if not file_content or len(file_content.strip()) < 10:
+                await processing_msg.edit_text(
+                    "❌ Не удалось извлечь текст из файла или текста слишком мало\n\n"
+                    "Убедитесь, что файл содержит текстовое описание проекта.",
+                    reply_markup=get_main_menu_keyboard()
+                )
+                return ConversationHandler.END
+                
+            # Сохраняем данные для создания ТЗ
+            context.user_data['tz_creation'] = {
+                'method': 'upload',
+                'file_name': file_name,
+                'content': file_content.strip()
+            }
+            
+            log_user_action(user_id, "file_uploaded", f"File: {file_name}, Length: {len(file_content)}")
+            
+            # Удаляем сообщение о загрузке
+            await processing_msg.delete()
+            
+            # Показываем превью и создаем ТЗ
+            preview_text = file_content[:500] + ("..." if len(file_content) > 500 else "")
+            
+            await message.reply_text(
+                f"📄 <b>Файл обработан успешно!</b>\n\n"
+                f"📁 Файл: {file_name}\n"
+                f"📏 Длина текста: {len(file_content)} символов\n\n"
+                f"<b>Превью содержимого:</b>\n"
+                f"<code>{preview_text}</code>\n\n"
+                f"⏳ Создаем техническое задание на основе вашего файла...",
+                parse_mode='HTML'
+            )
+            
+            # Создаем ТЗ на основе содержимого файла
+            tz_data = await self._generate_tz_from_text(file_content, user_id)
+            
+            if tz_data:
+                # Добавляем метаинформацию
+                tz_data['source'] = 'file'
+                tz_data['file_name'] = file_name
+                tz_data['file_content'] = file_content
+                
+                # Сохраняем данные для пользователя в context
+                context.user_data['tz_creation'] = tz_data
+                
+                # Показываем сгенерированное ТЗ
+                await self._show_generated_tz(update, context, tz_data)
+                return self.TZ_REVIEW
+            else:
+                await update.message.reply_text(
+                    "❌ Не удалось создать ТЗ на основе файла.\n\n"
+                    "Попробуйте другой файл или используйте текстовое описание.",
+                    reply_markup=self.get_back_keyboard()
+                )
+                return self.TZ_METHOD
             
         except Exception as e:
             logger.error(f"Ошибка в handle_file_upload: {e}")
+            await update.message.reply_text(
+                "❌ Произошла ошибка при обработке файла.\n\n"
+                "Попробуйте еще раз или используйте текстовое описание.",
+                reply_markup=get_main_menu_keyboard()
+            )
             return ConversationHandler.END
     
     async def handle_review_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
