@@ -39,26 +39,19 @@ jobs:
         timeout: 180s
         command_timeout: 120s
         script: |
-          # Установка базовых настроек для избежания ошибок
-          set +e  # Не прерывать выполнение при ошибках команд
-
           # Создаем директорию проекта если не существует
           mkdir -p /var/www/bot_business_card
           cd /var/www/bot_business_card
 
-          # Останавливаем текущие процессы без sudo и более мягко
-          echo "Stopping application processes..."
-          pkill -f "python.*main.py" 2>/dev/null || true
-          pkill -f "run.py" 2>/dev/null || true  
-          pkill -f "app.main" 2>/dev/null || true
-          pkill -f "bot_app" 2>/dev/null || true
+          # Останавливаем все процессы (включая дублирующие боты)
+          echo "Stopping all application processes..."
+          pkill -f "python.*run.py" || true
+          pkill -f "python.*app.main" || true
+          pkill -f "bot_app" || true
+          screen -S bot_app -X quit || true
           sleep 3
 
-          # Завершаем screen сессии если есть
-          screen -S bot_app -X quit 2>/dev/null || true
-          sleep 1
-
-          # Клонируем или обновляем код из git
+          # Обновляем код
           if [ -d ".git" ]; then
               git fetch origin
               git reset --hard origin/main
@@ -66,14 +59,14 @@ jobs:
               git clone https://github.com/deathdaycome/MYBOTTZ.git .
           fi
 
-          # Создаем необходимые папки
+          # Создаем директории
           mkdir -p data logs uploads
 
-          # Создаем .env файл с необходимыми переменными  
+          # Создаем .env с правильными переменными
           cat > .env << 'ENV_EOF'
           # Telegram Bot Configuration
-          BOT_TOKEN=7881909419:AAGM1NaGnQdvVkGbjgvILgZ3R83dOjEbv-k
           TELEGRAM_BOT_TOKEN=7881909419:AAGM1NaGnQdvVkGbjgvILgZ3R83dOjEbv-k
+          BOT_TOKEN=7881909419:AAGM1NaGnQdvVkGbjgvILgZ3R83dOjEbv-k
           TELEGRAM_CHAT_ID=501613334
           BOT_USERNAME=ivan_dev_bot
 
@@ -82,7 +75,7 @@ jobs:
           OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
           DEFAULT_MODEL=anthropic/claude-3.5-sonnet
 
-          # OpenAI API Configuration  
+          # OpenAI API Configuration
           OPENAI_API_KEY=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
 
           # Database Configuration
@@ -97,9 +90,9 @@ jobs:
           # Security
           SECRET_KEY=prod-bot-secret-key-2024-super-secure-random-string
 
-          # Server Configuration
+          # Server Configuration - ПРАВИЛЬНЫЙ ПОРТ!
           HOST=0.0.0.0
-          PORT=8001
+          PORT=8000
           DEBUG=false
           ENVIRONMENT=production
 
@@ -132,85 +125,45 @@ jobs:
           CONSULTANT_TEMPERATURE=0.7
           ENV_EOF
 
-          # Устанавливаем/обновляем зависимости
-          pip3 install --user -r requirements.txt || echo "Requirements installation had issues"
+          # Устанавливаем зависимости
+          pip3 install --user -r requirements.txt
 
-          # Применяем миграции базы данных
+          # Инициализируем БД
           python3 -c "
           try:
-              from app.database.database import init_db
-              init_db()
-              print('Database migrations applied successfully')
+              from app.database.database import init_database
+              init_database()
+              print('✓ Database initialized')
           except Exception as e:
-              print(f'Migration failed: {e}')
-          " || echo "Migration step completed with warnings"
+              print(f'Database init error: {e}')
+          "
 
-          # Создаем скрипт запуска с полным путем к python
-          cat > start_app.sh << 'SCRIPT_EOF'
-          #!/bin/bash
-          cd /var/www/bot_business_card
-          export PATH="$HOME/.local/bin:$PATH"
-          exec python3 -m app.main > app.log 2>&1
-          SCRIPT_EOF
-
-          chmod +x start_app.sh
-
-          # Проверяем установлен ли screen, если нет - устанавливаем
-          if ! command -v screen &> /dev/null; then
-              echo "Installing screen..."
-              apt-get update && apt-get install -y screen || echo "Could not install screen"
-          fi
-
-          # Запускаем приложение через screen
-          echo "Starting application in screen session..."
-          screen -dmS bot_app bash -c 'cd /var/www/bot_business_card && ./start_app.sh'
+          # Запускаем приложение через правильный run.py
+          echo "Starting application..."
+          screen -dmS bot_app bash -c 'cd /var/www/bot_business_card && python3 run.py > app.log 2>&1'
 
           # Ждем запуска
-          sleep 8
+          sleep 10
 
           # Проверяем результат
-          if screen -list | grep -q "bot_app"; then
-              echo "✓ Screen session created successfully"
+          if screen -list | grep -q bot_app && pgrep -f "python.*run.py"; then
+              echo "✓ Application started successfully"
               
-              # Проверяем процесс Python
-              if pgrep -f "python.*app.main" > /dev/null; then
-                  echo "✓ Python process is running"
-                  
-                  # HTTP проверка с таймаутом
-                  echo "Checking HTTP response..."
-                  sleep 5
-                  if timeout 10 curl -f http://localhost:8001/ > /dev/null 2>&1; then
-                      echo "✓ HTTP check passed - application is responding"
-                  else
-                      echo "⚠ HTTP check failed, but process is running - app may still be starting"
-                  fi
+              # Проверяем HTTP на правильном порту 8000
+              if timeout 10 curl -f http://localhost:8000/ > /dev/null 2>&1; then
+                  echo "✓ HTTP check passed on port 8000"
               else
-                  echo "⚠ Python process not detected yet - checking logs"
-                  tail -20 app.log 2>/dev/null || echo "No logs available yet"
+                  echo "⚠ HTTP check failed on port 8000"
               fi
               
-              echo "✓ Deployment completed successfully"
-              
-              # Показываем статус
-              echo ""
-              echo "=== STATUS ==="
-              echo "Screen sessions:"
-              screen -list 2>/dev/null || echo "No screen sessions"
-              echo "Python processes:"
-              pgrep -f python || echo "No python processes found"
+              echo "Screen sessions: $(screen -list)"
+              echo "Python processes: $(pgrep -f python)"
+              echo "Open ports: $(netstat -tlnp | grep python)"
               
           else
-              echo "✗ Failed to create screen session"
-              echo "Trying alternative startup method..."
-              
-              # Альтернативный запуск с nohup
-              nohup python3 -m app.main > app.log 2>&1 &
-              sleep 5
-              
-              if pgrep -f "python.*app.main" > /dev/null; then
-                  echo "✓ Application started with nohup"
-              else
-                  echo "✗ Application failed to start"
-                  tail -20 app.log 2>/dev/null || echo "No logs to show"
-              fi
+              echo "✗ Application failed to start"
+              tail -20 app.log 2>/dev/null || echo "No logs"
+              exit 1
           fi
+
+          echo "✅ Deployment completed successfully"
