@@ -37,45 +37,83 @@ jobs:
         key: ${{ secrets.TIMEWEB_SSH_KEY }}
         port: ${{ secrets.TIMEWEB_SSH_PORT }}
         script: |
-          # Создаем директорию проекта если не существует
+          set -e  # Остановить выполнение при ошибке
+          
+          echo "=== DEPLOYMENT START ==="
+          echo "Step 1: Creating project directory"
           sudo mkdir -p /var/www/bot_business_card
           cd /var/www/bot_business_card
+          pwd
+          ls -la
           
-          # Останавливаем текущий процесс
-          pkill -f "python.*main.py" || true
-          sleep 5
+          echo "Step 2: Stopping current process"
+          pkill -f "python.*main.py" || echo "No process to kill"
+          sleep 2
           
-          # Клонируем или обновляем код из git
+          echo "Step 3: Setting up git repository"
           if [ -d ".git" ]; then
-            git fetch origin
-            git reset --hard origin/main
+            echo "Git repository exists, updating..."
+            git fetch origin 2>&1 || echo "Git fetch failed"
+            git reset --hard origin/main 2>&1 || echo "Git reset failed"
           else
-            git clone https://github.com/deathdaycome/MYBOTTZ.git .
+            echo "Cloning repository..."
+            git clone https://github.com/deathdaycome/MYBOTTZ.git . 2>&1 || {
+              echo "Git clone failed, trying with cleanup..."
+              rm -rf * .[^.]* 2>/dev/null || true
+              git clone https://github.com/deathdaycome/MYBOTTZ.git . 2>&1
+            }
           fi
           
-          # Создаем необходимые папки
+          echo "Step 4: Checking repository contents"
+          ls -la
+          
+          echo "Step 5: Creating necessary directories"
           mkdir -p data logs uploads
           
-          # Устанавливаем/обновляем зависимости
-          pip3 install --user -r requirements.txt
+          echo "Step 6: Installing Python dependencies"
+          python3 --version
+          pip3 --version
+          pip3 install --user -r requirements.txt 2>&1 || {
+            echo "Pip install failed, output:"
+            cat requirements.txt
+            exit 1
+          }
           
-          # Применяем миграции базы данных
+          echo "Step 7: Applying database migrations"
           python3 -c "
-          from app.database.database import get_db_context, init_database
-          init_database()
-          print('Database migrations applied')
-          " || echo "Migration failed or not needed"
+          try:
+              from app.database.database import get_db_context, init_database
+              init_database()
+              print('Database migrations applied successfully')
+          except Exception as e:
+              print(f'Migration error: {e}')
+              import traceback
+              traceback.print_exc()
+          " 
           
-          # Запускаем приложение в фоне
+          echo "Step 8: Starting application"
           nohup python3 -m app.main > app.log 2>&1 &
+          APP_PID=$!
+          echo "Started app with PID: $APP_PID"
           
-          # Проверяем что приложение запустилось
-          sleep 10
-          if curl -f http://localhost:8001/ > /dev/null 2>&1; then
-            echo "Application started successfully"
+          echo "Step 9: Waiting for application to start"
+          sleep 15
+          
+          echo "Step 10: Checking application status"
+          if ps -p $APP_PID > /dev/null; then
+            echo "Process is running"
           else
-            echo "Application failed to start"
+            echo "Process died, checking logs:"
+            cat app.log 2>/dev/null || echo "No log file found"
             exit 1
           fi
           
-          echo "Deployment completed successfully"
+          echo "Step 11: Testing HTTP endpoint"
+          curl -f http://localhost:8001/ 2>&1 || {
+            echo "HTTP check failed, application logs:"
+            tail -50 app.log 2>/dev/null || echo "No log file to show"
+            ps aux | grep python
+            exit 1
+          }
+          
+          echo "=== DEPLOYMENT SUCCESS ==="
