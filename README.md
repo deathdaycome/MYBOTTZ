@@ -252,3 +252,4 @@ docker-compose up -d
 ---
 
 **Создано с ❤️ для автоматизации работы разработчиков ботов**# Production deployment ready
+# Fix SSH key
