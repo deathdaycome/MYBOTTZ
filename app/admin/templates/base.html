@@ -526,6 +526,18 @@
                 Правки
             </a>
             
+            <!-- Планировщик задач -->
+            <a class="nav-link" href="/admin/tasks/">
+                <i class="fas fa-tasks"></i>
+                Планировщик задач
+            </a>
+            
+            <!-- Мои задачи -->
+            <a class="nav-link" href="/admin/tasks/user/my-tasks">
+                <i class="fas fa-clipboard-list"></i>
+                Мои задачи
+            </a>
+            
             {% if user_role == "owner" %}
             <!-- Только для владельца -->
             <a class="nav-link" href="/admin/users">

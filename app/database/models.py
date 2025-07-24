@@ -1024,8 +1024,116 @@ class RevisionMessageFile(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
 
+# Модели для системы планировщика задач
+
+class Task(Base):
+    """Модель задач для сотрудников"""
+    __tablename__ = "tasks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(500), nullable=False)  # Заголовок задачи
+    description = Column(Text, nullable=True)  # Описание задачи
+    status = Column(String(50), default="pending")  # pending, in_progress, completed, cancelled
+    priority = Column(String(20), default="normal")  # low, normal, high, urgent
+    color = Column(String(20), default="normal")  # normal, red, yellow, green - цвет карточки
+    
+    # Назначение и создание
+    assigned_to_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)  # Исполнитель
+    created_by_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)  # Кто создал
+    
+    # Временные рамки
+    deadline = Column(DateTime, nullable=True)  # Дедлайн
+    estimated_hours = Column(Integer, nullable=True)  # Оценочное время в часах
+    actual_hours = Column(Integer, nullable=True)  # Фактическое время
+    
+    # Системные поля
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)  # Время завершения
+    
+    # Дополнительные данные
+    task_metadata = Column(JSON, default=lambda: {})  # Дополнительная информация
+    
+    # Связи
+    assigned_to = relationship("AdminUser", foreign_keys=[assigned_to_id], back_populates="assigned_tasks")
+    created_by = relationship("AdminUser", foreign_keys=[created_by_id], back_populates="created_tasks")
+    comments = relationship("TaskComment", back_populates="task")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "status": self.status,
+            "priority": self.priority,
+            "color": self.color,
+            "assigned_to_id": self.assigned_to_id,
+            "created_by_id": self.created_by_id,
+            "deadline": self.deadline.isoformat() if self.deadline else None,
+            "estimated_hours": self.estimated_hours,
+            "actual_hours": self.actual_hours,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "task_metadata": self.task_metadata,
+            "assigned_to": self.assigned_to.to_dict() if self.assigned_to else None,
+            "created_by": self.created_by.to_dict() if self.created_by else None,
+            "comments_count": len(self.comments) if self.comments else 0
+        }
+    
+    @property
+    def is_overdue(self):
+        """Проверить, просрочена ли задача"""
+        if self.status == "completed" or not self.deadline:
+            return False
+        return datetime.utcnow() > self.deadline
+    
+    @property
+    def days_until_deadline(self):
+        """Количество дней до дедлайна"""
+        if not self.deadline:
+            return None
+        delta = self.deadline - datetime.utcnow()
+        return delta.days
+    
+    @property
+    def comments_count(self):
+        """Количество комментариев к задаче"""
+        return len(self.comments) if self.comments else 0
+
+class TaskComment(Base):
+    """Модель комментариев к задачам"""
+    __tablename__ = "task_comments"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    author_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)  # Автор комментария
+    comment = Column(Text, nullable=False)  # Текст комментария
+    comment_type = Column(String(50), default="general")  # general, status_change, deadline_change
+    is_internal = Column(Boolean, default=False)  # Внутренний комментарий (только для команды)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Связи
+    task = relationship("Task", back_populates="comments")
+    author = relationship("AdminUser", back_populates="task_comments")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "task_id": self.task_id,
+            "author_id": self.author_id,
+            "comment": self.comment,
+            "comment_type": self.comment_type,
+            "is_internal": self.is_internal,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "author": self.author.to_dict() if self.author else None
+        }
+
 # Обновляем связи существующих моделей
 AdminUser.assigned_projects = relationship("Project", back_populates="assigned_executor")
+AdminUser.assigned_tasks = relationship("Task", foreign_keys="[Task.assigned_to_id]", back_populates="assigned_to")
+AdminUser.created_tasks = relationship("Task", foreign_keys="[Task.created_by_id]", back_populates="created_by")
+AdminUser.task_comments = relationship("TaskComment", back_populates="author")
 Project.revisions = relationship("ProjectRevision", back_populates="project")
 User.created_revisions = relationship("ProjectRevision", back_populates="created_by")
 AdminUser.assigned_revisions = relationship("ProjectRevision", back_populates="assigned_to")

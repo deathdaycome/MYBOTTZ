@@ -17,17 +17,41 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
     correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
     
     if correct_username and correct_password:
-        # Возвращаем владельца как AdminUser
-        return AdminUser(
-            id=0,
-            username=settings.ADMIN_USERNAME,
-            password_hash="",
-            email="admin@example.com",
-            first_name="Admin",
-            last_name="User",
-            role="owner",
-            is_active=True
-        )
+        # Ищем администратора в базе данных
+        try:
+            db = next(get_db())
+            admin_user = db.query(AdminUser).filter(
+                AdminUser.username == settings.ADMIN_USERNAME,
+                AdminUser.role == "owner"
+            ).first()
+            db.close()
+            
+            if admin_user:
+                return admin_user
+            else:
+                # Если не найден в БД, создаем виртуального админа с правильным ID
+                return AdminUser(
+                    id=1,  # Используем правильный ID из БД
+                    username=settings.ADMIN_USERNAME,
+                    password_hash="",
+                    email="admin@example.com",
+                    first_name="Администратор",
+                    last_name="",
+                    role="owner",
+                    is_active=True
+                )
+        except Exception:
+            # Fallback - создаем виртуального админа
+            return AdminUser(
+                id=1,
+                username=settings.ADMIN_USERNAME,
+                password_hash="",
+                email="admin@example.com",
+                first_name="Администратор",
+                last_name="",
+                role="owner",
+                is_active=True
+            )
     
     # Проверяем исполнителей в базе данных
     try:

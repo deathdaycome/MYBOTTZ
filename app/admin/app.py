@@ -47,6 +47,14 @@ except ImportError as e:
     print(f"Ошибка импорта роутера файлов: {e}")
     files_router = None
 
+# Импорт роутера задач
+try:
+    from .routers.tasks import router as tasks_router
+    print("Роутер задач подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера задач: {e}")
+    tasks_router = None
+
 # Импорт роутера статусов проектов
 try:
     from .routers.project_statuses import router as project_statuses_router
@@ -115,6 +123,10 @@ if users_router:
 # Подключаем роутер файлов
 if files_router:
     admin_router.include_router(files_router, prefix="/api/files")
+
+# Подключаем роутер задач
+if tasks_router:
+    admin_router.include_router(tasks_router, prefix="/tasks")
 
 # Подключаем роутер статусов проектов
 if project_statuses_router:
@@ -1331,6 +1343,7 @@ def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
         # Владелец видит все разделы
         return base_items + [
             {"name": "Проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
+            {"name": "Планировщик задач", "url": "/tasks", "icon": "fas fa-tasks"},
             {"name": "Пользователи", "url": "/users", "icon": "fas fa-users"},
             {"name": "Исполнители", "url": "/contractors", "icon": "fas fa-users-cog"},
             {"name": "Портфолио", "url": "/portfolio", "icon": "fas fa-briefcase"},
@@ -1343,6 +1356,7 @@ def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
         # Исполнитель видит ограниченный набор
         return base_items + [
             {"name": "Мои проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
+            {"name": "Мои задачи", "url": "/tasks", "icon": "fas fa-tasks"},
             {"name": "База проектов", "url": "/project-files", "icon": "fas fa-database"},
             {"name": "Правки", "url": "/revisions", "icon": "fas fa-edit"},
             {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"},

@@ -92,7 +92,13 @@ class SpeechService:
             
             try:
                 # Загружаем OGG файл
-                audio = AudioSegment.from_file(input_path, format="ogg")
+                try:
+                    audio = AudioSegment.from_file(input_path, format="ogg")
+                except Exception as e:
+                    logger.error(f"Ошибка загрузки OGG (нет ffmpeg?): {e}")
+                    # Возвращаем исходные данные как есть для тестирования
+                    logger.warning("Возвращаем исходные аудио данные без конвертации")
+                    return voice_data
                 logger.info(f"Исходное аудио: {len(audio)}ms, {audio.frame_rate}Hz, {audio.channels} каналов")
                 
                 # Оптимизируем для распознавания речи

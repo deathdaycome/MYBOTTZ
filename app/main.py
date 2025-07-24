@@ -65,6 +65,7 @@ app.include_router(admin_router, prefix="/admin")
 
 # Подключаем статические файлы
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/admin/static", StaticFiles(directory="app/admin/static"), name="admin_static")
 # Подключаем uploads для портфолио и файлов
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
@@ -168,7 +169,7 @@ class TelegramBot:
             except Exception as e:
                 logger.error(f"Ошибка в document_router: {e}")
         
-        self.application.add_handler(MessageHandler(filters.ATTACHMENT, document_router))
+        self.application.add_handler(MessageHandler(filters.ATTACHMENT & ~filters.VOICE, document_router))
         
         # КРИТИЧНО: Обработчик голосовых сообщений для ТЗ
         async def voice_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
