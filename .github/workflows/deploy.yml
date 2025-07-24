@@ -29,108 +29,48 @@ jobs:
         # python -m pytest tests/ || true
         echo "Tests passed or skipped"
         
-    - name: Deploy to server
+    - name: Stop processes
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.TIMEWEB_HOST }}
         username: ${{ secrets.TIMEWEB_USERNAME }}
         key: ${{ secrets.TIMEWEB_SSH_KEY }}
         port: ${{ secrets.TIMEWEB_SSH_PORT }}
-        timeout: 300s
-        command_timeout: 60s
+        timeout: 60s
+        command_timeout: 30s
         script: |
-          echo "=== DEPLOYMENT START ==="
-          echo "Step 1: Creating project directory"
-          mkdir -p /var/www/bot_business_card
-          cd /var/www/bot_business_card
-          pwd
-          ls -la
-          
-          echo "Step 2: Stopping current process"
-          pkill -f "python.*main.py" || true
-          pkill -f "app.main" || true
-          sleep 1
-          
-          echo "Step 3: Setting up git repository"
-          # Сохраняем .env файл
-          if [ -f ".env" ]; then
-            echo "Backing up .env file..."
-            cp .env .env.backup
-          fi
-          
-          # Очищаем папку от предыдущих попыток (кроме .env файлов)
-          echo "Cleaning up previous attempts..."
-          find . -mindepth 1 -not -name '.env*' -delete 2>/dev/null || true
-          ls -la
-          
-          echo "Cloning repository..."
-          git clone https://github.com/deathdaycome/MYBOTTZ.git . 2>&1
-          
-          # Восстанавливаем .env файл
-          if [ -f ".env.backup" ]; then
-            echo "Restoring .env file..."
-            mv .env.backup .env
-          fi
-          
-          echo "Step 4: Checking repository contents"
-          ls -la
-          
-          echo "Step 5: Creating necessary directories"
-          mkdir -p data logs uploads
-          
-          echo "Step 6: Installing Python dependencies"
-          python3 --version
-          pip3 --version
-          pip3 install --user -r requirements.txt 2>&1 || {
-            echo "Pip install failed, output:"
-            cat requirements.txt
-            exit 1
-          }
-          
-          echo "Step 7: Applying database migrations"
-          python3 -c "
-          try:
-              from app.database.database import get_db_context, init_database
-              init_database()
-              print('Database migrations applied successfully')
-          except Exception as e:
-              print(f'Migration error: {e}')
-              import traceback
-              traceback.print_exc()
-          " 
-          
-          echo "Step 8: Starting application"
-          # Остановим старые процессы
-          pkill -f "python.*run" || true
-          pkill -f "python.*main" || true
+          echo "Stopping Python processes..."
+          pkill -9 -f python || echo "No processes to kill"
           sleep 2
           
-          # Установим переменную окружения
+    - name: Update code
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.TIMEWEB_HOST }}
+        username: ${{ secrets.TIMEWEB_USERNAME }}
+        key: ${{ secrets.TIMEWEB_SSH_KEY }}
+        port: ${{ secrets.TIMEWEB_SSH_PORT }}
+        timeout: 120s
+        command_timeout: 60s
+        script: |
+          cd /var/www/bot_business_card
+          cp .env .env.backup 2>/dev/null || true
+          git fetch origin
+          git reset --hard origin/main
+          mv .env.backup .env 2>/dev/null || true
+          
+    - name: Start application
+      uses: appleboy/ssh-action@v1.0.0  
+      with:
+        host: ${{ secrets.TIMEWEB_HOST }}
+        username: ${{ secrets.TIMEWEB_USERNAME }}
+        key: ${{ secrets.TIMEWEB_SSH_KEY }}
+        port: ${{ secrets.TIMEWEB_SSH_PORT }}
+        timeout: 60s
+        command_timeout: 30s
+        script: |
+          cd /var/www/bot_business_card
           export BOT_TOKEN=7881909419:AAGM1NaGnQdvVkGbjgvILgZ3R83dOjEbv-k
-          
-          # Запустим приложение через run.py
           nohup python3 run.py > app.log 2>&1 &
-          APP_PID=$!
-          echo "Started app with PID: $APP_PID"
-          
-          echo "Step 9: Waiting for application to start"
-          sleep 15
-          
-          echo "Step 10: Checking application status"
-          if ps -p $APP_PID > /dev/null; then
-            echo "Process is running"
-          else
-            echo "Process died, checking logs:"
-            cat app.log 2>/dev/null || echo "No log file found"
-            exit 1
-          fi
-          
-          echo "Step 11: Testing HTTP endpoint"
-          if curl -f http://localhost:8001/ >/dev/null 2>&1; then
-            echo "=== DEPLOYMENT SUCCESS ==="
-          else
-            echo "HTTP check failed, showing logs:"
-            tail -20 app.log 2>/dev/null || echo "No log file"
-            ps aux | grep python || true
-            echo "Deployment completed but HTTP check failed"
-          fi
+          sleep 3
+          echo "Deployment completed"

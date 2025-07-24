@@ -254,3 +254,4 @@ docker-compose up -d
 **Создано с ❤️ для автоматизации работы разработчиков ботов**# Production deployment ready
 # Fix SSH key
 # Auto-deploy test четверг, 24 июля 2025 г. 22:08:58 (MSK)
+# Simplified deploy test четверг, 24 июля 2025 г. 22:14:54 (MSK)
