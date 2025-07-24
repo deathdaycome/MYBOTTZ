@@ -37,16 +37,24 @@ jobs:
         key: ${{ secrets.TIMEWEB_SSH_KEY }}
         port: ${{ secrets.TIMEWEB_SSH_PORT }}
         script: |
-          # Переходим в директорию проекта
-          cd /var/www/bot_business_card || exit 1
+          # Создаем директорию проекта если не существует
+          sudo mkdir -p /var/www/bot_business_card
+          cd /var/www/bot_business_card
           
           # Останавливаем текущий процесс
           pkill -f "python.*main.py" || true
           sleep 5
           
-          # Обновляем код из git
-          git fetch origin
-          git reset --hard origin/main
+          # Клонируем или обновляем код из git
+          if [ -d ".git" ]; then
+            git fetch origin
+            git reset --hard origin/main
+          else
+            git clone https://github.com/deathdaycome/MYBOTTZ.git .
+          fi
+          
+          # Создаем необходимые папки
+          mkdir -p data logs uploads
           
           # Устанавливаем/обновляем зависимости
           pip3 install --user -r requirements.txt
