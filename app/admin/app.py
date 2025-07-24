@@ -212,48 +212,6 @@ def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
         headers={"WWW-Authenticate": "Basic"},
     )
 
-# Публичный тестовый эндпоинт для проверки портфолио
-@admin_router.get("/test-portfolio")
-async def test_portfolio():
-    """Тестовый эндпоинт для проверки работы портфолио"""
-    try:
-        from ..database.database import get_db
-        db = next(get_db())
-        
-        # Получаем все проекты
-        projects = db.query(Portfolio).all()
-        
-        result = {
-            "status": "success",
-            "count": len(projects),
-            "projects": []
-        }
-        
-        for project in projects:
-            result["projects"].append({
-                "id": project.id,
-                "title": project.title,
-                "category": project.category,
-                "complexity": project.complexity,
-                "complexity_level": project.complexity_level,
-                "development_time": project.development_time,
-                "cost": project.cost,
-                "cost_range": project.cost_range,
-                "is_featured": project.is_featured,
-                "is_visible": project.is_visible,
-                "created_at": project.created_at.isoformat() if project.created_at else None,
-                "updated_at": project.updated_at.isoformat() if project.updated_at else None
-            })
-        
-        db.close()
-        return result
-        
-    except Exception as e:
-        logger.error(f"Ошибка при тестировании портфолио: {e}")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
 
 @admin_router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, username: str = Depends(authenticate)):
@@ -1109,103 +1067,14 @@ async def health_check():
             "timestamp": datetime.utcnow().isoformat()
         }
 
-@admin_router.get("/test-modal", response_class=HTMLResponse)
-async def test_modal_page(
-    request: Request,
-    username: str = Depends(authenticate)
-):
-    """Тестовая страница для проверки модального окна"""
-    return templates.TemplateResponse("test_modal.html", {"request": request})
 
 @admin_router.get("/notifications")
 async def notifications_page(request: Request):
     """Страница тестирования уведомлений"""
     return templates.TemplateResponse("notifications.html", {"request": request})
 
-@admin_router.post("/api/notifications/test-admin")
-async def test_admin_notification(request: Request):
-    """Тестирование уведомления администратору"""
-    try:
-        data = await request.json()
-        message = data.get("message", "Тестовое уведомление")
-        
-        # Инициализируем notification_service
-        from ..services.notification_service import NotificationService
-        from telegram import Bot
-        
-        notification_service = NotificationService()
-        if not notification_service.bot:
-            notification_service.set_bot(Bot(settings.BOT_TOKEN))
-        
-        success = await notification_service.send_admin_notification(message)
-        
-        return JSONResponse({
-            "success": success,
-            "message": "Уведомление отправлено" if success else "Ошибка отправки"
-        })
-        
-    except Exception as e:
-        logger.error(f"Ошибка тестирования уведомления админу: {e}")
-        return JSONResponse({
-            "success": False,
-            "message": str(e)
-        }, status_code=500)
 
-@admin_router.post("/api/notifications/test-error")
-async def test_error_notification(request: Request):
-    """Тестирование уведомления об ошибке"""
-    try:
-        data = await request.json()
-        error_message = data.get("error", "Тестовая ошибка")
-        context = data.get("context", {})
-        
-        # Инициализируем notification_service
-        from ..services.notification_service import NotificationService
-        from telegram import Bot
-        
-        notification_service = NotificationService()
-        if not notification_service.bot:
-            notification_service.set_bot(Bot(settings.BOT_TOKEN))
-        
-        success = await notification_service.notify_error(error_message, context)
-        
-        return JSONResponse({
-            "success": success,
-            "message": "Уведомление об ошибке отправлено" if success else "Ошибка отправки"
-        })
-        
-    except Exception as e:
-        logger.error(f"Ошибка тестирования уведомления об ошибке: {e}")
-        return JSONResponse({
-            "success": False,
-            "message": str(e)
-        }, status_code=500)
 
-@admin_router.post("/api/notifications/daily-report")
-async def test_daily_report(request: Request):
-    """Тестирование ежедневного отчета"""
-    try:
-        # Инициализируем notification_service
-        from ..services.notification_service import NotificationService
-        from telegram import Bot
-        
-        notification_service = NotificationService()
-        if not notification_service.bot:
-            notification_service.set_bot(Bot(settings.BOT_TOKEN))
-        
-        success = await notification_service.send_daily_report()
-        
-        return JSONResponse({
-            "success": success,
-            "message": "Ежедневный отчет отправлен" if success else "Ошибка отправки"
-        })
-        
-    except Exception as e:
-        logger.error(f"Ошибка отправки ежедневного отчета: {e}")
-        return JSONResponse({
-            "success": False,
-            "message": str(e)
-        }, status_code=500)
 
 @admin_router.get("/api/notifications/bot-status")
 async def check_bot_status(request: Request):
@@ -1232,10 +1101,6 @@ async def check_bot_status(request: Request):
             "message": str(e)
         }, status_code=500)
 
-@admin_router.get("/api/test")
-async def test_api():
-    """Простой тестовый API эндпоинт"""
-    return {"message": "API работает!", "timestamp": datetime.utcnow().isoformat()}
 
 @admin_router.put("/api/projects/{project_id}/status")
 async def update_project_status_direct(

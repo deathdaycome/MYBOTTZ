@@ -191,22 +191,35 @@ bot_business_card/
 
 ## 🚀 Развертывание
 
-### VPS/Сервер:
+### Быстрый старт локально:
 ```bash
-# Клонирование и настройка
-git clone <repo>
+# Клонирование репозитория
+git clone https://github.com/yourusername/bot_business_card.git
 cd bot_business_card
-python -m venv venv
-source venv/bin/activate
+
+# Создание виртуального окружения
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Установка зависимостей
 pip install -r requirements.txt
 
-# Создание systemd сервиса
-sudo nano /etc/systemd/system/telegram-bot.service
+# Копирование конфигурации
+cp .env.example .env
+# Отредактируйте .env файл с вашими настройками
 
-# Запуск
-sudo systemctl enable telegram-bot
-sudo systemctl start telegram-bot
+# Запуск приложения
+python -m app.main
 ```
+
+### Автоматический деплой на Timeweb:
+
+Полное руководство по настройке автоматического деплоя с GitHub Actions смотрите в [DEPLOYMENT.md](DEPLOYMENT.md).
+
+**Кратко:**
+1. Настройте сервер: `sudo bash scripts/setup_server.sh`
+2. Добавьте GitHub Secrets (SSH ключи, адрес сервера)
+3. Push в main ветку - автоматический деплой!
 
 ### Docker:
 ```bash

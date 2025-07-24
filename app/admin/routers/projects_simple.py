@@ -111,7 +111,3 @@ async def update_project_status_simple(
         logger.error(f"Ошибка обновления статуса проекта {project_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка обновления статуса: {str(e)}")
 
-@router.get("/test")
-async def test_simple():
-    """Простой тестовый эндпоинт"""
-    return {"message": "Упрощенный роутер проектов работает!", "timestamp": datetime.utcnow().isoformat()}

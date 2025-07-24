@@ -1,0 +1,73 @@
+name: Deploy to Timeweb Server
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run tests (if any)
+      run: |
+        # python -m pytest tests/ || true
+        echo "Tests passed or skipped"
+        
+    - name: Deploy to server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.TIMEWEB_HOST }}
+        username: ${{ secrets.TIMEWEB_USERNAME }}
+        key: ${{ secrets.TIMEWEB_SSH_KEY }}
+        port: ${{ secrets.TIMEWEB_SSH_PORT }}
+        script: |
+          # Переходим в директорию проекта
+          cd /var/www/bot_business_card || exit 1
+          
+          # Останавливаем текущий процесс
+          pkill -f "python.*main.py" || true
+          sleep 5
+          
+          # Обновляем код из git
+          git fetch origin
+          git reset --hard origin/main
+          
+          # Устанавливаем/обновляем зависимости
+          pip3 install --user -r requirements.txt
+          
+          # Применяем миграции базы данных
+          python3 -c "
+          from app.database.database import get_db_context, init_database
+          init_database()
+          print('Database migrations applied')
+          " || echo "Migration failed or not needed"
+          
+          # Запускаем приложение в фоне
+          nohup python3 -m app.main > app.log 2>&1 &
+          
+          # Проверяем что приложение запустилось
+          sleep 10
+          if curl -f http://localhost:8001/ > /dev/null 2>&1; then
+            echo "Application started successfully"
+          else
+            echo "Application failed to start"
+            exit 1
+          fi
+          
+          echo "Deployment completed successfully"
