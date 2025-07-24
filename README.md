@@ -262,3 +262,4 @@ docker-compose up -d
 # Complete deployment script четверг, 24 июля 2025 г. 22:47:20 (MSK)
 # Enhanced deployment with fallback четверг, 24 июля 2025 г. 22:51:30 (MSK)
 # Final deployment script with run.py четверг, 24 июля 2025 г. 22:54:45 (MSK)
+# Switch to webhook deployment четверг, 24 июля 2025 г. 23:02:30 (MSK)
