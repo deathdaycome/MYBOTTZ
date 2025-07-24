@@ -51,17 +51,24 @@ jobs:
           sleep 2
           
           echo "Step 3: Setting up git repository"
-          if [ -d ".git" ]; then
-            echo "Git repository exists, updating..."
-            git fetch origin 2>&1 || echo "Git fetch failed"
-            git reset --hard origin/main 2>&1 || echo "Git reset failed"
-          else
-            echo "Cloning repository..."
-            git clone https://github.com/deathdaycome/MYBOTTZ.git . 2>&1 || {
-              echo "Git clone failed, trying with cleanup..."
-              rm -rf * .[^.]* 2>/dev/null || true
-              git clone https://github.com/deathdaycome/MYBOTTZ.git . 2>&1
-            }
+          # Сохраняем .env файл
+          if [ -f ".env" ]; then
+            echo "Backing up .env file..."
+            cp .env .env.backup
+          fi
+          
+          # Очищаем папку от предыдущих попыток (кроме .env файлов)
+          echo "Cleaning up previous attempts..."
+          find . -mindepth 1 -not -name '.env*' -delete 2>/dev/null || true
+          ls -la
+          
+          echo "Cloning repository..."
+          git clone https://github.com/deathdaycome/MYBOTTZ.git . 2>&1
+          
+          # Восстанавливаем .env файл
+          if [ -f ".env.backup" ]; then
+            echo "Restoring .env file..."
+            mv .env.backup .env
           fi
           
           echo "Step 4: Checking repository contents"
