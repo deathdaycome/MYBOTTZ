@@ -39,8 +39,9 @@ jobs:
         timeout: 60s
         command_timeout: 30s
         script: |
-          echo "Stopping Python processes..."
-          pkill -9 -f python || echo "No processes to kill"
+          echo "Stopping application processes..."
+          pkill -f "run.py" || echo "No run.py processes to kill"
+          pkill -f "app.main" || echo "No app.main processes to kill"
           sleep 2
           
     - name: Update code

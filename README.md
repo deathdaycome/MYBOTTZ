@@ -255,3 +255,4 @@ docker-compose up -d
 # Fix SSH key
 # Auto-deploy test четверг, 24 июля 2025 г. 22:08:58 (MSK)
 # Simplified deploy test четверг, 24 июля 2025 г. 22:14:54 (MSK)
+# Fix pkill command четверг, 24 июля 2025 г. 22:17:07 (MSK)
