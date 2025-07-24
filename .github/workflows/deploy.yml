@@ -100,7 +100,16 @@ jobs:
           " 
           
           echo "Step 8: Starting application"
-          nohup python3 -m app.main > app.log 2>&1 &
+          # Остановим старые процессы
+          pkill -f "python.*run" || true
+          pkill -f "python.*main" || true
+          sleep 2
+          
+          # Установим переменную окружения
+          export BOT_TOKEN=7881909419:AAGM1NaGnQdvVkGbjgvILgZ3R83dOjEbv-k
+          
+          # Запустим приложение через run.py
+          nohup python3 run.py > app.log 2>&1 &
           APP_PID=$!
           echo "Started app with PID: $APP_PID"
           
