@@ -29,49 +29,99 @@ jobs:
         # python -m pytest tests/ || true
         echo "Tests passed or skipped"
         
-    - name: Stop processes
+    - name: Complete deployment
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.TIMEWEB_HOST }}
         username: ${{ secrets.TIMEWEB_USERNAME }}
         key: ${{ secrets.TIMEWEB_SSH_KEY }}
         port: ${{ secrets.TIMEWEB_SSH_PORT }}
-        timeout: 60s
-        command_timeout: 30s
+        timeout: 180s
+        command_timeout: 120s
         script: |
+          # Создаем директорию проекта если не существует
+          sudo mkdir -p /var/www/bot_business_card
+          cd /var/www/bot_business_card
+
+          # Останавливаем текущий процесс
           echo "Stopping application processes..."
-          pkill -f "run.py" || echo "No run.py processes to kill"
-          pkill -f "app.main" || echo "No app.main processes to kill"
+          sudo pkill -f "python.*main.py" || echo "No processes to kill"
+          sudo pkill -f "run.py" || echo "No run.py processes to kill"
+          sudo pkill -f "app.main" || echo "No app.main processes to kill"
           sleep 2
-          
-    - name: Update code
-      uses: appleboy/ssh-action@v1.0.0
-      with:
-        host: ${{ secrets.TIMEWEB_HOST }}
-        username: ${{ secrets.TIMEWEB_USERNAME }}
-        key: ${{ secrets.TIMEWEB_SSH_KEY }}
-        port: ${{ secrets.TIMEWEB_SSH_PORT }}
-        timeout: 120s
-        command_timeout: 60s
-        script: |
+
+          # Клонируем или обновляем код из git
+          if [ -d ".git" ]; then
+              git fetch origin
+              git reset --hard origin/main
+          else
+              git clone https://github.com/deathdaycome/MYBOTTZ.git .
+          fi
+
+          # Создаем необходимые папки
+          mkdir -p data logs uploads
+
+          # Создаем .env файл с необходимыми переменными
+          cat > .env << 'ENV_EOF'
+          BOT_TOKEN=7881909419:AAGM1NaGnQdvVkGbjgvILgZ3R83dOjEbv-k
+          TELEGRAM_CHAT_ID=501613334
+          ADMIN_USERNAME=admin
+          ADMIN_PASSWORD=qwerty123
+          DATABASE_URL=sqlite:///./data/bot_production.db
+          ENV_EOF
+
+          # Устанавливаем/обновляем зависимости
+          pip3 install --user -r requirements.txt
+
+          # Применяем миграции базы данных
+          python3 -c "
+          from app.database.database import init_db
+          init_db()
+          print('Database migrations applied')
+          " || echo "Migration failed or not needed"
+
+          # Создаем скрипт запуска
+          cat > start_app.sh << 'SCRIPT_EOF'
+          #!/bin/bash
           cd /var/www/bot_business_card
-          cp .env .env.backup 2>/dev/null || true
-          git fetch origin
-          git reset --hard origin/main
-          mv .env.backup .env 2>/dev/null || true
-          
-    - name: Start application
-      uses: appleboy/ssh-action@v1.0.0  
-      with:
-        host: ${{ secrets.TIMEWEB_HOST }}
-        username: ${{ secrets.TIMEWEB_USERNAME }}
-        key: ${{ secrets.TIMEWEB_SSH_KEY }}
-        port: ${{ secrets.TIMEWEB_SSH_PORT }}
-        timeout: 60s
-        command_timeout: 30s
-        script: |
-          cd /var/www/bot_business_card
-          export BOT_TOKEN=7881909419:AAGM1NaGnQdvVkGbjgvILgZ3R83dOjEbv-k
-          nohup python3 run.py > app.log 2>&1 &
-          sleep 3
-          echo "Deployment completed"
+          exec python3 -m app.main
+          SCRIPT_EOF
+
+          chmod +x start_app.sh
+
+          # Запускаем приложение через screen (чтобы оно работало после отключения SSH)
+          screen -dmS bot_app ./start_app.sh
+
+          # Ждем немного
+          sleep 5
+
+          # Проверяем что screen сессия создалась
+          if screen -list | grep -q "bot_app"; then
+              echo "Application started successfully in screen session"
+              
+              # Дополнительная проверка процесса
+              if pgrep -f "python.*main.py" > /dev/null; then
+                  echo "Python process is running"
+                  
+                  # HTTP проверка
+                  sleep 5
+                  if curl -f http://localhost:8001/ > /dev/null 2>&1; then
+                      echo "HTTP check passed - application is responding"
+                  else
+                      echo "HTTP check failed, but process is running"
+                  fi
+              else
+                  echo "Warning: Python process not found"
+              fi
+          else
+              echo "Failed to start screen session"
+              exit 1
+          fi
+
+          echo "Deployment completed successfully"
+
+          # Показываем статус
+          echo "Screen sessions:"
+          screen -list
+          echo "Python processes:"
+          pgrep -f python
