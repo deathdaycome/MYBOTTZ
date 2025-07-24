@@ -257,3 +257,5 @@ docker-compose up -d
 # Simplified deploy test четверг, 24 июля 2025 г. 22:14:54 (MSK)
 # Fix pkill command четверг, 24 июля 2025 г. 22:17:07 (MSK)
 # Test new SSH key четверг, 24 июля 2025 г. 22:26:11 (MSK)
+# Test ed25519 SSH key четверг, 24 июля 2025 г. 22:39:15 (MSK)
+# Test updated SSH key четверг, 24 июля 2025 г. 22:43:30 (MSK)
