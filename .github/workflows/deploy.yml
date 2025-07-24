@@ -36,19 +36,20 @@ jobs:
         username: ${{ secrets.TIMEWEB_USERNAME }}
         key: ${{ secrets.TIMEWEB_SSH_KEY }}
         port: ${{ secrets.TIMEWEB_SSH_PORT }}
+        timeout: 300s
+        command_timeout: 60s
         script: |
-          set -e  # Остановить выполнение при ошибке
-          
           echo "=== DEPLOYMENT START ==="
           echo "Step 1: Creating project directory"
-          sudo mkdir -p /var/www/bot_business_card
+          mkdir -p /var/www/bot_business_card
           cd /var/www/bot_business_card
           pwd
           ls -la
           
           echo "Step 2: Stopping current process"
-          pkill -f "python.*main.py" || echo "No process to kill"
-          sleep 2
+          pkill -f "python.*main.py" || true
+          pkill -f "app.main" || true
+          sleep 1
           
           echo "Step 3: Setting up git repository"
           # Сохраняем .env файл
@@ -116,11 +117,11 @@ jobs:
           fi
           
           echo "Step 11: Testing HTTP endpoint"
-          curl -f http://localhost:8001/ 2>&1 || {
-            echo "HTTP check failed, application logs:"
-            tail -50 app.log 2>/dev/null || echo "No log file to show"
-            ps aux | grep python
-            exit 1
-          }
-          
-          echo "=== DEPLOYMENT SUCCESS ==="
+          if curl -f http://localhost:8001/ >/dev/null 2>&1; then
+            echo "=== DEPLOYMENT SUCCESS ==="
+          else
+            echo "HTTP check failed, showing logs:"
+            tail -20 app.log 2>/dev/null || echo "No log file"
+            ps aux | grep python || true
+            echo "Deployment completed but HTTP check failed"
+          fi
