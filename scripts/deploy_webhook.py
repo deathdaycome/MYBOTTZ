@@ -114,42 +114,100 @@ def deploy():
             subprocess.run(['kill', '-9'] + result.stdout.strip().split('\n'), 
                          check=False)
         
-        # Запускаем в screen сессии
-        subprocess.run([
+        # Запускаем в screen сессии с детальным логированием
+        logger.info("Запускаем приложение в screen сессии...")
+        
+        # Убедимся что директория существует
+        if not os.path.exists(REPO_PATH):
+            raise Exception(f"Директория {REPO_PATH} не существует")
+        
+        # Проверим что run.py существует
+        run_py_path = os.path.join(REPO_PATH, "run.py")
+        if not os.path.exists(run_py_path):
+            raise Exception(f"Файл {run_py_path} не найден")
+        
+        # Убиваем существующие screen сессии с таким именем
+        subprocess.run(["screen", "-S", "bot_app", "-X", "quit"], check=False)
+        time.sleep(1)
+        
+        # Запускаем новую screen сессию
+        cmd = [
             "screen", "-dmS", "bot_app", 
             "bash", "-c", f"cd {REPO_PATH} && python3 run.py > app.log 2>&1"
-        ], check=True)
+        ]
+        
+        logger.info(f"Выполняем команду: {' '.join(cmd)}")
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            logger.error(f"Ошибка запуска screen: {result.stderr}")
+            raise Exception(f"Не удалось запустить screen сессию: {result.stderr}")
+        
+        logger.info("Screen сессия создана успешно")
         
         # Проверяем запуск с несколькими попытками
-        import time
-        for attempt in range(3):
-            time.sleep(5)
-            logger.info(f"Проверка запуска (попытка {attempt + 1}/3)...")
+        for attempt in range(5):  # Увеличиваем количество попыток
+            time.sleep(3)  # Меньше ждем между попытками
+            logger.info(f"Проверка запуска (попытка {attempt + 1}/5)...")
             
-            # Проверяем процесс
-            result = subprocess.run(['pgrep', '-f', 'python.*run.py'], 
-                                  capture_output=True, text=True)
-            process_running = result.returncode == 0
+            # Проверяем screen сессию
+            screen_result = subprocess.run(['screen', '-list'], 
+                                         capture_output=True, text=True)
+            screen_exists = 'bot_app' in screen_result.stdout
+            logger.info(f"Screen сессия bot_app: {'найдена' if screen_exists else 'НЕ найдена'}")
             
-            # Проверяем HTTP (с таймаутом)
-            result = subprocess.run([
-                "curl", "-f", "--connect-timeout", "10", "http://localhost:8000/"
-            ], capture_output=True, check=False)
-            http_ok = result.returncode == 0
+            # Проверяем процесс Python
+            process_result = subprocess.run(['pgrep', '-f', 'python.*run.py'], 
+                                          capture_output=True, text=True)
+            process_running = process_result.returncode == 0
+            logger.info(f"Python процесс run.py: {'запущен' if process_running else 'НЕ запущен'}")
             
+            # Если процесс не запущен, показываем ошибки
+            if not process_running:
+                # Проверяем логи приложения
+                log_path = os.path.join(REPO_PATH, "app.log")
+                if os.path.exists(log_path):
+                    with open(log_path, 'r') as f:
+                        lines = f.readlines()
+                        if lines:
+                            logger.error("Последние строки app.log:")
+                            for line in lines[-5:]:
+                                logger.error(f"  {line.strip()}")
+            
+            # Проверяем HTTP (только если процесс запущен)
+            http_ok = False
             if process_running:
+                http_result = subprocess.run([
+                    "curl", "-f", "--connect-timeout", "5", "http://localhost:8000/"
+                ], capture_output=True, check=False)
+                http_ok = http_result.returncode == 0
+                logger.info(f"HTTP проверка: {'OK' if http_ok else 'FAILED'}")
+            
+            if process_running and screen_exists:
                 if http_ok:
-                    logger.info("✅ Деплой успешно завершен! Приложение работает.")
+                    logger.info("✅ Деплой успешно завершен! Приложение работает полностью.")
                     return True
                 else:
-                    logger.info("✅ Процесс запущен, HTTP может еще инициализироваться...")
-                    if attempt == 2:  # Последняя попытка
+                    logger.info("✅ Процесс и screen запущены, HTTP инициализируется...")
+                    if attempt >= 2:  # После 3-й попытки считаем успешным
                         logger.info("✅ Деплой завершен, приложение запускается...")
                         return True
             else:
-                logger.warning(f"❌ Процесс не запущен на попытке {attempt + 1}")
-                if attempt == 2:  # Последняя попытка
-                    logger.error("❌ Не удалось запустить приложение")
+                logger.warning(f"❌ Попытка {attempt + 1}: process={process_running}, screen={screen_exists}")
+                
+                # Если это не последняя попытка, пробуем перезапустить
+                if attempt < 4:
+                    logger.info("Пробуем перезапустить...")
+                    subprocess.run(["screen", "-S", "bot_app", "-X", "quit"], check=False)
+                    time.sleep(1)
+                    
+                    restart_cmd = [
+                        "screen", "-dmS", "bot_app", 
+                        "bash", "-c", f"cd {REPO_PATH} && python3 run.py > app.log 2>&1"
+                    ]
+                    subprocess.run(restart_cmd, check=False)
+                else:
+                    logger.error("❌ Не удалось запустить приложение после всех попыток")
                     return False
         
         return True
