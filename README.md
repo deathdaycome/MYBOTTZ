@@ -270,3 +270,4 @@ Webhook test via Cloudflare Tunnel пятница, 25 июля 2025 г. 10:39:57
 🛠 Test improved webhook with process management пятница, 25 июля 2025 г. 15:27:30 (MSK)
 ✅ Test fixed webhook - no self-kill пятница, 25 июля 2025 г. 15:33:00 (MSK)
 🔥 Final webhook test - all systems go пятница, 25 июля 2025 г. 15:37:00 (MSK)
+🚀 Test improved auto-restart webhook пятница, 25 июля 2025 г. 15:48:00 (MSK)
