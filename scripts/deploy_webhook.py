@@ -40,22 +40,31 @@ def deploy():
         # Переходим в директорию проекта
         os.chdir(REPO_PATH)
         
-        # Полная остановка всех процессов
+        # Полная остановка всех процессов приложения (кроме webhook)
         logger.info("Останавливаем все процессы приложения...")
         
-        # Останавливаем все Python процессы связанные с проектом
+        # Останавливаем только процессы run.py (НЕ webhook!)
         subprocess.run(["pkill", "-f", "python.*run.py"], check=False)
         subprocess.run(["pkill", "-f", "python3.*run.py"], check=False)
-        subprocess.run(["pkill", "-f", f"{REPO_PATH}"], check=False)
+        
+        # Останавливаем процессы из директории проекта (кроме webhook)
+        result = subprocess.run(['pgrep', '-f', f'{REPO_PATH}'], 
+                              capture_output=True, text=True)
+        if result.stdout.strip():
+            pids = result.stdout.strip().split('\n')
+            webhook_pid = str(os.getpid())  # PID текущего webhook процесса
+            
+            for pid in pids:
+                if pid != webhook_pid and pid.isdigit():
+                    subprocess.run(['kill', pid], check=False)
         
         # Закрываем screen сессии
         subprocess.run(["screen", "-S", "bot_app", "-X", "quit"], check=False)
         subprocess.run(["pkill", "-f", "SCREEN.*bot_app"], check=False)
         
-        # Освобождаем порты принудительно
-        logger.info("Освобождаем порты...")
+        # Освобождаем только порт 8000 (НЕ трогаем 9999 - webhook!)
+        logger.info("Освобождаем порт 8000...")
         subprocess.run(["fuser", "-k", "8000/tcp"], check=False)
-        subprocess.run(["fuser", "-k", "9999/tcp"], check=False)
         
         # Ждем полного завершения процессов
         import time
@@ -98,14 +107,13 @@ def deploy():
         # Запускаем приложение
         logger.info("Запускаем приложение...")
         
-        # Проверяем что порты свободны перед запуском
-        for port in ['8000', '9999']:
-            result = subprocess.run(['lsof', '-ti', f':{port}'], 
-                                  capture_output=True, text=True)
-            if result.stdout.strip():
-                logger.info(f"Освобождаем порт {port}...")
-                subprocess.run(['kill', '-9'] + result.stdout.strip().split('\n'), 
-                             check=False)
+        # Проверяем что порт 8000 свободен (НЕ трогаем 9999 - webhook!)
+        result = subprocess.run(['lsof', '-ti', ':8000'], 
+                              capture_output=True, text=True)
+        if result.stdout.strip():
+            logger.info("Освобождаем порт 8000...")
+            subprocess.run(['kill', '-9'] + result.stdout.strip().split('\n'), 
+                         check=False)
         
         # Запускаем в screen сессии
         subprocess.run([
