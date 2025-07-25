@@ -47,15 +47,14 @@ def deploy():
         subprocess.run(["pkill", "-f", "python.*run.py"], check=False)
         subprocess.run(["pkill", "-f", "python3.*run.py"], check=False)
         
-        # Останавливаем процессы из директории проекта (кроме webhook)
-        result = subprocess.run(['pgrep', '-f', f'{REPO_PATH}'], 
+        # Безопасная остановка только screen сессии с ботом
+        # НЕ используем pgrep для поиска webhook процессов
+        result = subprocess.run(['pgrep', '-f', 'python.*run.py'], 
                               capture_output=True, text=True)
         if result.stdout.strip():
             pids = result.stdout.strip().split('\n')
-            webhook_pid = str(os.getpid())  # PID текущего webhook процесса
-            
             for pid in pids:
-                if pid != webhook_pid and pid.isdigit():
+                if pid.isdigit():
                     subprocess.run(['kill', pid], check=False)
         
         # Закрываем screen сессии
