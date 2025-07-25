@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc, func, text
 from pydantic import BaseModel
 
-from ...database.database import get_db
+from ...database.database import get_db, get_db_context
 from ...database.models import (
     Project, User, AdminUser, ProjectFile, ProjectStatus, ProjectRevision, 
     RevisionMessage, RevisionFile, ProjectStatusLog, ConsultantSession, 
@@ -92,15 +92,20 @@ def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> d
     
     # Если не подошло, проверяем новую систему (исполнители)
     try:
-        from ...services.auth_service import AuthService
-        user = AuthService.authenticate_user(credentials.username, credentials.password)
-        if user and user.is_active:
-            return {
-                "id": user.id,
-                "username": user.username,
-                "role": user.role,
-                "is_active": user.is_active
-            }
+        with get_db_context() as db:
+            from ...services.auth_service import AuthService
+            admin_user = db.query(AdminUser).filter(
+                AdminUser.username == credentials.username,
+                AdminUser.is_active == True
+            ).first()
+            
+            if admin_user and AuthService.verify_password(credentials.password, admin_user.password_hash):
+                return {
+                    "id": admin_user.id,
+                    "username": admin_user.username,
+                    "role": admin_user.role,
+                    "is_active": admin_user.is_active
+                }
     except Exception as e:
         logger.error(f"Ошибка проверки в новой системе: {e}")
     

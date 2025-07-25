@@ -653,6 +653,9 @@
             </div>
             {% if current_user.role == "owner" %}
             <div>
+                <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#taskModal">
+                    <i class="fas fa-plus me-2"></i>Добавить задачу
+                </button>
                 <button class="btn btn-secondary me-2" onclick="importProjects()">
                     <i class="fas fa-download me-2"></i>Импорт проектов
                 </button>

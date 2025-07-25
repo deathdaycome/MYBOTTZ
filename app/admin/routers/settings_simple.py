@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from app.database.database import get_db
 from app.database.models import Settings, AdminUser
-from app.admin.middleware.auth import require_admin_auth
+from app.admin.middleware.auth import get_current_admin_user
 from app.config.settings import settings
 from datetime import datetime
 from typing import Dict, Any
@@ -13,7 +13,7 @@ router = APIRouter(tags=["admin_settings"])
 templates = Jinja2Templates(directory="app/admin/templates")
 
 @router.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request, user: AdminUser = Depends(require_admin_auth)):
+async def settings_page(request: Request, user: dict = Depends(get_current_admin_user)):
     """Страница настроек"""
     return templates.TemplateResponse("settings.html", {
         "request": request,
@@ -21,7 +21,7 @@ async def settings_page(request: Request, user: AdminUser = Depends(require_admi
     })
 
 @router.get("/api/settings", response_class=JSONResponse)
-async def get_settings(db: Session = Depends(get_db), user: AdminUser = Depends(require_admin_auth)):
+async def get_settings(db: Session = Depends(get_db), user: dict = Depends(get_current_admin_user)):
     """Получить все настройки"""
     try:
         settings_data = db.query(Settings).all()
@@ -58,7 +58,7 @@ async def get_settings(db: Session = Depends(get_db), user: AdminUser = Depends(
 async def update_settings(
     request: Request,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Обновить настройки"""
     try:
@@ -69,7 +69,7 @@ async def update_settings(
             if setting:
                 setting.setting_value = str(value)
                 setting.updated_at = datetime.utcnow()
-                setting.updated_by_id = user.id
+                setting.updated_by_id = user["id"]
         
         db.commit()
         

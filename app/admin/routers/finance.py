@@ -53,7 +53,7 @@ class FinanceBudgetCreateModel(BaseModel):
 async def get_finance_categories(
     type: Optional[str] = Query(None, description="Тип категории: income или expense"),
     db: Session = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить все категории финансов"""
     try:
@@ -77,7 +77,7 @@ async def get_finance_categories(
 async def create_finance_category(
     category_data: FinanceCategoryCreateModel,
     db: Session = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Создать новую категорию финансов"""
     try:
@@ -91,7 +91,7 @@ async def create_finance_category(
             description=category_data.description,
             color=category_data.color,
             icon=category_data.icon,
-            created_by_id=current_user.id if current_user.id > 0 else None,
+            created_by_id=current_user["id"],
             created_at=datetime.utcnow()
         )
         
@@ -125,11 +125,16 @@ async def get_finance_transactions(
     limit: int = Query(50, description="Количество записей"),
     offset: int = Query(0, description="Смещение"),
     db: Session = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить финансовые транзакции с фильтрами"""
     try:
         query = db.query(FinanceTransaction)
+        
+        # Фильтрация по пользователю: исполнители видят только свои транзакции
+        if current_user["role"] == "executor":
+            query = query.filter(FinanceTransaction.created_by_id == current_user["id"])
+        # Владелец видит все транзакции (без дополнительного фильтра)
         
         if type:
             query = query.filter(FinanceTransaction.type == type)
@@ -165,7 +170,7 @@ async def get_finance_transactions(
 async def create_finance_transaction(
     transaction_data: FinanceTransactionCreateModel,
     db: Session = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Создать новую финансовую транзакцию"""
     try:
@@ -196,7 +201,7 @@ async def create_finance_transaction(
             notes=transaction_data.notes,
             is_recurring=transaction_data.is_recurring,
             recurring_period=transaction_data.recurring_period,
-            created_by_id=current_user.id,
+            created_by_id=current_user["id"],
             created_at=datetime.utcnow()
         )
         
@@ -225,7 +230,7 @@ async def get_finance_summary(
     date_from: Optional[datetime] = Query(None, description="Дата от"),
     date_to: Optional[datetime] = Query(None, description="Дата до"),
     db: Session = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить сводку по финансам"""
     try:
@@ -239,6 +244,10 @@ async def get_finance_summary(
             FinanceTransaction.date >= date_from,
             FinanceTransaction.date <= date_to
         )
+        
+        # Фильтрация по пользователю: исполнители видят только свои транзакции
+        if current_user["role"] == "executor":
+            query = query.filter(FinanceTransaction.created_by_id == current_user["id"])
         
         # Доходы
         income_query = query.filter(FinanceTransaction.type == "income")
@@ -254,24 +263,30 @@ async def get_finance_summary(
         profit = total_income - total_expenses
         
         # Топ категории доходов
-        top_income_categories = db.query(
+        top_income_query = db.query(
             FinanceCategory.name,
             func.sum(FinanceTransaction.amount).label('total')
         ).join(FinanceTransaction).filter(
             FinanceTransaction.type == "income",
             FinanceTransaction.date >= date_from,
             FinanceTransaction.date <= date_to
-        ).group_by(FinanceCategory.id).order_by(desc('total')).limit(5).all()
+        )
+        if current_user["role"] == "executor":
+            top_income_query = top_income_query.filter(FinanceTransaction.created_by_id == current_user["id"])
+        top_income_categories = top_income_query.group_by(FinanceCategory.id).order_by(desc('total')).limit(5).all()
         
         # Топ категории расходов
-        top_expense_categories = db.query(
+        top_expense_query = db.query(
             FinanceCategory.name,
             func.sum(FinanceTransaction.amount).label('total')
         ).join(FinanceTransaction).filter(
             FinanceTransaction.type == "expense",
             FinanceTransaction.date >= date_from,
             FinanceTransaction.date <= date_to
-        ).group_by(FinanceCategory.id).order_by(desc('total')).limit(5).all()
+        )
+        if current_user["role"] == "executor":
+            top_expense_query = top_expense_query.filter(FinanceTransaction.created_by_id == current_user["id"])
+        top_expense_categories = top_expense_query.group_by(FinanceCategory.id).order_by(desc('total')).limit(5).all()
         
         return {
             "success": True,
@@ -308,7 +323,7 @@ async def get_finance_summary(
 async def get_monthly_analytics(
     year: int = Query(datetime.now().year, description="Год"),
     db: Session = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить месячную аналитику по финансам"""
     try:
@@ -325,6 +340,10 @@ async def get_monthly_analytics(
                 FinanceTransaction.date >= month_start,
                 FinanceTransaction.date <= month_end
             )
+            
+            # Фильтрация по пользователю: исполнители видят только свои транзакции
+            if current_user["role"] == "executor":
+                query = query.filter(FinanceTransaction.created_by_id == current_user["id"])
             
             income = query.filter(FinanceTransaction.type == "income").with_entities(
                 func.sum(FinanceTransaction.amount)
@@ -358,16 +377,12 @@ async def get_monthly_analytics(
 async def delete_finance_transaction(
     transaction_id: int,
     db: Session = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Удалить финансовую транзакцию"""
     try:
-        # Проверяем права доступа - только владелец может удалять транзакции
-        if current_user.role != "owner":
-            raise HTTPException(
-                status_code=403, 
-                detail="У вас нет прав для удаления транзакций"
-            )
+        # Проверяем права доступа - владелец может удалять все, исполнители только свои
+        # (Разрешим исполнителям удалять свои транзакции)
         
         # Получаем транзакцию
         transaction = db.query(FinanceTransaction).filter(
@@ -376,6 +391,10 @@ async def delete_finance_transaction(
         
         if not transaction:
             raise HTTPException(status_code=404, detail="Транзакция не найдена")
+        
+        # Проверяем права доступа: исполнители могут удалять только свои транзакции
+        if current_user["role"] == "executor" and transaction.created_by_id != current_user["id"]:
+            raise HTTPException(status_code=403, detail="У вас нет прав для удаления этой транзакции")
         
         # Сохраняем информацию для логирования
         transaction_description = transaction.description
@@ -405,16 +424,12 @@ async def update_finance_transaction(
     transaction_id: int,
     transaction_data: FinanceTransactionCreateModel,
     db: Session = Depends(get_db),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Обновить финансовую транзакцию"""
     try:
-        # Проверяем права доступа - только владелец может редактировать транзакции
-        if current_user.role != "owner":
-            raise HTTPException(
-                status_code=403, 
-                detail="У вас нет прав для редактирования транзакций"
-            )
+        # Проверяем права доступа - владелец может редактировать все, исполнители только свои
+        # (Разрешим исполнителям редактировать свои транзакции)
         
         # Получаем транзакцию
         transaction = db.query(FinanceTransaction).filter(
@@ -423,6 +438,10 @@ async def update_finance_transaction(
         
         if not transaction:
             raise HTTPException(status_code=404, detail="Транзакция не найдена")
+        
+        # Проверяем права доступа: исполнители могут редактировать только свои транзакции
+        if current_user["role"] == "executor" and transaction.created_by_id != current_user["id"]:
+            raise HTTPException(status_code=403, detail="У вас нет прав для редактирования этой транзакции")
         
         # Проверяем, что тип корректный
         if transaction_data.type not in ["income", "expense"]:

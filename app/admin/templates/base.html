@@ -514,11 +514,13 @@
                 {% if user_role == "executor" %}Мои файлы{% else %}База проектов{% endif %}
             </a>
             
-            <!-- Портфолио доступно всем -->
+            <!-- Портфолио доступно только владельцам -->
+            {% if user_role == "owner" %}
             <a class="nav-link" href="/admin/portfolio">
                 <i class="fas fa-briefcase"></i>
                 Портфолио
             </a>
+            {% endif %}
             
             <!-- Правки доступны всем -->
             <a class="nav-link" href="/admin/revisions">
@@ -538,15 +540,17 @@
                 Мои задачи
             </a>
             
+            <!-- Финансы доступны всем -->
+            <a class="nav-link" href="/admin/finance">
+                <i class="fas fa-money-bill-wave"></i>
+                Финансы
+            </a>
+            
             {% if user_role == "owner" %}
             <!-- Только для владельца -->
             <a class="nav-link" href="/admin/users">
                 <i class="fas fa-users"></i>
                 Пользователи
-            </a>
-            <a class="nav-link" href="/admin/finance">
-                <i class="fas fa-chart-pie"></i>
-                Финансы
             </a>
             <a class="nav-link" href="/admin/contractors">
                 <i class="fas fa-user-tie"></i>

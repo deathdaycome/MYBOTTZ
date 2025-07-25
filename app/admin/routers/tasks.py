@@ -20,12 +20,12 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/admin/templates")
 
 @router.get("/user/my-tasks", response_class=HTMLResponse)
-async def my_tasks_page(request: Request, current_user: AdminUser = Depends(get_current_admin_user)):
+async def my_tasks_page(request: Request, current_user: dict = Depends(get_current_admin_user)):
     """Страница 'Мои задачи' для всех пользователей"""
     try:
         with get_db_context() as db:
             # Получаем только задачи текущего пользователя
-            query = db.query(Task).filter(Task.assigned_to_id == current_user.id)
+            query = db.query(Task).filter(Task.assigned_to_id == current_user["id"])
             tasks = query.order_by(Task.created_at.desc()).all()
             
             # Преобразуем задачи в словари
@@ -39,7 +39,7 @@ async def my_tasks_page(request: Request, current_user: AdminUser = Depends(get_
                 task_dict = task.to_dict()
                 task_dict["is_overdue"] = task.is_overdue
                 task_dict["days_until_deadline"] = task.days_until_deadline
-                task_dict["can_delete"] = current_user.role == "owner"  # Только владелец может удалять задачи
+                task_dict["can_delete"] = current_user["role"] == "owner"  # Только владелец может удалять задачи
                 tasks_data.append(task_dict)
             
             # Статистика
@@ -52,14 +52,14 @@ async def my_tasks_page(request: Request, current_user: AdminUser = Depends(get_
             }
             
             # Для исполнителей показываем только его самого в "сотрудниках"
-            employees = [current_user.to_dict()]
+            employees = [current_user]
             
             return templates.TemplateResponse("my_tasks.html", {
                 "request": request,
                 "tasks": tasks_data,
                 "employees": employees,
                 "stats": stats,
-                "current_user": current_user.to_dict()
+                "current_user": current_user
             })
             
     except Exception as e:
@@ -67,7 +67,7 @@ async def my_tasks_page(request: Request, current_user: AdminUser = Depends(get_
         raise HTTPException(status_code=500, detail="Ошибка при загрузке задач")
 
 @router.get("/", response_class=HTMLResponse)
-async def tasks_page(request: Request, current_user: AdminUser = Depends(get_current_admin_user)):
+async def tasks_page(request: Request, current_user: dict = Depends(get_current_admin_user)):
     """Страница планировщика задач"""
     try:
         with get_db_context() as db:
@@ -75,9 +75,9 @@ async def tasks_page(request: Request, current_user: AdminUser = Depends(get_cur
             query = db.query(Task).outerjoin(AdminUser, Task.assigned_to_id == AdminUser.id)
             
             # Владелец видит все задачи, исполнители - только свои
-            if current_user.role == "executor":
-                query = query.filter(Task.assigned_to_id == current_user.id)
-            elif current_user.role == "owner":
+            if current_user["role"] == "executor":
+                query = query.filter(Task.assigned_to_id == current_user["id"])
+            elif current_user["role"] == "owner":
                 # Владелец видит все задачи
                 pass
             
@@ -96,21 +96,21 @@ async def tasks_page(request: Request, current_user: AdminUser = Depends(get_cur
                 task_dict = task.to_dict()
                 task_dict["is_overdue"] = task.is_overdue
                 task_dict["days_until_deadline"] = task.days_until_deadline
-                task_dict["can_delete"] = current_user.role == "owner"
+                task_dict["can_delete"] = current_user["role"] == "owner"
                 tasks_data.append(task_dict)
             
             # Получаем сотрудников для канбан-доски
             employees = []
-            if current_user.role == "owner":
+            if current_user["role"] == "owner":
                 # Владелец видит всех активных сотрудников (исполнителей + себя)
                 employees_raw = db.query(AdminUser).filter(
                     AdminUser.is_active == True,
                     AdminUser.role.in_(["owner", "executor"])
                 ).all()
                 employees = [emp.to_dict() for emp in employees_raw]
-            elif current_user.role == "executor":
+            elif current_user["role"] == "executor":
                 # Исполнители видят только себя
-                employees = [current_user.to_dict()]
+                employees = [current_user]
             
             # Статистика
             stats = {
@@ -126,7 +126,7 @@ async def tasks_page(request: Request, current_user: AdminUser = Depends(get_cur
                 "tasks": tasks_data,
                 "employees": employees,
                 "stats": stats,
-                "current_user": current_user.to_dict()
+                "current_user": current_user
             })
             
     except Exception as e:
@@ -134,7 +134,7 @@ async def tasks_page(request: Request, current_user: AdminUser = Depends(get_cur
         raise HTTPException(status_code=500, detail="Ошибка при загрузке задач")
 
 @router.get("/{task_id}", response_class=HTMLResponse)
-async def task_detail_page(request: Request, task_id: int, current_user: AdminUser = Depends(get_current_admin_user)):
+async def task_detail_page(request: Request, task_id: int, current_user: dict = Depends(get_current_admin_user)):
     """Страница детального просмотра задачи"""
     try:
         with get_db_context() as db:
@@ -143,7 +143,7 @@ async def task_detail_page(request: Request, task_id: int, current_user: AdminUs
                 raise HTTPException(status_code=404, detail="Задача не найдена")
             
             # Проверяем права доступа
-            if current_user.role == "executor" and task.assigned_to_id != current_user.id:
+            if current_user["role"] == "executor" and task.assigned_to_id != current_user["id"]:
                 raise HTTPException(status_code=403, detail="Нет доступа к этой задаче")
             
             return templates.TemplateResponse("task_detail.html", {
@@ -164,7 +164,7 @@ async def get_tasks(
     assigned_to_id: Optional[int] = None,
     created_by_id: Optional[int] = None,
     priority: Optional[str] = None,
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить список задач с фильтрацией"""
     try:
@@ -172,8 +172,8 @@ async def get_tasks(
             query = db.query(Task).join(AdminUser, Task.assigned_to_id == AdminUser.id)
             
             # Если пользователь исполнитель, показываем только его задачи
-            if current_user.role == "executor":
-                query = query.filter(Task.assigned_to_id == current_user.id)
+            if current_user["role"] == "executor":
+                query = query.filter(Task.assigned_to_id == current_user["id"])
             
             # Применяем фильтры
             if status:
@@ -214,12 +214,12 @@ async def create_task(
     deadline: Optional[str] = Form(None),
     estimated_hours: Optional[int] = Form(None),
     color: str = Form("normal"),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Создать новую задачу"""
     try:
         # Проверяем права (только владелец может создавать задачи)
-        if current_user.role != "owner":
+        if current_user["role"] != "owner":
             return {"success": False, "error": "Недостаточно прав"}
         
         # Парсим дату дедлайна
@@ -241,7 +241,7 @@ async def create_task(
                 return {"success": False, "error": "Исполнитель не найден"}
             
             # Создаем задачу (исправляем проблему с ID=0)
-            creator_id = current_user.id if current_user.id > 0 else 1
+            creator_id = current_user["id"] if current_user["id"] > 0 else 1
             
             new_task = Task(
                 title=title,
@@ -274,7 +274,7 @@ async def create_task(
 @router.get("/api/tasks/{task_id}")
 async def get_task(
     task_id: int,
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить детали задачи"""
     try:
@@ -285,8 +285,8 @@ async def get_task(
                 return {"success": False, "error": "Задача не найдена"}
             
             # Проверяем права доступа
-            if (current_user.role == "executor" and 
-                task.assigned_to_id != current_user.id):
+            if (current_user["role"] == "executor" and 
+                task.assigned_to_id != current_user["id"]):
                 return {"success": False, "error": "Недостаточно прав"}
             
             # Получаем комментарии
@@ -317,7 +317,7 @@ async def update_task(
     actual_hours: Optional[int] = Form(None),
     assigned_to_id: Optional[int] = Form(None),
     color: Optional[str] = Form(None),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Обновить задачу"""
     try:
@@ -329,8 +329,8 @@ async def update_task(
             
             # Проверяем права
             can_edit = (
-                current_user.role == "owner" or  # Владелец может редактировать все
-                task.assigned_to_id == current_user.id  # Исполнитель может редактировать свои
+                current_user["role"] == "owner" or  # Владелец может редактировать все
+                task.assigned_to_id == current_user["id"]  # Исполнитель может редактировать свои
             )
             
             if not can_edit:
@@ -349,7 +349,7 @@ async def update_task(
                 task.description = description
                 changes.append(f"описание обновлено")
             
-            if priority is not None and current_user.role == "owner":
+            if priority is not None and current_user["role"] == "owner":
                 old_priority = task.priority
                 task.priority = priority
                 changes.append(f"приоритет: {old_priority} → {priority}")
@@ -373,12 +373,12 @@ async def update_task(
                 task.actual_hours = actual_hours
                 changes.append(f"фактическое время: {actual_hours}ч")
             
-            if assigned_to_id is not None and current_user.role == "owner":
+            if assigned_to_id is not None and current_user["role"] == "owner":
                 old_assignee = task.assigned_to_id
                 task.assigned_to_id = assigned_to_id
                 changes.append(f"исполнитель изменен")
             
-            if color is not None and current_user.role == "owner":
+            if color is not None and current_user["role"] == "owner":
                 old_color = task.color
                 task.color = color
                 changes.append(f"цвет: {old_color} → {color}")
@@ -393,10 +393,10 @@ async def update_task(
             db.commit()
             
             # Добавляем комментарий об изменениях
-            if changes and current_user.role == "owner":
+            if changes and current_user["role"] == "owner":
                 change_comment = TaskComment(
                     task_id=task_id,
-                    author_id=current_user.id,
+                    author_id=current_user["id"],
                     comment=f"Изменения: {', '.join(changes)}",
                     comment_type="status_change"
                 )
@@ -418,12 +418,12 @@ async def update_task(
 @router.delete("/api/tasks/{task_id}")
 async def delete_task(
     task_id: int,
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Удалить задачу (только владелец)"""
     try:
         # Проверяем права доступа
-        if current_user.role != "owner":
+        if current_user["role"] != "owner":
             return {"success": False, "error": "Недостаточно прав для удаления задач"}
             
         with get_db_context() as db:
@@ -452,7 +452,7 @@ async def add_task_comment(
     task_id: int,
     comment: str = Form(...),
     is_internal: bool = Form(False),
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Добавить комментарий к задаче"""
     try:
@@ -464,8 +464,8 @@ async def add_task_comment(
             
             # Проверяем права доступа
             can_comment = (
-                current_user.role == "owner" or
-                task.assigned_to_id == current_user.id
+                current_user["role"] == "owner" or
+                task.assigned_to_id == current_user["id"]
             )
             
             if not can_comment:
@@ -474,9 +474,9 @@ async def add_task_comment(
             # Создаем комментарий
             new_comment = TaskComment(
                 task_id=task_id,
-                author_id=current_user.id,
+                author_id=current_user["id"],
                 comment=comment,
-                is_internal=is_internal and current_user.role == "owner"  # Только владелец может создавать внутренние комментарии
+                is_internal=is_internal and current_user["role"] == "owner"  # Только владелец может создавать внутренние комментарии
             )
             
             db.add(new_comment)
@@ -497,7 +497,7 @@ async def add_task_comment(
 
 @router.get("/api/tasks/stats/dashboard")
 async def get_task_dashboard_stats(
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить статистику для дашборда задач"""
     try:
@@ -505,10 +505,10 @@ async def get_task_dashboard_stats(
             stats = {}
             
             # Базовый запрос в зависимости от роли
-            if current_user.role == "owner":
+            if current_user["role"] == "owner":
                 base_query = db.query(Task)
             else:
-                base_query = db.query(Task).filter(Task.assigned_to_id == current_user.id)
+                base_query = db.query(Task).filter(Task.assigned_to_id == current_user["id"])
             
             # Общая статистика
             stats["total_tasks"] = base_query.count()
@@ -548,7 +548,7 @@ async def get_task_dashboard_stats(
             stats["recent_tasks"] = [task.to_dict() for task in recent_tasks]
             
             # Если владелец, добавляем статистику по сотрудникам
-            if current_user.role == "owner":
+            if current_user["role"] == "owner":
                 employee_stats = db.query(AdminUser).filter(
                     AdminUser.role == "executor",
                     AdminUser.is_active == True
@@ -577,12 +577,12 @@ async def get_task_dashboard_stats(
 
 @router.get("/api/employees")
 async def get_employees(
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить список сотрудников для назначения задач"""
     try:
         # Только владелец может получать список всех сотрудников
-        if current_user.role != "owner":
+        if current_user["role"] != "owner":
             return {"success": False, "error": "Недостаточно прав"}
         
         with get_db_context() as db:
@@ -614,11 +614,11 @@ async def get_employees(
 
 @router.post("/api/import-projects")
 async def import_projects_as_tasks(
-    current_user: AdminUser = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Импортировать все проекты как задачи"""
     try:
-        if current_user.role != "owner":
+        if current_user["role"] != "owner":
             return {"success": False, "error": "Недостаточно прав"}
         
         with get_db_context() as db:
@@ -661,7 +661,7 @@ async def import_projects_as_tasks(
                         title=f"Проект: {project.title}",
                         description=f"Проект ID: {project.id}\n\n{project.description or 'Нет описания'}",
                         assigned_to_id=project.assigned_executor_id or 1,  # Назначаем владельцу если нет исполнителя
-                        created_by_id=current_user.id if current_user.id > 0 else 1,
+                        created_by_id=current_user["id"] if current_user["id"] > 0 else 1,
                         priority=priority_map.get(project.priority, "normal"),
                         status=status_map.get(project.status, "pending"),
                         deadline=project.deadline,

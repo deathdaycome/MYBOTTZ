@@ -18,26 +18,20 @@ from ...database.database import get_db_context, get_db
 from ...database.models import Portfolio
 from ...config.settings import settings
 from ...config.logging import get_logger
+from ..middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/portfolio", tags=["portfolio"])
 
-# Базовая аутентификация
-security = HTTPBasic()
-
-def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
-    """Проверка аутентификации"""
-    correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
-    correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
-    
-    if not (correct_username and correct_password):
+def check_portfolio_access(current_user: dict = Depends(get_current_admin_user)):
+    """Проверка доступа к портфолио (только для владельцев)"""
+    if current_user["role"] != "owner":
         raise HTTPException(
-            status_code=401,
-            detail="Неверные учетные данные",
-            headers={"WWW-Authenticate": "Basic"},
+            status_code=403,
+            detail="У исполнителей нет доступа к портфолио"
         )
-    return credentials.username
+    return current_user
 
 # Константы
 UPLOAD_DIR = "uploads/portfolio"
@@ -105,7 +99,7 @@ def save_uploaded_image(file: UploadFile, subfolder: str = "main") -> dict:
 
 # =================== ADMIN API ENDPOINTS ===================
 
-@router.get("/", dependencies=[Depends(authenticate)])
+@router.get("/", dependencies=[Depends(check_portfolio_access)])
 async def get_portfolio_list(
     page: int = 1,
     per_page: int = 10,
@@ -175,7 +169,7 @@ async def get_portfolio_list(
         logger.error(f"Ошибка получения списка портфолио: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка получения данных: {str(e)}")
 
-@router.get("/categories", dependencies=[Depends(authenticate)])
+@router.get("/categories", dependencies=[Depends(check_portfolio_access)])
 async def get_categories(db: Session = Depends(get_db)):
     """Получить список всех категорий"""
     try:
@@ -218,7 +212,7 @@ async def get_categories(db: Session = Depends(get_db)):
         logger.error(f"Ошибка получения категорий: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка получения категорий: {str(e)}")
 
-@router.get("/{project_id}", dependencies=[Depends(authenticate)])
+@router.get("/{project_id}", dependencies=[Depends(check_portfolio_access)])
 async def get_portfolio_item(project_id: int, db: Session = Depends(get_db)):
     """Получить конкретный проект портфолио"""
     try:
@@ -238,7 +232,7 @@ async def get_portfolio_item(project_id: int, db: Session = Depends(get_db)):
         logger.error(f"Ошибка получения проекта {project_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка получения проекта: {str(e)}")
 
-@router.post("/", dependencies=[Depends(authenticate)])
+@router.post("/", dependencies=[Depends(check_portfolio_access)])
 async def create_portfolio_item(
     request: Request,
     db: Session = Depends(get_db)
@@ -363,7 +357,7 @@ async def create_portfolio_item(
         logger.error(f"Ошибка создания проекта: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка создания проекта: {str(e)}")
 
-@router.put("/{project_id}", dependencies=[Depends(authenticate)])
+@router.put("/{project_id}", dependencies=[Depends(check_portfolio_access)])
 async def update_portfolio_item(
     project_id: int,
     title: str = Form(...),
@@ -488,7 +482,7 @@ async def update_portfolio_item(
         logger.error(f"Ошибка обновления проекта {project_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка обновления проекта: {str(e)}")
 
-@router.delete("/{project_id}", dependencies=[Depends(authenticate)])
+@router.delete("/{project_id}", dependencies=[Depends(check_portfolio_access)])
 async def delete_portfolio_item(project_id: int, db: Session = Depends(get_db)):
     """Удалить проект из портфолио"""
     try:
@@ -527,7 +521,7 @@ async def delete_portfolio_item(project_id: int, db: Session = Depends(get_db)):
         logger.error(f"Ошибка удаления проекта {project_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка удаления проекта: {str(e)}")
 
-@router.post("/upload-image", dependencies=[Depends(authenticate)])
+@router.post("/upload-image", dependencies=[Depends(check_portfolio_access)])
 async def upload_image(
     file: UploadFile = File(...),
     subfolder: str = Form("main")
@@ -551,7 +545,7 @@ async def upload_image(
         logger.error(f"Ошибка загрузки изображения: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка загрузки изображения: {str(e)}")
 
-@router.post("/reorder", dependencies=[Depends(authenticate)])
+@router.post("/reorder", dependencies=[Depends(check_portfolio_access)])
 async def reorder_portfolio(
     order_data: dict,
     db: Session = Depends(get_db)
@@ -582,7 +576,7 @@ async def reorder_portfolio(
         logger.error(f"Ошибка изменения порядка: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка изменения порядка: {str(e)}")
 
-@router.get("/stats/overview", dependencies=[Depends(authenticate)])
+@router.get("/stats/overview", dependencies=[Depends(check_portfolio_access)])
 async def get_portfolio_stats(db: Session = Depends(get_db)):
     """Получить статистику портфолио"""
     try:

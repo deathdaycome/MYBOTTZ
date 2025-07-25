@@ -20,7 +20,7 @@ from ...database.models import (
     Project, User, AdminUser
 )
 from ...config.logging import get_logger
-from ..middleware.auth import require_admin_auth
+from ..middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 templates = Jinja2Templates(directory="app/admin/templates")
@@ -53,7 +53,7 @@ class RevisionMessageCreateModel(BaseModel):
     is_internal: bool = False
 
 @router.get("/revisions", response_class=HTMLResponse)
-async def revisions_page(request: Request, user: AdminUser = Depends(require_admin_auth)):
+async def revisions_page(request: Request, user: dict = Depends(get_current_admin_user)):
     """Страница управления правками"""
     return templates.TemplateResponse("revisions.html", {
         "request": request,
@@ -63,7 +63,7 @@ async def revisions_page(request: Request, user: AdminUser = Depends(require_adm
 @router.get("/api/revisions", response_class=JSONResponse)
 async def get_revisions(
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth),
+    user: dict = Depends(get_current_admin_user),
     project_id: Optional[int] = None,
     status: Optional[str] = None,
     priority: Optional[str] = None,
@@ -74,8 +74,8 @@ async def get_revisions(
         query = db.query(ProjectRevision).join(Project)
         
         # Если пользователь не владелец, показываем только правки по его проектам
-        if not user.is_owner():
-            query = query.filter(Project.assigned_executor_id == user.id)
+        if user["role"] != "owner":
+            query = query.filter(Project.assigned_executor_id == user["id"])
         
         if project_id:
             query = query.filter(ProjectRevision.project_id == project_id)
@@ -87,7 +87,7 @@ async def get_revisions(
             query = query.filter(ProjectRevision.priority == priority)
         
         if assigned_to_me:
-            query = query.filter(ProjectRevision.assigned_to_id == user.id)
+            query = query.filter(ProjectRevision.assigned_to_id == user["id"])
         
         revisions = query.order_by(desc(ProjectRevision.created_at)).all()
         
@@ -120,25 +120,25 @@ async def get_revisions(
 async def get_revision(
     revision_id: int,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Получить детали правки"""
     try:
-        logger.info(f"Getting revision {revision_id} for user {user.id}")
+        logger.info(f"Getting revision {revision_id} for user {user["id"]}")
         
         query = db.query(ProjectRevision).join(Project).filter(
             ProjectRevision.id == revision_id
         )
         
         # Если пользователь не владелец, проверяем назначение проекта
-        if user.id and user.id > 0:  # Не владелец системы
-            logger.info(f"User {user.id} is not owner, filtering by assigned_executor_id")
-            query = query.filter(Project.assigned_executor_id == user.id)
+        if user["role"] != "owner":  # Не владелец системы
+            logger.info(f"User {user["id"]} is not owner, filtering by assigned_executor_id")
+            query = query.filter(Project.assigned_executor_id == user["id"])
         
         revision = query.first()
         
         if not revision:
-            logger.warning(f"Revision {revision_id} not found for user {user.id}")
+            logger.warning(f"Revision {revision_id} not found for user {user["id"]}")
             return JSONResponse({
                 "success": False,
                 "error": "Правка не найдена"
@@ -184,7 +184,7 @@ async def get_revision(
 async def create_revision(
     revision_data: RevisionCreateModel,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Создать новую правку (админ создает от имени клиента)"""
     try:
@@ -211,7 +211,7 @@ async def create_revision(
             description=revision_data.description,
             priority=revision_data.priority,
             created_by_id=project.user_id,  # От имени клиента
-            assigned_to_id=project.assigned_executor_id or user.id
+            assigned_to_id=project.assigned_executor_id or user["id"]
         )
         
         db.add(revision)
@@ -240,7 +240,7 @@ async def update_revision(
     revision_id: int,
     revision_data: RevisionUpdateModel,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Обновить правку"""
     try:
@@ -290,7 +290,7 @@ async def add_revision_message(
     is_internal: bool = Form(False),
     files: List[UploadFile] = File(default=[]),
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Добавить сообщение к правке"""
     try:
@@ -308,7 +308,7 @@ async def add_revision_message(
         revision_message = RevisionMessage(
             revision_id=revision_id,
             sender_type="admin",  # Всегда от админа/исполнителя
-            sender_admin_id=user.id,
+            sender_admin_id=user["id"],
             message=message,
             is_internal=is_internal
         )
@@ -358,7 +358,7 @@ async def complete_revision(
     actual_time: Optional[int] = Form(None),
     completion_message: str = Form("Правки внесены"),
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Отметить правку как выполненную"""
     try:
@@ -384,7 +384,7 @@ async def complete_revision(
         completion_msg = RevisionMessage(
             revision_id=revision_id,
             sender_type="admin",
-            sender_admin_id=user.id,
+            sender_admin_id=user["id"],
             message=completion_message,
             is_internal=False
         )
@@ -412,7 +412,7 @@ async def complete_revision(
 @router.get("/api/revisions/stats", response_class=JSONResponse)
 async def get_revisions_stats(
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Получить статистику по правкам"""
     try:
@@ -425,11 +425,11 @@ async def get_revisions_stats(
         ).count()
         
         # Для владельца показываем все правки, для исполнителя - только назначенные
-        if user.id and user.id > 0:  # Обычный админ/исполнитель
+        if user["role"] != "owner":  # Обычный админ/исполнитель
             my_revisions = db.query(ProjectRevision).filter(
-                ProjectRevision.assigned_to_id == user.id
+                ProjectRevision.assigned_to_id == user["id"]
             ).count()
-        else:  # Владелец (ID = 0 или None)
+        else:  # Владелец
             my_revisions = total_revisions
         
         return JSONResponse({
@@ -453,7 +453,7 @@ async def get_revisions_stats(
 async def download_revision_file(
     file_id: int,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Скачать файл правки"""
     try:
@@ -483,7 +483,7 @@ async def download_revision_file(
 async def get_file_thumbnail(
     file_id: int,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Получить миниатюру изображения"""
     try:
@@ -524,7 +524,7 @@ async def get_file_thumbnail(
 async def get_revision_files(
     revision_id: int,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Получить файлы правки"""
     try:
@@ -565,7 +565,7 @@ async def get_revision_files(
 async def get_revision_messages(
     revision_id: int,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Получить сообщения правки"""
     try:
@@ -770,11 +770,11 @@ async def send_revision_message_notification(revision: ProjectRevision, message:
 async def create_revision_message_simple(
     request: Request,
     db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth)
+    user: dict = Depends(get_current_admin_user)
 ):
     """Создать сообщение правки (упрощенный роут)"""
     try:
-        logger.info(f"Creating revision message for user {user.id}")
+        logger.info(f"Creating revision message for user {user["id"]}")
         
         # Получаем данные из формы
         form_data = await request.form()
@@ -799,7 +799,7 @@ async def create_revision_message_simple(
         message = RevisionMessage(
             revision_id=revision_id,
             sender_type="admin",
-            sender_admin_id=user.id,  # ID админа
+            sender_admin_id=user["id"],  # ID админа
             message=content,  # Используем поле 'message' вместо 'content'
             is_internal=is_internal,
             created_at=datetime.utcnow()
