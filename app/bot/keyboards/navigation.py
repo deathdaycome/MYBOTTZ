@@ -190,6 +190,7 @@ def get_create_tz_navigation() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎤 Голосовое сообщение", callback_data="tz_voice")],
         [InlineKeyboardButton("📋 Пошаговое создание", callback_data="tz_step_by_step")],
         [InlineKeyboardButton("📄 Загрузить документ", callback_data="tz_upload")],
+        [InlineKeyboardButton("📋 Добавить свое ТЗ", callback_data="tz_own")],
     ]
     
     return get_navigation_keyboard('create_tz', keyboard, show_breadcrumbs=False)

@@ -197,6 +197,9 @@ class TelegramBot:
                 if tz_data.get('method') == 'text':
                     await tz_creation_handler_instance.handle_text_input(update, context)
                     return
+                elif tz_data.get('method') == 'own':
+                    await tz_creation_handler_instance.handle_own_tz_input(update, context)
+                    return
                 
                 # Проверяем создание правок
                 step = context.user_data.get('creating_revision_step')
@@ -262,7 +265,7 @@ class TelegramBot:
         # ПРИОРИТЕТ 4: ТЗ Creation (ConversationHandler маршруты)
         router.register(r"^create_tz$", tz_handler.show_tz_creation_menu,
                        priority=40, description="Создать техническое задание")
-        router.register(r"^tz_(text|voice|step_by_step|upload)$", tz_handler.select_tz_method,
+        router.register(r"^tz_(text|voice|step_by_step|upload|own)$", tz_handler.select_tz_method,
                        priority=40, description="Выбор метода создания ТЗ")
         
         # Пошаговое создание ТЗ - кнопки с ответами
@@ -270,7 +273,7 @@ class TelegramBot:
                        priority=40, description="Ответы на пошаговые вопросы ТЗ")
         
         # Действия с готовым ТЗ
-        router.register(r"^review_", tz_handler.handle_review_action,
+        router.register(r"^(review_|edit_own_tz)", tz_handler.handle_review_action,
                        priority=40, description="Действия с готовым ТЗ")
         
         # ПРИОРИТЕТ 5: Консультации

@@ -20,7 +20,7 @@ class TZCreationHandler:
     """Обработчик создания технических заданий"""
     
     # Переносим состояния внутрь класса
-    TZ_METHOD, TZ_TEXT_INPUT, TZ_VOICE_INPUT, TZ_STEP_BY_STEP, TZ_FILE_UPLOAD, TZ_REVIEW, TZ_EDIT, DESCRIPTION, CONFIRMATION = range(9)
+    TZ_METHOD, TZ_TEXT_INPUT, TZ_VOICE_INPUT, TZ_STEP_BY_STEP, TZ_FILE_UPLOAD, TZ_OWN_INPUT, TZ_REVIEW, TZ_EDIT, DESCRIPTION, CONFIRMATION = range(10)
     
     def __init__(self):
         self.step_questions = [
@@ -135,6 +135,9 @@ AI автоматически структурирует ваше описани
                 
             elif method == "upload":
                 return await self.start_file_upload(update, context)
+                
+            elif method == "own":
+                return await self.start_own_tz(update, context)
             
             else:
                 await query.answer("Метод не поддерживается")
@@ -750,6 +753,203 @@ AI проанализирует ваше описание и создаст ст
             )
             return ConversationHandler.END
     
+    async def start_own_tz(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Начать ввод собственного ТЗ"""
+        try:
+            user_id = update.effective_user.id
+            log_user_action(user_id, "start_own_tz")
+            
+            text = """
+📋 <b>Добавить готовое техническое задание</b>
+
+У вас уже есть готовое ТЗ? Отлично! Просто вставьте его текст сюда.
+
+<b>🎯 Что указать в ТЗ:</b>
+• Название проекта
+• Описание функций и возможностей
+• Требования к дизайну
+• Сроки выполнения  
+• Бюджет проекта
+
+<b>💡 Преимущества:</b>
+• Проект сразу попадает в админ-панель
+• Не требует обработки ИИ
+• Быстрее обычного создания ТЗ
+
+<i>Введите текст вашего технического задания:</i>
+            """
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("❌ Отмена", callback_data="main_menu")]
+            ])
+            
+            if update.callback_query:
+                await update.callback_query.edit_message_text(
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode='HTML'
+                )
+            else:
+                await update.message.reply_text(
+                    text,
+                    reply_markup=keyboard,
+                    parse_mode='HTML'
+                )
+            
+            return self.TZ_OWN_INPUT
+            
+        except Exception as e:
+            logger.error(f"Ошибка в start_own_tz: {e}")
+            return ConversationHandler.END
+
+    async def handle_own_tz_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработать ввод собственного ТЗ"""
+        try:
+            user_id = update.effective_user.id
+            user_text = update.message.text
+            
+            log_user_action(user_id, "handle_own_tz_input", f"Length: {len(user_text)}")
+            
+            # Проверяем минимальную длину
+            if len(user_text) < 50:
+                await update.message.reply_text(
+                    "📝 Техническое задание слишком короткое. Пожалуйста, опишите проект более подробно (минимум 50 символов)."
+                )
+                return self.TZ_OWN_INPUT
+            
+            # Создаем структуру проекта без обработки ИИ
+            tz_data = {
+                'title': self._extract_title_from_text(user_text),
+                'description': user_text,
+                'tz_text': user_text,
+                'method': 'own',
+                'source': 'user_tz',
+                'estimated_cost': self._estimate_cost_from_text(user_text),
+                'estimated_hours': self._estimate_hours_from_text(user_text),
+                'complexity': 'medium',
+                'status': 'new'
+            }
+            
+            # Сохраняем данные для пользователя в context
+            context.user_data['tz_creation'] = tz_data
+            
+            # Показываем предварительное ТЗ
+            await self._show_own_tz_preview(update, context, tz_data)
+            return self.TZ_REVIEW
+                    
+        except Exception as e:
+            logger.error(f"Ошибка в handle_own_tz_input: {e}")
+            await update.message.reply_text(
+                "❌ Произошла ошибка при обработке. Попробуйте еще раз.",
+                reply_markup=get_main_menu_keyboard()
+            )
+            return ConversationHandler.END
+
+    def _extract_title_from_text(self, text: str) -> str:
+        """Извлечь название проекта из текста"""
+        # Ищем строки, которые могут быть названием
+        lines = text.split('\n')
+        for line in lines[:5]:  # Проверяем первые 5 строк
+            line = line.strip()
+            if line and len(line) < 100:
+                # Если строка содержит ключевые слова
+                title_indicators = ['проект', 'бот', 'система', 'приложение', 'сайт', 'название', 'тема']
+                if any(indicator in line.lower() for indicator in title_indicators):
+                    return line
+                    
+        # Если не нашли, берем первую строку или создаем дефолтное название
+        first_line = lines[0].strip() if lines else ""
+        if first_line and len(first_line) < 100:
+            return first_line
+        
+        return "Проект пользователя"
+
+    def _estimate_cost_from_text(self, text: str) -> int:
+        """Оценить стоимость из текста (простая логика)"""
+        text_lower = text.lower()
+        
+        # Ищем упоминание стоимости в тексте
+        import re
+        cost_patterns = [
+            r'(\d+)\s*(?:руб|₽|рублей)',
+            r'бюджет[:\s]*(\d+)',
+            r'стоимость[:\s]*(\d+)',
+            r'цена[:\s]*(\d+)'
+        ]
+        
+        for pattern in cost_patterns:
+            matches = re.findall(pattern, text_lower)
+            if matches:
+                try:
+                    return int(matches[0])
+                except ValueError:
+                    continue
+        
+        # Простая оценка по ключевым словам
+        cost = 25000  # базовая стоимость
+        
+        keywords_high = ['интеграция', 'api', 'база данных', 'платежи', 'crm', 'админка']
+        keywords_medium = ['бот', 'автоматизация', 'уведомления']
+        
+        high_count = sum(1 for word in keywords_high if word in text_lower)
+        medium_count = sum(1 for word in keywords_medium if word in text_lower)
+        
+        cost += high_count * 15000
+        cost += medium_count * 5000
+        
+        return min(cost, 150000)  # максимум 150к
+
+    def _estimate_hours_from_text(self, text: str) -> int:
+        """Оценить количество часов из текста"""
+        cost = self._estimate_cost_from_text(text)
+        hourly_rate = 1000  # из конфига
+        return max(cost // hourly_rate, 10)  # минимум 10 часов
+
+    async def _show_own_tz_preview(self, update: Update, context: ContextTypes.DEFAULT_TYPE, tz_data: Dict):
+        """Показать предварительный просмотр собственного ТЗ"""
+        try:
+            tz_text = tz_data.get('tz_text', '')
+            title = tz_data.get('title', 'Проект пользователя')
+            estimated_cost = tz_data.get('estimated_cost', 0)
+            
+            # Ограничиваем текст для показа
+            preview_text = tz_text[:800] + "..." if len(tz_text) > 800 else tz_text
+            
+            text = f"""
+📋 <b>Предварительный просмотр проекта</b>
+
+<b>📌 Название:</b> {title}
+
+<b>📝 Техническое задание:</b>
+<code>{preview_text}</code>
+
+<b>💰 Примерная стоимость:</b> {format_currency(estimated_cost)}
+
+<b>✅ Готово к сохранению</b>
+Проект будет добавлен в админ-панель без дополнительной обработки.
+            """
+            
+            keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("✅ Сохранить проект", callback_data="review_save"),
+                    InlineKeyboardButton("✏️ Редактировать", callback_data="edit_own_tz")
+                ],
+                [
+                    InlineKeyboardButton("🔄 Ввести заново", callback_data="tz_own"),
+                    InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
+                ]
+            ])
+            
+            await update.message.reply_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+                
+        except Exception as e:
+            logger.error(f"Ошибка в _show_own_tz_preview: {e}")
+            await self._send_error_message(update, "Ошибка при отображении предварительного просмотра")
+
     async def handle_review_action(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработать действие в режиме просмотра ТЗ"""
         try:
@@ -767,6 +967,9 @@ AI проанализирует ваше описание и создаст ст
             elif callback_data == "review_regenerate":
                 await update.callback_query.answer("Повторная генерация в разработке")
                 return self.TZ_REVIEW
+            elif callback_data == "edit_own_tz":
+                # Возвращаемся к вводу собственного ТЗ
+                return await self.start_own_tz(update, context)
             else:
                 return ConversationHandler.END
                 
