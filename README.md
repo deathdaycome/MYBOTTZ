@@ -264,3 +264,5 @@ docker-compose up -d
 # Final deployment script with run.py четверг, 24 июля 2025 г. 22:54:45 (MSK)
 # Switch to webhook deployment четверг, 24 июля 2025 г. 23:02:30 (MSK)
 Webhook test via Cloudflare Tunnel пятница, 25 июля 2025 г. 10:39:57 (MSK)
+🎉 AUTO-DEPLOY SUCCESS! Webhook working perfectly! пятница, 25 июля 2025 г. 10:43:36 (MSK)
+🎉 AUTO-DEPLOY SUCCESS! Webhook working perfectly! пятница, 25 июля 2025 г. 10:44:55 (MSK)
