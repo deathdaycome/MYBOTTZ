@@ -38,6 +38,7 @@ def get_create_tz_methods_keyboard() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("🎤 Голосовое сообщение", callback_data="tz_voice")],
         [InlineKeyboardButton("📋 Пошаговое создание", callback_data="tz_step_by_step")],
         [InlineKeyboardButton("📄 Загрузить документ", callback_data="tz_upload")],
+        [InlineKeyboardButton("📋 Собственное ТЗ", callback_data="tz_own")],
         [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
     ]
     return InlineKeyboardMarkup(keyboard)
