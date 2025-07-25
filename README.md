@@ -266,3 +266,4 @@ docker-compose up -d
 Webhook test via Cloudflare Tunnel пятница, 25 июля 2025 г. 10:39:57 (MSK)
 🎉 AUTO-DEPLOY SUCCESS! Webhook working perfectly! пятница, 25 июля 2025 г. 10:43:36 (MSK)
 🎉 AUTO-DEPLOY SUCCESS! Webhook working perfectly! пятница, 25 июля 2025 г. 10:44:55 (MSK)
+🔄 Deployment trigger test пятница, 25 июля 2025 г. 14:27:15 (MSK)
