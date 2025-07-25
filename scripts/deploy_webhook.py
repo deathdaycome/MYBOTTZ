@@ -40,10 +40,34 @@ def deploy():
         # Переходим в директорию проекта
         os.chdir(REPO_PATH)
         
-        # Останавливаем приложение
-        logger.info("Останавливаем приложение...")
+        # Полная остановка всех процессов
+        logger.info("Останавливаем все процессы приложения...")
+        
+        # Останавливаем все Python процессы связанные с проектом
         subprocess.run(["pkill", "-f", "python.*run.py"], check=False)
+        subprocess.run(["pkill", "-f", "python3.*run.py"], check=False)
+        subprocess.run(["pkill", "-f", f"{REPO_PATH}"], check=False)
+        
+        # Закрываем screen сессии
         subprocess.run(["screen", "-S", "bot_app", "-X", "quit"], check=False)
+        subprocess.run(["pkill", "-f", "SCREEN.*bot_app"], check=False)
+        
+        # Освобождаем порты принудительно
+        logger.info("Освобождаем порты...")
+        subprocess.run(["fuser", "-k", "8000/tcp"], check=False)
+        subprocess.run(["fuser", "-k", "9999/tcp"], check=False)
+        
+        # Ждем полного завершения процессов
+        import time
+        time.sleep(3)
+        
+        # Проверяем что процессы остановлены
+        result = subprocess.run(['pgrep', '-f', 'python.*run.py'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            logger.warning("⚠️ Процессы все еще запущены, принудительно завершаем...")
+            subprocess.run(["pkill", "-9", "-f", "python.*run.py"], check=False)
+            time.sleep(2)
         
         # Обновляем код
         logger.info("Обновляем код...")
@@ -73,25 +97,55 @@ def deploy():
         
         # Запускаем приложение
         logger.info("Запускаем приложение...")
+        
+        # Проверяем что порты свободны перед запуском
+        for port in ['8000', '9999']:
+            result = subprocess.run(['lsof', '-ti', f':{port}'], 
+                                  capture_output=True, text=True)
+            if result.stdout.strip():
+                logger.info(f"Освобождаем порт {port}...")
+                subprocess.run(['kill', '-9'] + result.stdout.strip().split('\n'), 
+                             check=False)
+        
+        # Запускаем в screen сессии
         subprocess.run([
             "screen", "-dmS", "bot_app", 
             "bash", "-c", f"cd {REPO_PATH} && python3 run.py > app.log 2>&1"
         ], check=True)
         
-        # Проверяем запуск
+        # Проверяем запуск с несколькими попытками
         import time
-        time.sleep(5)
+        for attempt in range(3):
+            time.sleep(5)
+            logger.info(f"Проверка запуска (попытка {attempt + 1}/3)...")
+            
+            # Проверяем процесс
+            result = subprocess.run(['pgrep', '-f', 'python.*run.py'], 
+                                  capture_output=True, text=True)
+            process_running = result.returncode == 0
+            
+            # Проверяем HTTP (с таймаутом)
+            result = subprocess.run([
+                "curl", "-f", "--connect-timeout", "10", "http://localhost:8000/"
+            ], capture_output=True, check=False)
+            http_ok = result.returncode == 0
+            
+            if process_running:
+                if http_ok:
+                    logger.info("✅ Деплой успешно завершен! Приложение работает.")
+                    return True
+                else:
+                    logger.info("✅ Процесс запущен, HTTP может еще инициализироваться...")
+                    if attempt == 2:  # Последняя попытка
+                        logger.info("✅ Деплой завершен, приложение запускается...")
+                        return True
+            else:
+                logger.warning(f"❌ Процесс не запущен на попытке {attempt + 1}")
+                if attempt == 2:  # Последняя попытка
+                    logger.error("❌ Не удалось запустить приложение")
+                    return False
         
-        result = subprocess.run([
-            "curl", "-f", "http://localhost:8000/"
-        ], capture_output=True, check=False)
-        
-        if result.returncode == 0:
-            logger.info("✅ Деплой успешно завершен!")
-            return True
-        else:
-            logger.warning("⚠️ Приложение запущено, но HTTP проверка не прошла")
-            return True
+        return True
             
     except Exception as e:
         logger.error(f"❌ Ошибка деплоя: {e}")
