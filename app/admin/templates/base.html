@@ -413,10 +413,11 @@
         }
 
         /* Mobile Responsive */
-        @media (max-width: 768px) {
+        @media (max-width: 992px) {
             .sidebar {
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
+                z-index: 1050;
             }
             
             .sidebar.show {
@@ -432,10 +433,103 @@
                 flex-direction: column;
                 gap: 1rem;
                 text-align: center;
+                padding: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
             }
             
             .stat-card {
                 margin-bottom: 1rem;
+                padding: 1.5rem;
+            }
+            
+            .stat-value {
+                font-size: 2rem;
+            }
+            
+            .card-body {
+                padding: 1rem;
+            }
+            
+            .table-responsive {
+                font-size: 0.875rem;
+            }
+            
+            .btn {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+        }
+
+        /* Mobile Overlay */
+        .mobile-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1040;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .mobile-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* iPhone 14 Pro Max specific optimizations */
+        @media (max-width: 430px) {
+            .sidebar {
+                width: 100%;
+                max-width: 320px;
+            }
+            
+            .header {
+                padding: 0.75rem;
+                margin-bottom: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 1.25rem;
+            }
+            
+            .main-content {
+                padding: 0.75rem;
+            }
+            
+            .stat-card {
+                padding: 1rem;
+            }
+            
+            .stat-value {
+                font-size: 1.75rem;
+            }
+            
+            .card-body {
+                padding: 0.75rem;
+            }
+            
+            .sidebar-header {
+                padding: 1.5rem 1rem;
+            }
+            
+            .sidebar-header h4 {
+                font-size: 1.25rem;
+            }
+            
+            .nav-link {
+                padding: 0.75rem 1rem;
+                font-size: 0.875rem;
+            }
+            
+            .nav-link i {
+                width: 18px;
+                font-size: 1rem;
             }
         }
 
@@ -485,9 +579,12 @@
 </head>
 <body>
     <!-- Mobile Menu Button -->
-    <button class="btn btn-primary d-lg-none position-fixed" style="top: 20px; left: 20px; z-index: 1001;" onclick="toggleSidebar()">
+    <button class="btn btn-primary d-lg-none position-fixed" style="top: 20px; left: 20px; z-index: 1051;" onclick="toggleSidebar()" id="mobileMenuBtn">
         <i class="fas fa-bars"></i>
     </button>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay d-lg-none" id="mobileOverlay" onclick="closeSidebar()"></div>
 
     <!-- Sidebar -->
     <nav class="sidebar" id="sidebar">
@@ -616,17 +713,47 @@
         // Mobile Sidebar Toggle
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
-            sidebar.classList.toggle('show');
+            const overlay = document.getElementById('mobileOverlay');
+            const body = document.body;
+            
+            if (sidebar.classList.contains('show')) {
+                closeSidebar();
+            } else {
+                openSidebar();
+            }
         }
 
-        // Close sidebar when clicking outside on mobile
-        document.addEventListener('click', function(event) {
+        function openSidebar() {
             const sidebar = document.getElementById('sidebar');
-            const isClickInsideSidebar = sidebar.contains(event.target);
-            const isClickOnToggle = event.target.closest('button')?.onclick?.toString().includes('toggleSidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            const body = document.body;
             
-            if (!isClickInsideSidebar && !isClickOnToggle && window.innerWidth <= 768) {
-                sidebar.classList.remove('show');
+            sidebar.classList.add('show');
+            overlay.classList.add('show');
+            body.style.overflow = 'hidden'; // Предотвращает прокрутку страницы
+        }
+
+        function closeSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            const body = document.body;
+            
+            sidebar.classList.remove('show');
+            overlay.classList.remove('show');
+            body.style.overflow = '';
+        }
+
+        // Close sidebar when clicking on nav links on mobile
+        document.addEventListener('click', function(event) {
+            if (event.target.closest('.nav-link') && window.innerWidth <= 992) {
+                setTimeout(closeSidebar, 150); // Небольшая задержка для лучшего UX
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 992) {
+                closeSidebar();
             }
         });
 
