@@ -75,7 +75,7 @@ async def get_revisions(
         
         # Если пользователь не владелец, показываем только правки по его проектам
         if user["role"] != "owner":
-            query = query.filter(Project.assigned_executor_id == user["id"])
+            query = query.filter(Project.assigned_executor_id == user['id'])
         
         if project_id:
             query = query.filter(ProjectRevision.project_id == project_id)
@@ -87,7 +87,7 @@ async def get_revisions(
             query = query.filter(ProjectRevision.priority == priority)
         
         if assigned_to_me:
-            query = query.filter(ProjectRevision.assigned_to_id == user["id"])
+            query = query.filter(ProjectRevision.assigned_to_id == user['id'])
         
         revisions = query.order_by(desc(ProjectRevision.created_at)).all()
         
@@ -124,7 +124,7 @@ async def get_revision(
 ):
     """Получить детали правки"""
     try:
-        logger.info(f"Getting revision {revision_id} for user {user["id"]}")
+        logger.info(f"Getting revision {revision_id} for user {user['id']}")
         
         query = db.query(ProjectRevision).join(Project).filter(
             ProjectRevision.id == revision_id
@@ -132,13 +132,13 @@ async def get_revision(
         
         # Если пользователь не владелец, проверяем назначение проекта
         if user["role"] != "owner":  # Не владелец системы
-            logger.info(f"User {user["id"]} is not owner, filtering by assigned_executor_id")
-            query = query.filter(Project.assigned_executor_id == user["id"])
+            logger.info(f"User {user['id']} is not owner, filtering by assigned_executor_id")
+            query = query.filter(Project.assigned_executor_id == user['id'])
         
         revision = query.first()
         
         if not revision:
-            logger.warning(f"Revision {revision_id} not found for user {user["id"]}")
+            logger.warning(f"Revision {revision_id} not found for user {user['id']}")
             return JSONResponse({
                 "success": False,
                 "error": "Правка не найдена"
@@ -192,7 +192,7 @@ async def get_revisions_stats(
         
         # Если пользователь не владелец, фильтруем по назначенным проектам
         if user["role"] != "owner":
-            base_query = base_query.filter(Project.assigned_executor_id == user["id"])
+            base_query = base_query.filter(Project.assigned_executor_id == user['id'])
         
         # Общее количество правок
         total_revisions = base_query.count()
@@ -214,7 +214,7 @@ async def get_revisions_stats(
         else:
             # Для исполнителя считаем только назначенные на него
             my_revisions = base_query.filter(
-                ProjectRevision.assigned_to_id == user["id"]
+                ProjectRevision.assigned_to_id == user['id']
             ).count()
         
         return JSONResponse({
@@ -265,7 +265,7 @@ async def create_revision(
             description=revision_data.description,
             priority=revision_data.priority,
             created_by_id=project.user_id,  # От имени клиента
-            assigned_to_id=project.assigned_executor_id or user["id"]
+            assigned_to_id=project.assigned_executor_id or user['id']
         )
         
         db.add(revision)
@@ -362,7 +362,7 @@ async def add_revision_message(
         revision_message = RevisionMessage(
             revision_id=revision_id,
             sender_type="admin",  # Всегда от админа/исполнителя
-            sender_admin_id=user["id"],
+            sender_admin_id=user['id'],
             message=message,
             is_internal=is_internal
         )
@@ -438,7 +438,7 @@ async def complete_revision(
         completion_msg = RevisionMessage(
             revision_id=revision_id,
             sender_type="admin",
-            sender_admin_id=user["id"],
+            sender_admin_id=user['id'],
             message=completion_message,
             is_internal=False
         )
@@ -481,7 +481,7 @@ async def get_revisions_stats(
         # Для владельца показываем все правки, для исполнителя - только назначенные
         if user["role"] != "owner":  # Обычный админ/исполнитель
             my_revisions = db.query(ProjectRevision).filter(
-                ProjectRevision.assigned_to_id == user["id"]
+                ProjectRevision.assigned_to_id == user['id']
             ).count()
         else:  # Владелец
             my_revisions = total_revisions
@@ -828,7 +828,7 @@ async def create_revision_message_simple(
 ):
     """Создать сообщение правки (упрощенный роут)"""
     try:
-        logger.info(f"Creating revision message for user {user["id"]}")
+        logger.info(f"Creating revision message for user {user['id']}")
         
         # Получаем данные из формы
         form_data = await request.form()
@@ -853,7 +853,7 @@ async def create_revision_message_simple(
         message = RevisionMessage(
             revision_id=revision_id,
             sender_type="admin",
-            sender_admin_id=user["id"],  # ID админа
+            sender_admin_id=user['id'],  # ID админа
             message=content,  # Используем поле 'message' вместо 'content'
             is_internal=is_internal,
             created_at=datetime.utcnow()
