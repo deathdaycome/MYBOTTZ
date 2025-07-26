@@ -674,7 +674,7 @@ async def create_project(
         if not user:
             # Создаем нового пользователя
             user = User(
-                telegram_id=project_data.client_telegram_id,
+                telegram_id=project_data.client_telegram_id or "",  # Обеспечиваем не None значение
                 first_name=project_data.client_name or "Клиент",
                 last_name="",
                 username="",

@@ -901,7 +901,7 @@ async def update_portfolio_item(
 async def api_stats(username: str = Depends(authenticate)):
     """API для получения статистики"""
     try:
-        stats = analytics_service.get_dashboard_data(7)
+        stats = get_dashboard_data(7)
         return {"success": True, "data": stats}
     except Exception as e:
         logger.error(f"Ошибка в api_stats: {e}")
