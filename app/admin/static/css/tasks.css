@@ -545,3 +545,335 @@ h4 {
 .text-center {
     text-align: center !important;
 }
+
+/* МОБИЛЬНАЯ АДАПТАЦИЯ ДЛЯ ПЛАНИРОВЩИКА ЗАДАЧ */
+
+/* Мобильные устройства */
+@media (max-width: 992px) {
+    /* Основной контейнер */
+    body.tasks-page .main-content {
+        margin-left: 0 !important;
+        padding: 1rem !important;
+    }
+    
+    /* Статистика */
+    body.tasks-page .stats-container {
+        margin-bottom: 1rem !important;
+        padding: 1rem !important;
+    }
+    
+    body.tasks-page .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.75rem !important;
+    }
+    
+    body.tasks-page .stat-item {
+        padding: 0.75rem !important;
+    }
+    
+    body.tasks-page .stat-number {
+        font-size: 1.5rem !important;
+    }
+    
+    body.tasks-page .stat-label {
+        font-size: 0.75rem !important;
+    }
+    
+    /* Фильтры в горизонтальную прокрутку */
+    body.tasks-page .filters-row {
+        flex-direction: row !important;
+        overflow-x: auto !important;
+        gap: 1rem !important;
+        padding-bottom: 0.5rem !important;
+    }
+    
+    body.tasks-page .filter-group {
+        min-width: 150px !important;
+        flex-shrink: 0 !important;
+    }
+    
+    /* Скрываем канбан доску на мобильных */
+    body.tasks-page .kanban-board {
+        display: none !important;
+    }
+    
+    /* Показываем мобильную версию */
+    .mobile-task-view {
+        display: block !important;
+    }
+}
+
+/* Мобильная версия планировщика */
+.mobile-task-view {
+    display: none;
+    background: white;
+    border-radius: 16px;
+    padding: 1rem;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+}
+
+.mobile-employee-selector {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.mobile-employee-selector h3 {
+    font-size: 1rem !important;
+    margin-bottom: 0.75rem !important;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.employee-tabs {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+}
+
+.employee-tab {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 120px;
+    flex-shrink: 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.employee-tab.active {
+    background: #6366f1;
+    border-color: #6366f1;
+    color: white;
+}
+
+.employee-tab:hover:not(.active) {
+    border-color: #6366f1;
+    background: #f0f9ff;
+}
+
+.employee-tab .avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #4f46e5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.employee-tab.active .avatar {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.employee-tab .info {
+    display: flex;
+    flex-direction: column;
+}
+
+.employee-tab .name {
+    font-weight: 600;
+}
+
+.employee-tab .task-count {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+.mobile-tasks-container {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.mobile-task-card {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.1);
+    transition: all 0.3s ease;
+}
+
+.mobile-task-card:hover {
+    box-shadow: 0 4px 8px -2px rgb(0 0 0 / 0.1);
+    transform: translateY(-2px);
+}
+
+.mobile-task-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+}
+
+.mobile-task-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #1e293b;
+    line-height: 1.4;
+    flex: 1;
+    margin-right: 0.5rem;
+}
+
+.mobile-task-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    flex-shrink: 0;
+}
+
+.mobile-task-description {
+    color: #64748b;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    margin-bottom: 0.75rem;
+}
+
+.mobile-task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.mobile-task-priority {
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+
+.mobile-task-deadline {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+.mobile-task-deadline.overdue {
+    color: #dc2626;
+    font-weight: 600;
+}
+
+.mobile-task-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f1f5f9;
+}
+
+.mobile-task-btn {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: white;
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+}
+
+.mobile-task-btn:hover {
+    border-color: #6366f1;
+    color: #6366f1;
+    background: #f0f9ff;
+}
+
+.mobile-task-btn.primary {
+    background: #6366f1;
+    border-color: #6366f1;
+    color: white;
+}
+
+.mobile-task-btn.primary:hover {
+    background: #4f46e5;
+}
+
+.mobile-empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #64748b;
+}
+
+.mobile-empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.mobile-empty-state h4 {
+    margin-bottom: 0.5rem;
+    color: #374151;
+}
+
+/* iPhone и маленькие экраны */
+@media (max-width: 430px) {
+    body.tasks-page .main-content {
+        padding: 0.75rem !important;
+    }
+    
+    body.tasks-page .stats-grid {
+        grid-template-columns: 1fr 1fr !important;
+        gap: 0.5rem !important;
+    }
+    
+    body.tasks-page .stat-item {
+        padding: 0.5rem !important;
+    }
+    
+    body.tasks-page .stat-number {
+        font-size: 1.25rem !important;
+    }
+    
+    .employee-tab {
+        min-width: 100px !important;
+        padding: 0.5rem 0.75rem !important;
+    }
+    
+    .employee-tab .avatar {
+        width: 28px;
+        height: 28px;
+    }
+    
+    .mobile-task-card {
+        padding: 0.75rem !important;
+    }
+    
+    .mobile-task-title {
+        font-size: 0.875rem !important;
+    }
+    
+    .mobile-task-actions {
+        flex-direction: column;
+    }
+    
+    .mobile-task-btn {
+        flex: none;
+        width: 100%;
+    }
+}

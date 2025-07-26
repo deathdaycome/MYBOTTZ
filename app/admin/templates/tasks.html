@@ -125,6 +125,51 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+<!-- Мобильная версия планировщика -->
+<div class="mobile-task-view" id="mobileTaskView">
+    {% if employees %}
+    <!-- Селектор исполнителей -->
+    <div class="mobile-employee-selector">
+        <h3>Выберите исполнителя</h3>
+        <div class="employee-tabs" id="employeeTabs">
+            {% for employee in employees %}
+            <div class="employee-tab" data-employee-id="{{ employee.id }}" onclick="selectMobileEmployee({{ employee.id }})">
+                <div class="avatar">
+                    {{ employee.first_name[0] if employee.first_name else employee.username[0] }}{{ employee.last_name[0] if employee.last_name else '' }}
+                </div>
+                <div class="info">
+                    <div class="name">{{ employee.first_name }} {{ employee.last_name }}</div>
+                    <div class="task-count">
+                        <span id="mobile-task-count-{{ employee.id }}">0</span> задач
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Контейнер задач -->
+    <div class="mobile-tasks-container" id="mobileTasksContainer">
+        <div class="mobile-empty-state" id="mobileEmptyState">
+            <i class="fas fa-clipboard-list"></i>
+            <h4>Выберите исполнителя</h4>
+            <p>Выберите исполнителя выше, чтобы увидеть его задачи</p>
+        </div>
+    </div>
+    {% else %}
+    <div class="mobile-empty-state">
+        <i class="fas fa-users-slash"></i>
+        <h4>Нет сотрудников</h4>
+        <p>Добавьте сотрудников в системе для управления задачами</p>
+        {% if current_user.role == "owner" %}
+        <a href="/admin/contractors" class="btn btn-primary">
+            <i class="fas fa-plus me-2"></i>Добавить сотрудника
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
 <!-- Кнопка создания задачи -->
 {% if current_user.role == "owner" %}
 <button class="create-task-btn" data-bs-toggle="modal" data-bs-target="#createTaskModal">
@@ -490,5 +535,226 @@ function showNotification(message, type = 'info') {
         notification.remove();
     }, 3000);
 }
+
+// МОБИЛЬНАЯ ВЕРСИЯ ПЛАНИРОВЩИКА
+let selectedMobileEmployee = null;
+
+function selectMobileEmployee(employeeId) {
+    selectedMobileEmployee = employeeId;
+    
+    // Обновляем активный таб
+    document.querySelectorAll('.employee-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`[data-employee-id="${employeeId}"]`).classList.add('active');
+    
+    // Загружаем задачи для выбранного сотрудника
+    loadMobileEmployeeTasks(employeeId);
+}
+
+function loadMobileEmployeeTasks(employeeId) {
+    const container = document.getElementById('mobileTasksContainer');
+    const emptyState = document.getElementById('mobileEmptyState');
+    
+    // Фильтруем задачи для данного сотрудника
+    const employeeTasks = allTasks.filter(task => task.assigned_to_id === employeeId);
+    
+    if (employeeTasks.length === 0) {
+        container.innerHTML = `
+            <div class="mobile-empty-state">
+                <i class="fas fa-tasks"></i>
+                <h4>Нет задач</h4>
+                <p>У этого исполнителя пока нет назначенных задач</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Создаем карточки задач
+    container.innerHTML = employeeTasks.map(task => createMobileTaskCard(task)).join('');
+}
+
+function createMobileTaskCard(task) {
+    const statusClass = getStatusClass(task.status);
+    const priorityClass = getPriorityClass(task.priority);
+    
+    const deadlineHtml = task.deadline ? 
+        `<div class="mobile-task-deadline ${isOverdue(task.deadline) ? 'overdue' : ''}">
+            <i class="fas fa-clock"></i>
+            ${formatDeadline(task.deadline)}
+        </div>` : '';
+    
+    return `
+        <div class="mobile-task-card" data-task-id="${task.id}">
+            <div class="mobile-task-header">
+                <div class="mobile-task-title">${task.title}</div>
+                <div class="mobile-task-status ${statusClass}">${getStatusText(task.status)}</div>
+            </div>
+            
+            ${task.description ? `<div class="mobile-task-description">${task.description}</div>` : ''}
+            
+            <div class="mobile-task-meta">
+                <div class="mobile-task-priority ${priorityClass}">
+                    ${getPriorityText(task.priority)}
+                </div>
+                ${deadlineHtml}
+            </div>
+            
+            <div class="mobile-task-actions">
+                <button class="mobile-task-btn" onclick="viewMobileTask(${task.id})">
+                    <i class="fas fa-eye"></i> Просмотр
+                </button>
+                <button class="mobile-task-btn" onclick="editMobileTask(${task.id})">
+                    <i class="fas fa-edit"></i> Изменить
+                </button>
+                ${task.status !== 'completed' ? 
+                    `<button class="mobile-task-btn primary" onclick="completeMobileTask(${task.id})">
+                        <i class="fas fa-check"></i> Завершить
+                    </button>` : ''
+                }
+            </div>
+        </div>
+    `;
+}
+
+function getStatusClass(status) {
+    const classes = {
+        'pending': 'status-pending',
+        'in_progress': 'status-in_progress',
+        'completed': 'status-completed'
+    };
+    return classes[status] || 'status-pending';
+}
+
+function getPriorityClass(priority) {
+    const classes = {
+        'low': 'priority-low',
+        'normal': 'priority-normal',
+        'high': 'priority-high',
+        'urgent': 'priority-urgent'
+    };
+    return classes[priority] || 'priority-normal';
+}
+
+function getStatusText(status) {
+    const texts = {
+        'pending': 'Ожидает',
+        'in_progress': 'В работе',
+        'completed': 'Выполнено'
+    };
+    return texts[status] || 'Неизвестно';
+}
+
+function getPriorityText(priority) {
+    const texts = {
+        'low': 'Низкий',
+        'normal': 'Обычный',
+        'high': 'Высокий',
+        'urgent': 'Срочно'
+    };
+    return texts[priority] || 'Обычный';
+}
+
+function formatDeadline(deadline) {
+    const date = new Date(deadline);
+    const now = new Date();
+    const diffTime = date - now;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+        return `Просрочено на ${Math.abs(diffDays)} дн.`;
+    } else if (diffDays === 0) {
+        return 'Сегодня';
+    } else if (diffDays === 1) {
+        return 'Завтра';
+    } else {
+        return `Через ${diffDays} дн.`;
+    }
+}
+
+function isOverdue(deadline) {
+    return new Date(deadline) < new Date();
+}
+
+function viewMobileTask(taskId) {
+    // Здесь можно добавить модальное окно для просмотра задачи
+    const task = allTasks.find(t => t.id === taskId);
+    if (task) {
+        alert(`Задача: ${task.title}\n\nОписание: ${task.description || 'Нет описания'}\n\nСтатус: ${getStatusText(task.status)}\nПриоритет: ${getPriorityText(task.priority)}`);
+    }
+}
+
+function editMobileTask(taskId) {
+    // Здесь можно добавить редактирование задачи
+    showNotification('Функция редактирования в разработке', 'info');
+}
+
+async function completeMobileTask(taskId) {
+    try {
+        const response = await fetch(`/admin/api/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                status: 'completed'
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+                // Обновляем задачу в списке
+                const taskIndex = allTasks.findIndex(t => t.id === taskId);
+                if (taskIndex !== -1) {
+                    allTasks[taskIndex].status = 'completed';
+                }
+                
+                // Перезагружаем мобильные задачи
+                if (selectedMobileEmployee) {
+                    loadMobileEmployeeTasks(selectedMobileEmployee);
+                }
+                
+                // Обновляем статистику
+                updateEmployeeStats();
+                
+                showNotification('Задача помечена как выполненная!', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка при обновлении задачи:', error);
+        showNotification('Ошибка при обновлении задачи', 'error');
+    }
+}
+
+// Обновляем счетчики задач в мобильной версии
+function updateMobileTaskCounts() {
+    if (!allTasks) return;
+    
+    // Считаем задачи для каждого сотрудника
+    const taskCounts = {};
+    allTasks.forEach(task => {
+        const employeeId = task.assigned_to_id;
+        if (!taskCounts[employeeId]) {
+            taskCounts[employeeId] = 0;
+        }
+        taskCounts[employeeId]++;
+    });
+    
+    // Обновляем счетчики в мобильных табах
+    Object.entries(taskCounts).forEach(([employeeId, count]) => {
+        const countElement = document.getElementById(`mobile-task-count-${employeeId}`);
+        if (countElement) {
+            countElement.textContent = count;
+        }
+    });
+}
+
+// Добавляем обновление мобильных счетчиков в основную функцию
+const originalUpdateEmployeeStats = updateEmployeeStats;
+updateEmployeeStats = function() {
+    originalUpdateEmployeeStats();
+    updateMobileTaskCounts();
+};
 </script>
 {% endblock %}
