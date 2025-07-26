@@ -18,6 +18,7 @@ body.tasks-page .main-content {
     min-height: 100vh !important;
 }
 
+
 /* Специфичное переопределение для контейнера задач */
 body.tasks-page .w-100 {
     width: 100% !important;
