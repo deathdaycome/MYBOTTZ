@@ -45,7 +45,7 @@ async def run_admin_panel():
     # Конфигурация сервера
     config = uvicorn.Config(
         app=app,
-        host="127.0.0.1",  # Локальный доступ для безопасности
+        host="0.0.0.0",  # Внешний доступ
         port=settings.ADMIN_PORT,
         reload=False,
         log_level="info"

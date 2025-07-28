@@ -127,6 +127,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Мобильная версия планировщика -->
 <div class="mobile-task-view" id="mobileTaskView">
+    <!-- Мобильная навигация -->
+    <div class="mobile-task-nav">
+        <a href="/admin/" class="mobile-nav-back">
+            <i class="fas fa-arrow-left me-2"></i>
+            Назад к меню
+        </a>
+        <div class="mobile-nav-title">Планировщик задач</div>
+    </div>
+    
     {% if employees %}
     <!-- Селектор исполнителей -->
     <div class="mobile-employee-selector">
