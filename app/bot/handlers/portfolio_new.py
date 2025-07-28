@@ -18,7 +18,7 @@ class PortfolioHandler:
     
     def __init__(self):
         self.items_per_page = 3
-        self.base_url = f"http://localhost:{settings.ADMIN_PORT}"
+        self.base_url = f"http://147.45.215.199:{settings.ADMIN_PORT}"
     
     @standard_handler
     async def show_portfolio_categories(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

@@ -23,8 +23,8 @@ class PortfolioHandler:
 
     def __init__(self):
         self.items_per_page = 3
-        self.base_url = f"http://localhost:{settings.ADMIN_PORT}"
-        self.media_base_url = f"http://localhost:{settings.ADMIN_PORT}/uploads/portfolio"
+        self.base_url = f"http://147.45.215.199:{settings.ADMIN_PORT}"
+        self.media_base_url = f"http://147.45.215.199:{settings.ADMIN_PORT}/uploads/portfolio"
     
     def get_image_url(self, image_path: str) -> str:
         """Получить полный URL изображения"""
