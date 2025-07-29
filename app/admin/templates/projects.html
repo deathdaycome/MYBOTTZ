@@ -505,6 +505,9 @@
                                 <button class="btn btn-outline-primary" onclick="viewProject({{ project.id }})" title="Просмотр">
                                     <i class="fas fa-eye"></i>
                                 </button>
+                                <button class="btn btn-outline-secondary" onclick="window.location.href='/admin/projects/{{ project.id }}/detail'" title="Детали">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
                                 <button class="btn btn-outline-info" onclick="openEditModal({{ project.id }})" title="Редактировать">
                                     <i class="fas fa-edit"></i>
                                 </button>
@@ -589,6 +592,9 @@
                         <div class="btn-group btn-group-sm">
                             <button class="btn btn-outline-primary" onclick="viewProject({{ project.id }})" title="Просмотр">
                                 <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary" onclick="window.location.href='/admin/projects/{{ project.id }}/detail'" title="Детали">
+                                <i class="fas fa-info-circle"></i>
                             </button>
                             <button class="btn btn-outline-info" onclick="openEditModal({{ project.id }})" title="Редактировать">
                                 <i class="fas fa-edit"></i>

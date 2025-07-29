@@ -406,6 +406,64 @@ async def projects_page(request: Request, username: str = Depends(authenticate))
         logger.error(f"Ошибка в projects_page: {e}")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
+@admin_router.get("/projects/{project_id}/detail", response_class=HTMLResponse)
+async def project_detail_page(request: Request, project_id: int, username: str = Depends(authenticate)):
+    """Детальная страница проекта"""
+    try:
+        user_role = get_user_role(username)
+        navigation_items = get_navigation_items(user_role)
+        
+        with get_db_context() as db:
+            # Получаем проект с присоединением пользователя и исполнителя
+            project = db.query(Project)\
+                .join(User, Project.user_id == User.id, isouter=True)\
+                .outerjoin(AdminUser, Project.assigned_executor_id == AdminUser.id)\
+                .filter(Project.id == project_id)\
+                .first()
+            
+            if not project:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+            
+            # Проверяем права доступа
+            if user_role == "executor":
+                admin_user = db.query(AdminUser).filter(AdminUser.username == username).first()
+                if not admin_user or project.assigned_executor_id != admin_user.id:
+                    raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
+            
+            # Рассчитываем прогресс выполнения
+            progress_map = {
+                'new': 0,
+                'review': 10,
+                'accepted': 20,
+                'in_progress': 50,
+                'testing': 80,
+                'completed': 100,
+                'cancelled': 0,
+                'on_hold': 30
+            }
+            progress_percentage = progress_map.get(project.status, 0)
+            
+            # Рассчитываем финансовый прогресс
+            financial_progress = 0
+            if project.estimated_cost and project.estimated_cost > 0:
+                financial_progress = min(100, (project.client_paid_total or 0) / project.estimated_cost * 100)
+            
+            return templates.TemplateResponse("project_detail.html", {
+                "request": request,
+                "username": username,
+                "user_role": user_role,
+                "navigation_items": navigation_items,
+                "project": project,
+                "progress_percentage": int(progress_percentage),
+                "financial_progress": int(financial_progress)
+            })
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка в project_detail_page: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
 @admin_router.get("/users", response_class=HTMLResponse)
 @RoleMiddleware.require_role("owner")
 async def users_page(request: Request, username: str = Depends(authenticate), current_user: dict = None):
