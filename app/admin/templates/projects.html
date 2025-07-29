@@ -739,9 +739,46 @@
                         </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label for="createProjectDeadline" class="form-label">Дедлайн</label>
-                        <input type="datetime-local" class="form-control" id="createProjectDeadline">
+                    <!-- Финансовые поля -->
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="createPrepaymentAmount" class="form-label">Предоплата (руб.)</label>
+                                <input type="number" class="form-control" id="createPrepaymentAmount" min="0" step="1000" placeholder="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="createClientPaidTotal" class="form-label">Уже заплачено клиентом (руб.)</label>
+                                <input type="number" class="form-control" id="createClientPaidTotal" min="0" step="1000" placeholder="0">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="createExecutorPaidTotal" class="form-label">Выплачено исполнителю (руб.)</label>
+                                <input type="number" class="form-control" id="createExecutorPaidTotal" min="0" step="500" placeholder="0">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Назначение исполнителя -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="createAssignedExecutor" class="form-label">Назначить исполнителя</label>
+                                <select class="form-select" id="createAssignedExecutor">
+                                    <option value="">Выберите исполнителя</option>
+                                    <!-- Опции будут загружены динамически -->
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="createProjectDeadline" class="form-label">Дедлайн</label>
+                                <input type="datetime-local" class="form-control" id="createProjectDeadline">
+                            </div>
+                        </div>
+                    </div>
                     </div>
                 </form>
             </div>
@@ -1447,6 +1484,12 @@
         const estimatedHours = document.getElementById('createEstimatedHours').value;
         const deadline = document.getElementById('createProjectDeadline').value;
         
+        // Новые поля
+        const prepaymentAmount = document.getElementById('createPrepaymentAmount').value;
+        const clientPaidTotal = document.getElementById('createClientPaidTotal').value;
+        const executorPaidTotal = document.getElementById('createExecutorPaidTotal').value;
+        const assignedExecutor = document.getElementById('createAssignedExecutor').value;
+        
         if (!title.trim()) {
             showNotification('Название проекта обязательно', 'warning');
             return;
@@ -1477,7 +1520,11 @@
                     estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
                     executor_cost: executorCost ? parseFloat(executorCost) : null,
                     estimated_hours: estimatedHours ? parseInt(estimatedHours) : null,
-                    deadline: deadline || null
+                    deadline: deadline || null,
+                    prepayment_amount: prepaymentAmount ? parseFloat(prepaymentAmount) : 0,
+                    client_paid_total: clientPaidTotal ? parseFloat(clientPaidTotal) : 0,
+                    executor_paid_total: executorPaidTotal ? parseFloat(executorPaidTotal) : 0,
+                    assigned_executor_id: assignedExecutor || null
                 })
             });
             

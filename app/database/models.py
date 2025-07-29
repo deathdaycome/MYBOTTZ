@@ -65,6 +65,12 @@ class Project(Base):
     estimated_cost = Column(Float, default=0.0)  # Полная стоимость проекта (видит только владелец)
     executor_cost = Column(Float, nullable=True)  # Стоимость для исполнителя (видит исполнитель)
     final_cost = Column(Float, nullable=True)
+    
+    # Финансовые поля
+    prepayment_amount = Column(Float, default=0.0)  # Сумма предоплаты от клиента
+    client_paid_total = Column(Float, default=0.0)  # Сколько уже заплатил клиент
+    executor_paid_total = Column(Float, default=0.0)  # Сколько уже выплачено исполнителю
+    
     estimated_hours = Column(Integer, default=0)
     actual_hours = Column(Integer, nullable=True)
     deadline = Column(DateTime, nullable=True)
@@ -99,6 +105,9 @@ class Project(Base):
             "estimated_cost": self.estimated_cost,
             "executor_cost": self.executor_cost,
             "final_cost": self.final_cost,
+            "prepayment_amount": self.prepayment_amount,
+            "client_paid_total": self.client_paid_total,
+            "executor_paid_total": self.executor_paid_total,
             "estimated_hours": self.estimated_hours,
             "actual_hours": self.actual_hours,
             "deadline": self.deadline.isoformat() if self.deadline else None,

@@ -40,6 +40,9 @@ class ProjectUpdateModel(BaseModel):
     estimated_cost: Optional[float] = None
     executor_cost: Optional[float] = None
     final_cost: Optional[float] = None
+    prepayment_amount: Optional[float] = None
+    client_paid_total: Optional[float] = None
+    executor_paid_total: Optional[float] = None
     estimated_hours: Optional[int] = None
     actual_hours: Optional[int] = None
     deadline: Optional[str] = None  # ISO format date string
@@ -65,9 +68,13 @@ class ProjectCreateModel(BaseModel):
     priority: str = "medium"
     estimated_cost: Optional[float] = None
     executor_cost: Optional[float] = None
+    prepayment_amount: Optional[float] = 0
+    client_paid_total: Optional[float] = 0
+    executor_paid_total: Optional[float] = 0
     estimated_hours: Optional[int] = None
     deadline: Optional[str] = None  # ISO format date string
     status: str = "new"
+    assigned_executor_id: Optional[int] = None
     bot_token: Optional[str] = None  # API токен Telegram бота
     timeweb_login: Optional[str] = None  # Логин Timeweb
     timeweb_password: Optional[str] = None  # Пароль Timeweb
@@ -695,6 +702,10 @@ async def create_project(
             status=project_data.status,
             estimated_cost=project_data.estimated_cost,
             executor_cost=project_data.executor_cost,
+            prepayment_amount=project_data.prepayment_amount or 0,
+            client_paid_total=project_data.client_paid_total or 0,
+            executor_paid_total=project_data.executor_paid_total or 0,
+            assigned_executor_id=project_data.assigned_executor_id,
             estimated_hours=project_data.estimated_hours,
             deadline=datetime.fromisoformat(project_data.deadline) if project_data.deadline else None,
             created_at=datetime.utcnow(),
