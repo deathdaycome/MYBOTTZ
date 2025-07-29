@@ -67,6 +67,82 @@
 /* Статусы для кастомных статусов */
 .status-custom { background-color: #e91e63 !important; color: #ffffff !important; border: 1px solid #e91e63 !important; }
 
+/* Дополнительные стили для карточек статистики */
+.stat-card.secondary {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    color: white;
+    border: none;
+}
+
+.stat-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Адаптивность для статистики */
+@media (max-width: 768px) {
+    .stat-card {
+        margin-bottom: 1rem;
+    }
+    
+    .stat-card .fa-2x {
+        font-size: 1.5em;
+    }
+    
+    .stat-card .h4 {
+        font-size: 1.2rem;
+    }
+}
+
+/* Стили для приоритетов проектов */
+.project-card-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-left: 4px solid #e9ecef;
+}
+
+.project-card-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+/* Цветовое кодирование по приоритету */
+.project-card[data-priority="low"] .project-card-item {
+    border-left-color: #28a745; /* Зеленый - низкий приоритет */
+}
+
+.project-card[data-priority="normal"] .project-card-item {
+    border-left-color: #007bff; /* Синий - нормальный приоритет */
+}
+
+.project-card[data-priority="high"] .project-card-item {
+    border-left-color: #fd7e14; /* Оранжевый - высокий приоритет */
+}
+
+.project-card[data-priority="urgent"] .project-card-item {
+    border-left-color: #dc3545; /* Красный - срочный приоритет */
+    animation: pulse-urgent 2s infinite;
+}
+
+/* Анимация для срочных проектов */
+@keyframes pulse-urgent {
+    0% { box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3); }
+    50% { box-shadow: 0 4px 16px rgba(220, 53, 69, 0.6); }
+    100% { box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3); }
+}
+
+/* Увеличенный размер карточек */
+.project-card {
+    min-height: 280px;
+}
+
+.project-card-item {
+    min-height: 250px;
+}
+
 /* Общие стили для всех статусов */
 .badge[class*="status-"] {
     font-weight: 500 !important;
@@ -191,7 +267,7 @@
 
 <!-- Statistics Cards -->
 <div class="row mb-4">
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="stat-card primary">
             <div class="d-flex align-items-center">
                 <i class="fas fa-project-diagram fa-2x me-3"></i>
@@ -202,7 +278,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="stat-card info">
             <div class="d-flex align-items-center">
                 <i class="fas fa-hourglass-half fa-2x me-3"></i>
@@ -215,7 +291,7 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="stat-card success">
             <div class="d-flex align-items-center">
                 <i class="fas fa-check-circle fa-2x me-3"></i>
@@ -228,15 +304,97 @@
             </div>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md-2">
         <div class="stat-card warning">
             <div class="d-flex align-items-center">
                 <i class="fas fa-ruble-sign fa-2x me-3"></i>
                 <div>
                     <div class="h4 mb-0" id="totalRevenue">
-                        {{ (projects|sum(attribute="estimated_cost"))|round|int }}₽
+                        {{ (projects|sum(attribute="estimated_cost") or 0)|round|int }}₽
                     </div>
                     <small>Общая стоимость</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card success">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-money-bill-wave fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="totalPaid">
+                        {{ (projects|sum(attribute="client_paid_total") or 0)|round|int }}₽
+                    </div>
+                    <small>Получено от клиентов</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card danger">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="remainingPayment">
+                        {{ ((projects|sum(attribute="estimated_cost") or 0) - (projects|sum(attribute="client_paid_total") or 0))|round|int }}₽
+                    </div>
+                    <small>Остаток по клиентам</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Financial Statistics Row -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card secondary">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-hand-holding-usd fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="totalPrepayments">
+                        {{ (projects|sum(attribute="prepayment_amount") or 0)|round|int }}₽
+                    </div>
+                    <small>Общие предоплаты</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card info">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-user-friends fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="totalExecutorPayments">
+                        {{ (projects|sum(attribute="executor_paid_total") or 0)|round|int }}₽
+                    </div>
+                    <small>Выплачено исполнителям</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card warning">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-clock fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="remainingExecutorPayments">
+                        {{ ((projects|sum(attribute="executor_cost") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int }}₽
+                    </div>
+                    <small>Остаток к выплате</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card success">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-chart-line fa-2x me-3"></i>
+                <div>
+                    <div class="h4 mb-0" id="profit">
+                        {{ ((projects|sum(attribute="client_paid_total") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int }}₽
+                    </div>
+                    <small>Текущая прибыль</small>
                 </div>
             </div>
         </div>
@@ -378,7 +536,7 @@
     <div id="cardsViewContainer" class="d-none">
         <div class="row p-3" id="projectsCards">
             {% for project in projects %}
-            <div class="col-md-6 col-lg-4 mb-4 project-card" data-project-id="{{ project.id }}" data-status="{{ project.status }}" data-complexity="{{ project.complexity }}" data-title="{{ project.title.lower() }}" data-client="{{ (project.user.first_name or '').lower() }}">
+            <div class="col-md-6 col-lg-4 mb-4 project-card" data-project-id="{{ project.id }}" data-status="{{ project.status }}" data-complexity="{{ project.complexity }}" data-priority="{{ project.priority }}" data-title="{{ project.title.lower() }}" data-client="{{ (project.user.first_name or '').lower() }}">
                 <div class="card h-100 shadow-sm project-card-item">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="mb-0 text-truncate" title="{{ project.title }}">{{ project.title }}</h6>
@@ -1061,12 +1219,49 @@
         }
     }
     
+    // Функция загрузки исполнителей
+    async function loadExecutors() {
+        try {
+            const response = await fetch('/admin/api/admin-users/', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const executorSelect = document.getElementById('createAssignedExecutor');
+                
+                if (executorSelect && data.admin_users) {
+                    // Очищаем существующие опции (кроме "Выберите исполнителя")
+                    while (executorSelect.children.length > 1) {
+                        executorSelect.removeChild(executorSelect.lastChild);
+                    }
+                    
+                    // Добавляем исполнителей
+                    data.admin_users.forEach(executor => {
+                        const option = document.createElement('option');
+                        option.value = executor.id;
+                        option.textContent = `${executor.full_name || executor.username} (${executor.role})`;
+                        executorSelect.appendChild(option);
+                    });
+                }
+            } else {
+                console.warn('Не удалось загрузить список исполнителей');
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки исполнителей:', error);
+        }
+    }
+    
     document.addEventListener('DOMContentLoaded', () => {
         // Инициализация фильтров
         initializeFilters();
         changeView(currentView);
         sortProjects();
         loadProjectStatuses();
+        loadExecutors();
     });
     
     // Функция для инициализации фильтров
