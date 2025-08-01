@@ -665,8 +665,11 @@ async def create_project(
 ):
     """Создать новый проект вручную через админку"""
     try:
+        logger.info(f"Попытка создания проекта пользователем {current_user.get('username')} с ролью {current_user.get('role')}")
+        
         # Проверяем права доступа (только владелец может создавать проекты)
         if current_user["role"] != "owner":
+            logger.warning(f"Отказ в создании проекта: недостаточно прав для пользователя {current_user.get('username')}")
             return {
                 "success": False,
                 "message": "У вас нет прав для создания проектов"
@@ -749,6 +752,7 @@ async def create_project(
             except Exception as e:
                 logger.error(f"Ошибка отправки уведомления: {e}")
         
+        logger.info(f"Проект '{project.title}' успешно создан с ID {project.id}")
         return {
             "success": True,
             "message": f"Проект '{project.title}' успешно создан" + 
