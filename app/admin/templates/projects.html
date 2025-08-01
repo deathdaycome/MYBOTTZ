@@ -21,32 +21,44 @@ body {
     margin: 1rem;
 }
 
-/* Исправление для модальных окон - полностью кастомное решение */
+/* Исправленное модальное окно - упрощенное решение */
+.modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.5) !important;
+    z-index: 9999 !important;
+}
+
 .modal {
-    z-index: 99999 !important;
-    backdrop-filter: none !important;
-    background: rgba(0, 0, 0, 0.5) !important; /* Кастомный backdrop */
+    z-index: 10000 !important;
+    display: none;
+}
+
+.modal.show {
+    display: block !important;
 }
 
 .modal-dialog {
-    z-index: 99999 !important;
-    position: relative !important;
-    margin: 1.75rem auto !important;
+    z-index: 10001 !important;
+    margin: 1.75rem auto;
+    max-width: 500px;
 }
 
 .modal-content {
-    background: white !important;
-    backdrop-filter: none !important;
-    position: relative !important;
-    z-index: 99999 !important;
-    border-radius: 12px !important;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    border: none;
 }
 
-/* Убираем конфликты с content-wrapper */
+/* Убираем backdrop-filter с content-wrapper при показе модального окна */
 .content-wrapper {
     position: relative;
     z-index: 1;
+    transition: backdrop-filter 0.3s ease;
+}
+
+.content-wrapper.modal-open {
+    backdrop-filter: none !important;
+    filter: none !important;
 }
 
 /* Отключаем стандартный backdrop */
@@ -1333,7 +1345,7 @@ body {
     // Функция загрузки исполнителей
     async function loadExecutors() {
         try {
-            const response = await fetch('/admin/api/admin-users/', {
+            const response = await fetch('/admin/api/users/executors', {
                 method: 'GET',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${username}:${password}`)
@@ -1344,14 +1356,14 @@ body {
                 const data = await response.json();
                 const executorSelect = document.getElementById('createAssignedExecutor');
                 
-                if (executorSelect && data.admin_users) {
+                if (executorSelect && data.executors) {
                     // Очищаем существующие опции (кроме "Выберите исполнителя")
                     while (executorSelect.children.length > 1) {
                         executorSelect.removeChild(executorSelect.lastChild);
                     }
                     
                     // Добавляем исполнителей
-                    data.admin_users.forEach(executor => {
+                    data.executors.forEach(executor => {
                         const option = document.createElement('option');
                         option.value = executor.id;
                         option.textContent = `${executor.full_name || executor.username} (${executor.role})`;
@@ -1771,46 +1783,36 @@ body {
         // Очищаем форму
         document.getElementById('createProjectForm').reset();
         
-        const modalElement = document.getElementById('createProjectModal');
-        
-        // Принудительно убираем backdrop-filter с content-wrapper при открытии модала
-        const contentWrapper = document.querySelector('.content-wrapper');
-        if (contentWrapper) {
-            contentWrapper.style.filter = 'none';
-            contentWrapper.style.backdropFilter = 'none';
-        }
-        
-        const modal = new bootstrap.Modal(modalElement, {
-            backdrop: false, // Отключаем backdrop полностью
-            keyboard: true,
-            focus: true
-        });
-        
-        // Обработчик закрытия модала
-        modalElement.addEventListener('hidden.bs.modal', function () {
-            if (contentWrapper) {
-                contentWrapper.style.filter = '';
-                contentWrapper.style.backdropFilter = 'blur(10px)';
-            }
-        });
-        
+        // Используем стандартный Bootstrap Modal
+        const modal = new bootstrap.Modal(document.getElementById('createProjectModal'));
         modal.show();
         
-        // Добавляем обработчик клика по фону для закрытия модала
-        modalElement.addEventListener('click', function(e) {
-            if (e.target === modalElement) {
-                modal.hide();
-            }
-        });
+        // Убираем backdrop-filter с content-wrapper при показе модального окна
+        const contentWrapper = document.querySelector('.content-wrapper');
+        if (contentWrapper) {
+            contentWrapper.classList.add('modal-open');
+        }
         
-        // Принудительно устанавливаем z-index после показа
+        // Фокус на первое поле
         setTimeout(() => {
-            const modalDialog = modalElement.querySelector('.modal-dialog');
-            if (modalDialog) {
-                modalDialog.style.zIndex = '99999';
-                modalDialog.style.position = 'relative';
+            const firstInput = document.querySelector('#createProjectModal input');
+            if (firstInput) {
+                firstInput.focus();
             }
         }, 100);
+    }
+    
+    function hideCreateProjectModal() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
+        if (modal) {
+            modal.hide();
+        }
+        
+        // Возвращаем backdrop-filter
+        const contentWrapper = document.querySelector('.content-wrapper');
+        if (contentWrapper) {
+            contentWrapper.classList.remove('modal-open');
+        }
     }
 
     async function createProject() {
@@ -1876,8 +1878,7 @@ body {
             if (data.success) {
                 showNotification('Проект успешно создан!', 'success');
                 
-                const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
-                modal.hide();
+                hideCreateProjectModal();
                 
                 // Обновляем страницу
                 setTimeout(() => {

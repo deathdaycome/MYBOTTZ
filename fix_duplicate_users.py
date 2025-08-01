@@ -48,13 +48,13 @@ def fix_duplicate_users():
             
             # Получаем всех пользователей с этим именем
             cursor.execute("""
-                SELECT id, first_name, last_name, username, telegram_id, phone, created_at, registration_date
+                SELECT id, first_name, last_name, username, telegram_id, phone, registration_date
                 FROM users 
                 WHERE first_name = ? 
                 ORDER BY 
                     CASE 
                         WHEN registration_date IS NOT NULL THEN registration_date 
-                        WHEN created_at IS NOT NULL THEN created_at 
+ 
                         ELSE '1970-01-01' 
                     END ASC
             """, (duplicate_name,))
