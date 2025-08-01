@@ -6,6 +6,87 @@
 
 {% block extra_css %}
 <style>
+/* Красивый бежевый градиент для фона */
+body {
+    background: linear-gradient(135deg, #f5f1eb 0%, #e8dcc6 25%, #f2e8d5 50%, #ede3d0 75%, #f9f5ef 100%);
+    min-height: 100vh;
+}
+
+.content-wrapper {
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    padding: 2rem;
+    margin: 1rem;
+}
+
+/* Улучшенные статистические карточки с красивыми иконками */
+.stat-card {
+    background: linear-gradient(135deg, #ffffff 0%, #faf8f5 100%);
+    border: none;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--card-accent, #007bff);
+    border-radius: 16px 16px 0 0;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.15);
+}
+
+.stat-card .stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, var(--icon-bg, #007bff), var(--icon-bg-alt, #0056b3));
+    color: white;
+    font-size: 1.5rem;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card .stat-label {
+    color: #718096;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+/* Цветовая схема для разных типов карточек */
+.stat-card.projects { --card-accent: #3b82f6; --icon-bg: #3b82f6; --icon-bg-alt: #2563eb; }
+.stat-card.active { --card-accent: #10b981; --icon-bg: #10b981; --icon-bg-alt: #059669; }
+.stat-card.completed { --card-accent: #22c55e; --icon-bg: #22c55e; --icon-bg-alt: #16a34a; }
+.stat-card.revenue { --card-accent: #f59e0b; --icon-bg: #f59e0b; --icon-bg-alt: #d97706; }
+.stat-card.paid { --card-accent: #06b6d4; --icon-bg: #06b6d4; --icon-bg-alt: #0891b2; }
+.stat-card.expenses { --card-accent: #ef4444; --icon-bg: #ef4444; --icon-bg-alt: #dc2626; }
+.stat-card.profit { --card-accent: #8b5cf6; --icon-bg: #8b5cf6; --icon-bg-alt: #7c3aed; }
+.stat-card.conversion { --card-accent: #f97316; --icon-bg: #f97316; --icon-bg-alt: #ea580c; }
+.stat-card.debt { --card-accent: #ef4444; --icon-bg: #ef4444; --icon-bg-alt: #dc2626; }
+.stat-card.profitability { --card-accent: #059669; --icon-bg: #059669; --icon-bg-alt: #047857; }
+
 .timeline {
     position: relative;
     max-height: 300px;
@@ -214,6 +295,7 @@
 {% endblock %}
 
 {% block content %}
+<div class="content-wrapper">
 <!-- Filters and Search -->
 <div class="card mb-4">
     <div class="card-body">
@@ -268,79 +350,67 @@
 <!-- Statistics Cards -->
 <div class="row mb-4">
     <div class="col-md-2">
-        <div class="stat-card primary">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-project-diagram fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="totalProjects">{{ projects|length }}</div>
-                    <small>Всего проектов</small>
-                </div>
+        <div class="stat-card projects">
+            <div class="stat-icon">
+                <i class="fas fa-project-diagram"></i>
             </div>
+            <div class="stat-value" id="totalProjects">{{ projects|length }}</div>
+            <div class="stat-label">Всего проектов</div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="stat-card info">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-hourglass-half fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="activeProjects">
-                        {{ projects|selectattr("status", "in", ["new", "review", "accepted", "in_progress", "testing"])|list|length }}
-                    </div>
-                    <small>Активные</small>
-                </div>
+        <div class="stat-card active">
+            <div class="stat-icon">
+                <i class="fas fa-hourglass-half"></i>
             </div>
+            <div class="stat-value" id="activeProjects">
+                {{ projects|selectattr("status", "in", ["new", "review", "accepted", "in_progress", "testing"])|list|length }}
+            </div>
+            <div class="stat-label">Активные</div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="stat-card success">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-check-circle fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="completedProjects">
-                        {{ projects|selectattr("status", "equalto", "completed")|list|length }}
-                    </div>
-                    <small>Завершенные</small>
-                </div>
+        <div class="stat-card completed">
+            <div class="stat-icon">
+                <i class="fas fa-check-circle"></i>
             </div>
+            <div class="stat-value" id="completedProjects">
+                {{ projects|selectattr("status", "equalto", "completed")|list|length }}
+            </div>
+            <div class="stat-label">Завершенные</div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="stat-card warning">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-ruble-sign fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="totalRevenue">
-                        {{ (projects|sum(attribute="estimated_cost") or 0)|round|int }}₽
-                    </div>
-                    <small>Общая стоимость</small>
-                </div>
+        <div class="stat-card revenue">
+            <div class="stat-icon">
+                <i class="fas fa-ruble-sign"></i>
             </div>
+            <div class="stat-value" id="totalRevenue">
+                {{ (projects|sum(attribute="estimated_cost") or 0)|round|int }}₽
+            </div>
+            <div class="stat-label">Общая стоимость</div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="stat-card success">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-money-bill-wave fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="totalPaid">
-                        {{ (projects|sum(attribute="client_paid_total") or 0)|round|int }}₽
-                    </div>
-                    <small>Получено от клиентов</small>
-                </div>
+        <div class="stat-card paid">
+            <div class="stat-icon">
+                <i class="fas fa-money-bill-wave"></i>
             </div>
+            <div class="stat-value" id="totalPaid">
+                {{ (projects|sum(attribute="client_paid_total") or 0)|round|int }}₽
+            </div>
+            <div class="stat-label">Получено от клиентов</div>
         </div>
     </div>
     <div class="col-md-2">
-        <div class="stat-card danger">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="remainingPayment">
-                        {{ ((projects|sum(attribute="estimated_cost") or 0) - (projects|sum(attribute="client_paid_total") or 0))|round|int }}₽
-                    </div>
-                    <small>Остаток по клиентам</small>
-                </div>
+        <div class="stat-card debt">
+            <div class="stat-icon">
+                <i class="fas fa-exclamation-triangle"></i>
             </div>
+            <div class="stat-value" id="remainingPayment">
+                {{ ((projects|sum(attribute="estimated_cost") or 0) - (projects|sum(attribute="client_paid_total") or 0))|round|int }}₽
+            </div>
+            <div class="stat-label">Остаток по клиентам</div>
         </div>
     </div>
 </div>
@@ -348,55 +418,47 @@
 <!-- Financial Statistics Row -->
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="stat-card secondary">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-hand-holding-usd fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="totalPrepayments">
-                        {{ (projects|sum(attribute="prepayment_amount") or 0)|round|int }}₽
-                    </div>
-                    <small>Общие предоплаты</small>
-                </div>
+        <div class="stat-card expenses">
+            <div class="stat-icon">
+                <i class="fas fa-hand-holding-usd"></i>
             </div>
+            <div class="stat-value" id="totalPrepayments">
+                {{ (projects|sum(attribute="prepayment_amount") or 0)|round|int }}₽
+            </div>
+            <div class="stat-label">Общие предоплаты</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card info">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-user-friends fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="totalExecutorPayments">
-                        {{ (projects|sum(attribute="executor_paid_total") or 0)|round|int }}₽
-                    </div>
-                    <small>Выплачено исполнителям</small>
-                </div>
+        <div class="stat-card conversion">
+            <div class="stat-icon">
+                <i class="fas fa-user-friends"></i>
             </div>
+            <div class="stat-value" id="totalExecutorPayments">
+                {{ (projects|sum(attribute="executor_paid_total") or 0)|round|int }}₽
+            </div>
+            <div class="stat-label">Выплачено исполнителям</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card warning">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-clock fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="remainingExecutorPayments">
-                        {{ ((projects|sum(attribute="executor_cost") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int }}₽
-                    </div>
-                    <small>Остаток к выплате</small>
-                </div>
+        <div class="stat-card debt">
+            <div class="stat-icon">
+                <i class="fas fa-clock"></i>
             </div>
+            <div class="stat-value" id="remainingExecutorPayments">
+                {{ ((projects|sum(attribute="executor_cost") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int }}₽
+            </div>
+            <div class="stat-label">Остаток к выплате</div>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="stat-card success">
-            <div class="d-flex align-items-center">
-                <i class="fas fa-chart-line fa-2x me-3"></i>
-                <div>
-                    <div class="h4 mb-0" id="profit">
-                        {{ ((projects|sum(attribute="client_paid_total") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int }}₽
-                    </div>
-                    <small>Текущая прибыль</small>
-                </div>
+        <div class="stat-card profit">
+            <div class="stat-icon">
+                <i class="fas fa-chart-line"></i>
             </div>
+            <div class="stat-value" id="profit">
+                {{ ((projects|sum(attribute="client_paid_total") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int }}₽
+            </div>
+            <div class="stat-label">Текущая прибыль</div>
         </div>
     </div>
 </div>
@@ -2514,4 +2576,5 @@
 
 
 </script>
+</div> <!-- content-wrapper -->
 {% endblock %}
