@@ -6,10 +6,33 @@
 
 {% block extra_css %}
 <style>
-/* Красивый бежевый градиент для фона */
-body {
+/* Красивый бежевый градиент для фона и полноэкранный режим */
+html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
     background: linear-gradient(135deg, #f5f1eb 0%, #e8dcc6 25%, #f2e8d5 50%, #ede3d0 75%, #f9f5ef 100%);
     min-height: 100vh;
+}
+
+/* Полноэкранные контейнеры */
+.container-fluid {
+    max-width: 100% !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+    margin: 0 !important;
+}
+
+.row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+.col, .col-* {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
 }
 
 .content-wrapper {
@@ -30,16 +53,47 @@ body {
 .modal {
     z-index: 10000 !important;
     display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    align-items: center;
+    justify-content: center;
 }
 
 .modal.show {
-    display: block !important;
+    display: flex !important;
 }
 
 .modal-dialog {
     z-index: 10001 !important;
-    margin: 1.75rem auto;
-    max-width: 500px;
+    margin: 0;
+    max-width: 90%;
+    width: auto;
+    position: relative;
+}
+
+/* Размеры модальных окон */
+.modal-dialog.modal-sm {
+    max-width: 400px;
+}
+
+.modal-dialog.modal-lg {
+    max-width: 800px;
+}
+
+.modal-dialog.modal-xl {
+    max-width: 1200px;
+}
+
+/* Адаптивность модальных окон */
+@media (max-width: 576px) {
+    .modal-dialog {
+        max-width: 95%;
+        margin: 10px;
+    }
 }
 
 .modal-content {
@@ -47,6 +101,21 @@ body {
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
     border: none;
+}
+
+/* Фиксация кнопок в модальном окне */
+.modal-footer button {
+    z-index: 10005 !important;
+    position: relative !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+#createProjectBtn {
+    z-index: 10010 !important;
+    position: relative !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
 }
 
 /* Убираем backdrop-filter с content-wrapper при показе модального окна */
@@ -68,12 +137,23 @@ body {
 
 /* Анимации для модального окна */
 .modal.fade .modal-dialog {
-    transform: translate(0, -50px) !important;
+    transform: scale(0.8) !important;
     transition: transform 0.3s ease-out !important;
+    opacity: 0;
 }
 
 .modal.show .modal-dialog {
-    transform: none !important;
+    transform: scale(1) !important;
+    opacity: 1;
+}
+
+.modal.fade {
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+}
+
+.modal.show {
+    opacity: 1;
 }
 
 /* Улучшенные статистические карточки с красивыми иконками */
@@ -81,11 +161,17 @@ body {
     background: linear-gradient(135deg, #ffffff 0%, #faf8f5 100%);
     border: none;
     border-radius: 16px;
-    padding: 1.5rem;
+    padding: 1.2rem;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
+    text-align: center;
+    min-height: 140px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
 }
 
 .stat-card::before {
@@ -104,30 +190,42 @@ body {
     box-shadow: 0 12px 32px rgba(0,0,0,0.15);
 }
 
+.stat-card:hover .stat-icon {
+    transform: scale(1.05);
+}
+
 .stat-card .stat-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.8rem;
     background: linear-gradient(135deg, var(--icon-bg, #007bff), var(--icon-bg-alt, #0056b3));
     color: white;
-    font-size: 1.5rem;
+    font-size: 1.4rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transition: transform 0.2s ease;
 }
 
 .stat-card .stat-value {
-    font-size: 2rem;
+    font-size: 1.8rem;
     font-weight: 700;
     color: #2d3748;
     margin-bottom: 0.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1;
 }
 
 .stat-card .stat-label {
     color: #718096;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
 }
 
 /* Цветовая схема для разных типов карточек */
@@ -223,14 +321,23 @@ body {
 @media (max-width: 768px) {
     .stat-card {
         margin-bottom: 1rem;
+        min-height: 120px;
+        padding: 1rem;
     }
     
-    .stat-card .fa-2x {
-        font-size: 1.5em;
-    }
-    
-    .stat-card .h4 {
+    .stat-card .stat-icon {
+        width: 48px;
+        height: 48px;
         font-size: 1.2rem;
+        margin-bottom: 0.6rem;
+    }
+    
+    .stat-card .stat-value {
+        font-size: 1.5rem;
+    }
+    
+    .stat-card .stat-label {
+        font-size: 0.8rem;
     }
 }
 
@@ -270,13 +377,65 @@ body {
     100% { box-shadow: 0 2px 8px rgba(220, 53, 69, 0.3); }
 }
 
-/* Увеличенный размер карточек */
+/* Стили для карточек проектов */
 .project-card {
-    min-height: 280px;
+    min-height: 350px;
+    max-height: 400px;
 }
 
 .project-card-item {
-    min-height: 250px;
+    min-height: 330px;
+    max-height: 380px;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-card-item .card-body {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-card-item .description-preview {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    line-clamp: 3;
+    max-height: 60px;
+    margin-bottom: 15px;
+}
+
+/* Стили для footer контейнера в карточках */
+.project-card-item .card-footer,
+.project-card-item .mt-auto {
+    margin-top: auto;
+    padding-top: 10px;
+}
+
+/* Стили для кнопок действий в карточках */
+.project-card-item .btn-group-sm .btn {
+    padding: 0.25rem 0.4rem;
+    font-size: 0.75rem;
+    margin-right: 2px;
+}
+
+/* Сжатие контента в карточках */
+.project-card-item .user-info {
+    margin-bottom: 10px;
+}
+
+.project-card-item .badge {
+    font-size: 0.7rem;
+    padding: 0.25em 0.5em;
+}
+
+.project-card-item .progress {
+    height: 4px;
+    margin-bottom: 10px;
 }
 
 /* Общие стили для всех статусов */
@@ -337,7 +496,7 @@ body {
 
 {% block header_actions %}
 <div class="btn-group">
-    <button class="btn btn-primary btn-custom" onclick="showCreateProjectModal()">
+    <button class="btn btn-primary btn-custom" onclick="showCreateProjectModal();">
         <i class="fas fa-plus me-1"></i> Создать проект
     </button>
     <button class="btn btn-secondary btn-custom" onclick="refreshProjects()">
@@ -407,7 +566,7 @@ body {
     <div class="col-md-2">
         <div class="stat-card projects">
             <div class="stat-icon">
-                <i class="fas fa-project-diagram"></i>
+                <i class="fas fa-briefcase"></i>
             </div>
             <div class="stat-value" id="totalProjects">{{ projects|length }}</div>
             <div class="stat-label">Всего проектов</div>
@@ -416,7 +575,7 @@ body {
     <div class="col-md-2">
         <div class="stat-card active">
             <div class="stat-icon">
-                <i class="fas fa-hourglass-half"></i>
+                <i class="fas fa-rocket"></i>
             </div>
             <div class="stat-value" id="activeProjects">
                 {{ projects|selectattr("status", "in", ["new", "review", "accepted", "in_progress", "testing"])|list|length }}
@@ -427,7 +586,7 @@ body {
     <div class="col-md-2">
         <div class="stat-card completed">
             <div class="stat-icon">
-                <i class="fas fa-check-circle"></i>
+                <i class="fas fa-trophy"></i>
             </div>
             <div class="stat-value" id="completedProjects">
                 {{ projects|selectattr("status", "equalto", "completed")|list|length }}
@@ -438,10 +597,10 @@ body {
     <div class="col-md-2">
         <div class="stat-card revenue">
             <div class="stat-icon">
-                <i class="fas fa-ruble-sign"></i>
+                <i class="fas fa-gem"></i>
             </div>
             <div class="stat-value" id="totalRevenue">
-                {{ (projects|sum(attribute="estimated_cost") or 0)|round|int }}₽
+                {{ "{:,}".format((projects|sum(attribute="estimated_cost") or 0)|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Общая стоимость</div>
         </div>
@@ -449,10 +608,10 @@ body {
     <div class="col-md-2">
         <div class="stat-card paid">
             <div class="stat-icon">
-                <i class="fas fa-money-bill-wave"></i>
+                <i class="fas fa-credit-card"></i>
             </div>
             <div class="stat-value" id="totalPaid">
-                {{ (projects|sum(attribute="client_paid_total") or 0)|round|int }}₽
+                {{ "{:,}".format((projects|sum(attribute="client_paid_total") or 0)|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Получено от клиентов</div>
         </div>
@@ -460,10 +619,10 @@ body {
     <div class="col-md-2">
         <div class="stat-card debt">
             <div class="stat-icon">
-                <i class="fas fa-exclamation-triangle"></i>
+                <i class="fas fa-clock-o"></i>
             </div>
             <div class="stat-value" id="remainingPayment">
-                {{ ((projects|sum(attribute="estimated_cost") or 0) - (projects|sum(attribute="client_paid_total") or 0))|round|int }}₽
+                {{ "{:,}".format(((projects|sum(attribute="estimated_cost") or 0) - (projects|sum(attribute="client_paid_total") or 0))|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Остаток по клиентам</div>
         </div>
@@ -475,10 +634,10 @@ body {
     <div class="col-md-3">
         <div class="stat-card expenses">
             <div class="stat-icon">
-                <i class="fas fa-hand-holding-usd"></i>
+                <i class="fas fa-piggy-bank"></i>
             </div>
             <div class="stat-value" id="totalPrepayments">
-                {{ (projects|sum(attribute="prepayment_amount") or 0)|round|int }}₽
+                {{ "{:,}".format((projects|sum(attribute="prepayment_amount") or 0)|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Общие предоплаты</div>
         </div>
@@ -486,10 +645,10 @@ body {
     <div class="col-md-3">
         <div class="stat-card conversion">
             <div class="stat-icon">
-                <i class="fas fa-user-friends"></i>
+                <i class="fas fa-handshake"></i>
             </div>
             <div class="stat-value" id="totalExecutorPayments">
-                {{ (projects|sum(attribute="executor_paid_total") or 0)|round|int }}₽
+                {{ "{:,}".format((projects|sum(attribute="executor_paid_total") or 0)|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Выплачено исполнителям</div>
         </div>
@@ -497,10 +656,10 @@ body {
     <div class="col-md-3">
         <div class="stat-card debt">
             <div class="stat-icon">
-                <i class="fas fa-clock"></i>
+                <i class="fas fa-stopwatch"></i>
             </div>
             <div class="stat-value" id="remainingExecutorPayments">
-                {{ ((projects|sum(attribute="executor_cost") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int }}₽
+                {{ "{:,}".format(((projects|sum(attribute="executor_cost") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Остаток к выплате</div>
         </div>
@@ -511,7 +670,7 @@ body {
                 <i class="fas fa-chart-line"></i>
             </div>
             <div class="stat-value" id="profit">
-                {{ ((projects|sum(attribute="client_paid_total") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int }}₽
+                {{ "{:,}".format(((projects|sum(attribute="client_paid_total") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Текущая прибыль</div>
         </div>
@@ -663,7 +822,7 @@ body {
                         <span class="badge bg-secondary">#{{ project.id }}</span>
                     </div>
                     <div class="card-body">
-                        <div class="d-flex align-items-center mb-3">
+                        <div class="d-flex align-items-center mb-2 user-info">
                             <div class="user-avatar me-2">
                                 {{ (project.user.first_name or 'U')[0] if project.user else 'U' }}
                             </div>
@@ -676,7 +835,7 @@ body {
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <span class="badge status-{{ project.status }}">
                                 {% if project.status == 'new' %}🆕 Новый
-                                {% elif project.status == 'review' %}👀 Рассмотрение
+                                {% elif project.status == 'review' %}👀 На рассмотрении
                                 {% elif project.status == 'accepted' %}✅ Принят
                                 {% elif project.status == 'in_progress' %}🔄 В работе
                                 {% elif project.status == 'testing' %}🧪 Тестирование
@@ -694,13 +853,13 @@ body {
                             </span>
                         </div>
 
-                        <div class="progress mb-3" style="height: 6px;">
+                        <div class="progress mb-2">
                             <div class="progress-bar" role="progressbar" style="width: {{ calculate_progress(project.status) }}%;" aria-valuenow="{{ calculate_progress(project.status) }}" aria-valuemin="0" aria-valuemax="100"></div>
                         </div>
 
                         <p class="card-text text-muted small description-preview">{{ project.description if project.description else 'Нет описания' }}</p>
 
-                        <div class="d-flex justify-content-between">
+                        <div class="d-flex justify-content-between mt-auto">
                             <div class="fw-bold">{{ (project.estimated_cost or 0)|round|int }}₽</div>
                             <small class="text-muted">{{ project.created_at[:10] if project.created_at else 'Н/Д' }}</small>
                         </div>
@@ -920,7 +1079,7 @@ body {
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="createProjectTitle" class="form-label">Название проекта *</label>
-                                <input type="text" class="form-control" id="createProjectTitle" required>
+                                <input type="text" class="form-control" id="createProjectTitle">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -938,7 +1097,7 @@ body {
                     
                     <div class="mb-3">
                         <label for="createProjectDescription" class="form-label">Описание проекта *</label>
-                        <textarea class="form-control" id="createProjectDescription" rows="3" required></textarea>
+                        <textarea class="form-control" id="createProjectDescription" rows="3"></textarea>
                     </div>
                     
                     <div class="row">
@@ -1064,8 +1223,8 @@ body {
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" onclick="createProject()">
+                <button type="button" class="btn btn-secondary" onclick="hideCreateProjectModal()">Отмена</button>
+                <button type="button" id="createProjectBtn" class="btn btn-primary" onclick="createProject()">
                     <i class="fas fa-plus me-1"></i>Создать проект
                 </button>
             </div>
@@ -1127,8 +1286,9 @@ body {
     // Конфигурация аутентификации
 
     let currentProjectId = null;
-    const username = 'admin';
-    const password = 'qwerty123';
+    // Определяем глобальные переменные без const
+    window.username = 'admin';
+    window.password = 'qwerty123';
 
     let currentView = 'table';
     let allProjects = {{ projects|tojson|safe }};
@@ -1348,7 +1508,7 @@ body {
             const response = await fetch('/admin/api/users/executors', {
                 method: 'GET',
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -1467,7 +1627,7 @@ body {
         try {
             const response = await fetch('/admin/api/project-statuses/', {
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -1666,7 +1826,7 @@ body {
         try {
             const response = await fetch(`/admin/api/projects/${projectId}`, {
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -1780,12 +1940,17 @@ body {
     }
 
     function showCreateProjectModal() {
+        console.log('Функция showCreateProjectModal вызвана');
+        
         // Очищаем форму
         document.getElementById('createProjectForm').reset();
         
-        // Используем стандартный Bootstrap Modal
-        const modal = new bootstrap.Modal(document.getElementById('createProjectModal'));
-        modal.show();
+        // Простое открытие модального окна
+        const modalElement = document.getElementById('createProjectModal');
+        modalElement.style.display = 'block';
+        modalElement.classList.add('show');
+        modalElement.style.background = 'rgba(0, 0, 0, 0.5)';
+        console.log('Модальное окно открыто');
         
         // Убираем backdrop-filter с content-wrapper при показе модального окна
         const contentWrapper = document.querySelector('.content-wrapper');
@@ -1803,10 +1968,10 @@ body {
     }
     
     function hideCreateProjectModal() {
-        const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
-        if (modal) {
-            modal.hide();
-        }
+        console.log('Закрываем модальное окно');
+        const modalElement = document.getElementById('createProjectModal');
+        modalElement.style.display = 'none';
+        modalElement.classList.remove('show');
         
         // Возвращаем backdrop-filter
         const contentWrapper = document.querySelector('.content-wrapper');
@@ -1815,9 +1980,18 @@ body {
         }
     }
 
-    async function createProject() {
+    window.createProject = async function() {
+        console.log('Функция createProject вызвана');
+        
+        // Используем глобальные переменные для аутентификации
+        const username = window.username;
+        const password = window.password;
+        
         const title = document.getElementById('createProjectTitle').value;
         const description = document.getElementById('createProjectDescription').value;
+        
+        console.log('Title:', title);
+        console.log('Description:', description);
         const projectType = document.getElementById('createProjectType').value;
         const clientName = document.getElementById('createClientName').value;
         const clientTelegramId = document.getElementById('createClientTelegramId').value;
@@ -1847,6 +2021,7 @@ body {
         }
         
         try {
+            console.log('Отправляем запрос на создание проекта');
             const response = await fetch('/admin/api/projects/', {
                 method: 'POST',
                 headers: {
@@ -1874,7 +2049,9 @@ body {
                 })
             });
             
+            console.log('Response status:', response.status);
             const data = await response.json();
+            console.log('Ответ сервера:', data);
             if (data.success) {
                 showNotification('Проект успешно создан!', 'success');
                 
@@ -1911,7 +2088,7 @@ body {
         try {
             const response = await fetch('/admin/api/projects/export', {
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -2016,7 +2193,7 @@ body {
         try {
             const response = await fetch(`/admin/api/projects/${projectId}`, {
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -2255,7 +2432,7 @@ body {
         try {
             const response = await fetch(`/admin/api/projects/${projectId}/files`, {
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -2395,7 +2572,7 @@ body {
             const response = await fetch('/admin/api/projects/files/upload', {
                 method: 'POST',
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 },
                 body: formData
             });
@@ -2428,7 +2605,7 @@ body {
         try {
             const response = await fetch(`/admin/api/files/${fileId}/download`, {
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -2472,7 +2649,7 @@ body {
             const response = await fetch(`/admin/api/files/${fileId}`, {
                 method: 'DELETE',
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -2631,7 +2808,7 @@ body {
             const response = await fetch(`/admin/api/projects/${projectId}`, {
                 method: 'DELETE',
                 headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -2655,7 +2832,57 @@ body {
             showNotification('Ошибка удаления проекта: ' + error.message, 'danger');
         }
     }
+    
+    // Глобальная функция для теста
+    window.testFunction = function() {
+        alert('Тест работает!');
+        console.log('Тест работает!');
+    };
+    
+    // Глобальные переменные для аутентификации
+    window.username = 'admin';
+    window.password = 'qwerty123';
 
+    // Проверяем работу кнопки при загрузке
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM загружен!');
+        const createBtn = document.getElementById('createProjectBtn');
+        console.log('Кнопка найдена:', createBtn);
+        
+        // Дополнительная защита - тройной обработчик
+        if (createBtn) {
+            // Диагностика событий мыши
+            createBtn.addEventListener('mousedown', function(e) {
+                console.log('MOUSEDOWN на кнопке!');
+            });
+            
+            createBtn.addEventListener('mouseup', function(e) {
+                console.log('MOUSEUP на кнопке!');
+            });
+            
+            createBtn.addEventListener('mouseover', function(e) {
+                console.log('MOUSEOVER на кнопке!');
+            });
+            
+            // 1. addEventListener как резерв
+            createBtn.addEventListener('click', function(e) {
+                console.log('КЛИК через addEventListener!');
+                e.preventDefault();
+                e.stopPropagation();
+                createProject();
+            });
+            
+            // 2. Прямое назначение onclick как резерв
+            createBtn.onclick = function(e) {
+                console.log('КЛИК через onclick!');
+                e.preventDefault();
+                e.stopPropagation();
+                createProject();
+            };
+            
+            console.log('Обработчики добавлены');
+        }
+    });
 
 </script>
 </div> <!-- content-wrapper -->

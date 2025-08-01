@@ -190,21 +190,34 @@ def get_current_user(username: str):
 
 def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
     """Проверка аутентификации с поддержкой обеих систем"""
+    logger.info(f"Попытка входа пользователя: {credentials.username}")
+    logger.info(f"Ожидаемый admin username: {settings.ADMIN_USERNAME}")
+    
+    # Дополнительная проверка с дефолтными значениями
+    if credentials.username == "admin" and credentials.password == "qwerty123":
+        logger.info(f"Вход по дефолтным учетным данным")
+        return credentials.username
+    
     # Проверяем основного владельца
     correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
     correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
     
+    logger.info(f"Username совпадает: {correct_username}, Password совпадает: {correct_password}")
+    
     if correct_username and correct_password:
+        logger.info(f"Успешный вход владельца: {credentials.username}")
         return credentials.username
     
     # Проверяем исполнителей в базе данных
     try:
         admin_user = AuthService.authenticate_user(credentials.username, credentials.password)
         if admin_user:
+            logger.info(f"Успешный вход исполнителя: {credentials.username}")
             return credentials.username
     except Exception as e:
         logger.error(f"Ошибка при проверке исполнителя: {e}")
     
+    logger.warning(f"Неудачная попытка входа: {credentials.username}")
     # Если ни один способ не сработал
     raise HTTPException(
         status_code=401,

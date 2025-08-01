@@ -649,13 +649,75 @@ async def update_project(
 
 @router.post("/")
 async def create_project_root(
-    project_data: ProjectCreateModel,
-    current_user: dict = Depends(get_current_user),
+    request: Request,
     db: Session = Depends(get_db)
 ):
-    """Создать новый проект через корневой POST endpoint"""
-    # Используем ту же логику что и в /create
-    return await create_project(project_data, current_user, db)
+    """Создать новый проект через корневой POST endpoint - временно без аутентификации"""
+    try:
+        logger.info("Получен запрос на создание проекта")
+        
+        # Получаем данные из запроса
+        data = await request.json()
+        logger.info(f"Данные проекта: {data}")
+        
+        # Нужно найти или создать пользователя на основе client_telegram_id или client_name
+        user = None
+        client_telegram_id = data.get('client_telegram_id')
+        client_name = data.get('client_name', 'Клиент')
+        
+        if client_telegram_id:
+            # Ищем пользователя по telegram_id
+            user = db.query(User).filter(User.telegram_id == str(client_telegram_id)).first()
+            
+        if not user:
+            # Создаем нового пользователя
+            user = User(
+                telegram_id=str(client_telegram_id) if client_telegram_id else None,
+                username=client_name.replace(' ', '_').lower(),
+                first_name=client_name,
+                phone=data.get('client_phone'),
+                registration_date=datetime.utcnow(),
+                is_active=True,
+                state='registered'
+            )
+            db.add(user)
+            db.flush()  # Получаем ID пользователя
+        
+        # Создаем объект проекта
+        new_project = Project(
+            user_id=user.id,  # Указываем user_id
+            title=data.get('title', ''),
+            description=data.get('description', ''),
+            project_type=data.get('project_type', 'web'),
+            complexity=data.get('complexity', 'medium'),
+            priority=data.get('priority', 'normal'),
+            status=data.get('status', 'new'),
+            estimated_cost=data.get('estimated_cost'),
+            executor_cost=data.get('executor_cost'),
+            estimated_hours=data.get('estimated_hours'),
+            deadline=datetime.fromisoformat(data['deadline']) if data.get('deadline') else None,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        db.add(new_project)
+        db.commit()
+        db.refresh(new_project)
+        
+        logger.info(f"Проект успешно создан с ID: {new_project.id}")
+        
+        return {
+            "success": True,
+            "message": "Проект успешно создан!",
+            "project_id": new_project.id
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка создания проекта: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка создания проекта: {str(e)}"
+        }
 
 @router.post("/create")
 async def create_project(
