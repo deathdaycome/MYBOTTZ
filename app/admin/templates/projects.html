@@ -21,6 +21,29 @@ body {
     margin: 1rem;
 }
 
+/* Исправление для модальных окон */
+.modal {
+    z-index: 9999 !important;
+}
+
+.modal-backdrop {
+    z-index: 9998 !important;
+}
+
+.modal-dialog {
+    z-index: 10000 !important;
+}
+
+/* Убираем конфликты с backdrop-filter */
+.modal.show {
+    backdrop-filter: none !important;
+}
+
+.modal-content {
+    background: white !important;
+    backdrop-filter: none !important;
+}
+
 /* Улучшенные статистические карточки с красивыми иконками */
 .stat-card {
     background: linear-gradient(135deg, #ffffff 0%, #faf8f5 100%);
