@@ -21,20 +21,17 @@ body {
     margin: 1rem;
 }
 
-/* Исправление для модальных окон */
+/* Исправление для модальных окон - полностью кастомное решение */
 .modal {
     z-index: 99999 !important;
     backdrop-filter: none !important;
-}
-
-.modal-backdrop {
-    z-index: 99998 !important;
-    backdrop-filter: none !important;
+    background: rgba(0, 0, 0, 0.5) !important; /* Кастомный backdrop */
 }
 
 .modal-dialog {
     z-index: 99999 !important;
     position: relative !important;
+    margin: 1.75rem auto !important;
 }
 
 .modal-content {
@@ -42,6 +39,8 @@ body {
     backdrop-filter: none !important;
     position: relative !important;
     z-index: 99999 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3) !important;
 }
 
 /* Убираем конфликты с content-wrapper */
@@ -50,13 +49,15 @@ body {
     z-index: 1;
 }
 
-/* Исправляем взаимодействие с backdrop */
-.modal-backdrop.show {
-    opacity: 0.5 !important;
+/* Отключаем стандартный backdrop */
+.modal-backdrop {
+    display: none !important;
 }
 
+/* Анимации для модального окна */
 .modal.fade .modal-dialog {
     transform: translate(0, -50px) !important;
+    transition: transform 0.3s ease-out !important;
 }
 
 .modal.show .modal-dialog {
@@ -1780,7 +1781,7 @@ body {
         }
         
         const modal = new bootstrap.Modal(modalElement, {
-            backdrop: true,
+            backdrop: false, // Отключаем backdrop полностью
             keyboard: true,
             focus: true
         });
@@ -1794,6 +1795,13 @@ body {
         });
         
         modal.show();
+        
+        // Добавляем обработчик клика по фону для закрытия модала
+        modalElement.addEventListener('click', function(e) {
+            if (e.target === modalElement) {
+                modal.hide();
+            }
+        });
         
         // Принудительно устанавливаем z-index после показа
         setTimeout(() => {
