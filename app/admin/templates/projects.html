@@ -23,25 +23,44 @@ body {
 
 /* Исправление для модальных окон */
 .modal {
-    z-index: 9999 !important;
+    z-index: 99999 !important;
+    backdrop-filter: none !important;
 }
 
 .modal-backdrop {
-    z-index: 9998 !important;
+    z-index: 99998 !important;
+    backdrop-filter: none !important;
 }
 
 .modal-dialog {
-    z-index: 10000 !important;
-}
-
-/* Убираем конфликты с backdrop-filter */
-.modal.show {
-    backdrop-filter: none !important;
+    z-index: 99999 !important;
+    position: relative !important;
 }
 
 .modal-content {
     background: white !important;
     backdrop-filter: none !important;
+    position: relative !important;
+    z-index: 99999 !important;
+}
+
+/* Убираем конфликты с content-wrapper */
+.content-wrapper {
+    position: relative;
+    z-index: 1;
+}
+
+/* Исправляем взаимодействие с backdrop */
+.modal-backdrop.show {
+    opacity: 0.5 !important;
+}
+
+.modal.fade .modal-dialog {
+    transform: translate(0, -50px) !important;
+}
+
+.modal.show .modal-dialog {
+    transform: none !important;
 }
 
 /* Улучшенные статистические карточки с красивыми иконками */
@@ -1751,8 +1770,39 @@ body {
         // Очищаем форму
         document.getElementById('createProjectForm').reset();
         
-        const modal = new bootstrap.Modal(document.getElementById('createProjectModal'));
+        const modalElement = document.getElementById('createProjectModal');
+        
+        // Принудительно убираем backdrop-filter с content-wrapper при открытии модала
+        const contentWrapper = document.querySelector('.content-wrapper');
+        if (contentWrapper) {
+            contentWrapper.style.filter = 'none';
+            contentWrapper.style.backdropFilter = 'none';
+        }
+        
+        const modal = new bootstrap.Modal(modalElement, {
+            backdrop: true,
+            keyboard: true,
+            focus: true
+        });
+        
+        // Обработчик закрытия модала
+        modalElement.addEventListener('hidden.bs.modal', function () {
+            if (contentWrapper) {
+                contentWrapper.style.filter = '';
+                contentWrapper.style.backdropFilter = 'blur(10px)';
+            }
+        });
+        
         modal.show();
+        
+        // Принудительно устанавливаем z-index после показа
+        setTimeout(() => {
+            const modalDialog = modalElement.querySelector('.modal-dialog');
+            if (modalDialog) {
+                modalDialog.style.zIndex = '99999';
+                modalDialog.style.position = 'relative';
+            }
+        }, 100);
     }
 
     async function createProject() {
