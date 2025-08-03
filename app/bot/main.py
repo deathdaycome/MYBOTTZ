@@ -95,7 +95,7 @@ def setup_handlers(app: Application):
     
     app.add_handler(CallbackQueryHandler(
         common_handler.handle_callback, 
-        pattern="^(main_menu|back|consultant|projects|about|calculator|faq|consultation|contacts|my_projects|create_tz|create_bot_guide|settings|setup_timeweb|setup_bot_token|send_bot_token|get_telegram_id|get_chat_id|send_chat_id|detailed_chat_instructions|timeweb_registered|admin_console|admin_money|upload_receipt|transaction_|my_transactions|view_income|view_expenses|money_analytics|money_categories)$"
+        pattern="^(main_menu|back|consultant|projects|about|calculator|faq|consultation|contacts|my_projects|create_tz|create_bot_guide|settings|setup_timeweb|setup_bot_token|send_bot_token|get_telegram_id|get_chat_id|send_chat_id|detailed_chat_instructions|timeweb_registered|admin_console|admin_money|upload_receipt|transaction_.*|my_transactions|view_income|view_expenses|money_analytics|money_categories)$"
     ))
     
     # Revision handlers
