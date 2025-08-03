@@ -1177,6 +1177,131 @@ class TaskComment(Base):
             "author": self.author.to_dict() if self.author else None
         }
 
+# Модели для системы учета средств с OCR распознаванием чеков
+
+class MoneyTransaction(Base):
+    """Модель финансовых транзакций главного админа"""
+    __tablename__ = "money_transactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    amount = Column(Float, nullable=False)  # Сумма
+    type = Column(String(20), nullable=False)  # income или expense
+    category = Column(String(100), nullable=False)  # Категория транзакции
+    description = Column(Text, nullable=True)  # Описание
+    date = Column(DateTime, nullable=False)  # Дата транзакции
+    
+    # OCR данные
+    receipt_file_path = Column(String(500), nullable=True)  # Путь к файлу чека
+    ocr_data = Column(JSON, default=lambda: {})  # Данные от OCR (сумма, дата, магазин и т.д.)
+    is_ocr_processed = Column(Boolean, default=False)  # Обработан ли OCR
+    
+    # Метаданные
+    notes = Column(Text, nullable=True)  # Дополнительные заметки
+    source = Column(String(50), default="manual")  # manual, ocr, api
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)
+    
+    # Связи
+    created_by = relationship("AdminUser", foreign_keys=[created_by_id])
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "amount": self.amount,
+            "type": self.type,
+            "category": self.category,
+            "description": self.description,
+            "date": self.date.isoformat() if self.date else None,
+            "receipt_file_path": self.receipt_file_path,
+            "ocr_data": self.ocr_data,
+            "is_ocr_processed": self.is_ocr_processed,
+            "notes": self.notes,
+            "source": self.source,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by": self.created_by.to_dict() if self.created_by else None
+        }
+
+class MoneyCategory(Base):
+    """Модель категорий доходов/расходов"""
+    __tablename__ = "money_categories"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)  # Название категории
+    type = Column(String(20), nullable=False)  # income или expense
+    description = Column(Text, nullable=True)  # Описание
+    color = Column(String(7), default="#6c757d")  # Цвет для графиков (HEX)
+    icon = Column(String(50), default="fas fa-circle")  # FontAwesome иконка
+    is_active = Column(Boolean, default=True)
+    sort_order = Column(Integer, default=0)  # Порядок сортировки
+    created_at = Column(DateTime, default=datetime.utcnow)
+    created_by_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)
+    
+    # Связи
+    created_by = relationship("AdminUser", foreign_keys=[created_by_id])
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "type": self.type,
+            "description": self.description,
+            "color": self.color,
+            "icon": self.icon,
+            "is_active": self.is_active,
+            "sort_order": self.sort_order,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_by": self.created_by.to_dict() if self.created_by else None
+        }
+
+class ReceiptFile(Base):
+    """Модель файлов чеков для OCR обработки"""
+    __tablename__ = "receipt_files"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255), nullable=False)  # Имя файла
+    original_filename = Column(String(255), nullable=False)  # Оригинальное имя
+    file_path = Column(String(500), nullable=False)  # Путь к файлу
+    file_size = Column(Integer, nullable=False)  # Размер файла в байтах
+    file_type = Column(String(50), nullable=False)  # jpg, png, pdf и т.д.
+    
+    # OCR статус
+    ocr_status = Column(String(50), default="pending")  # pending, processing, completed, failed
+    ocr_result = Column(JSON, default=lambda: {})  # Результат OCR
+    ocr_confidence = Column(Float, nullable=True)  # Уверенность OCR (0-1)
+    ocr_error = Column(Text, nullable=True)  # Ошибка OCR
+    
+    # Связь с транзакцией
+    transaction_id = Column(Integer, ForeignKey("money_transactions.id"), nullable=True)
+    
+    # Метаданные
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)  # Когда обработан OCR
+    uploaded_by_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)
+    
+    # Связи
+    uploaded_by = relationship("AdminUser", foreign_keys=[uploaded_by_id])
+    transaction = relationship("MoneyTransaction", foreign_keys=[transaction_id])
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "filename": self.filename,
+            "original_filename": self.original_filename,
+            "file_path": self.file_path,
+            "file_size": self.file_size,
+            "file_type": self.file_type,
+            "ocr_status": self.ocr_status,
+            "ocr_result": self.ocr_result,
+            "ocr_confidence": self.ocr_confidence,
+            "ocr_error": self.ocr_error,
+            "transaction_id": self.transaction_id,
+            "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
+            "processed_at": self.processed_at.isoformat() if self.processed_at else None,
+            "uploaded_by": self.uploaded_by.to_dict() if self.uploaded_by else None
+        }
+
 # Обновляем связи существующих моделей
 AdminUser.assigned_projects = relationship("Project", back_populates="assigned_executor")
 AdminUser.assigned_tasks = relationship("Task", foreign_keys="[Task.assigned_to_id]", back_populates="assigned_to")

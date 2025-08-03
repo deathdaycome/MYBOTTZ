@@ -78,7 +78,7 @@ class StartHandler:
 Выберите нужный раздел в меню ниже! 👇
             """
             
-            keyboard = get_main_menu_keyboard()
+            keyboard = get_main_menu_keyboard(user_id)
             
             if update.message:
                 await update.message.reply_text(
@@ -100,7 +100,7 @@ class StartHandler:
             if update.message:
                 await update.message.reply_text(
                     "Произошла ошибка при запуске. Попробуйте еще раз или обратитесь в поддержку.",
-                    reply_markup=get_main_menu_keyboard()
+                    reply_markup=get_main_menu_keyboard(user_id)
                 )
 
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -123,7 +123,7 @@ class StartHandler:
 • Email: support@botdev.studio
             """
             
-            keyboard = get_main_menu_keyboard()
+            keyboard = get_main_menu_keyboard(user_id)
             
             await update.message.reply_text(
                 help_text,
@@ -133,9 +133,10 @@ class StartHandler:
             
         except Exception as e:
             logger.error(f"Ошибка в help: {e}")
+            error_user_id = update.effective_user.id if update.effective_user else None
             await update.message.reply_text(
                 "Произошла ошибка при загрузке справки.",
-                reply_markup=get_main_menu_keyboard()
+                reply_markup=get_main_menu_keyboard(error_user_id)
             )
 
     async def menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -149,7 +150,7 @@ class StartHandler:
             
             menu_text = "🏠 <b>Главное меню</b>\n\nВыберите нужный раздел:"
             
-            keyboard = get_main_menu_keyboard()
+            keyboard = get_main_menu_keyboard(user_id)
             
             await update.message.reply_text(
                 menu_text,
@@ -159,9 +160,10 @@ class StartHandler:
             
         except Exception as e:
             logger.error(f"Ошибка в menu: {e}")
+            error_user_id = update.effective_user.id if update.effective_user else None
             await update.message.reply_text(
                 "Произошла ошибка при загрузке меню.",
-                reply_markup=get_main_menu_keyboard()
+                reply_markup=get_main_menu_keyboard(error_user_id)
             )
 
     async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -176,7 +178,7 @@ class StartHandler:
             context.user_data.clear()
             
             cancel_text = "Действие отменено. Возвращаю в главное меню."
-            keyboard = get_main_menu_keyboard()
+            keyboard = get_main_menu_keyboard(user.id)
             
             if update.callback_query:
                 await update.callback_query.edit_message_text(

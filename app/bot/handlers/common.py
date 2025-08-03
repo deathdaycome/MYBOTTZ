@@ -198,6 +198,51 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 start_handler = StartHandler()
                 await start_handler.start(update, context)
                 
+            elif callback_data == "admin_console":
+                logger.info(f"🔧 Обрабатываем admin_console для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_admin_console(update, context)
+                
+            elif callback_data == "admin_money":
+                logger.info(f"💰 Обрабатываем admin_money для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_admin_money(update, context)
+                
+            elif callback_data == "upload_receipt":
+                logger.info(f"📄 Обрабатываем upload_receipt для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_upload_receipt(update, context)
+                
+            elif callback_data.startswith("transaction_"):
+                logger.info(f"💳 Обрабатываем transaction для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_transaction_type(update, context)
+                
+            elif callback_data == "my_transactions":
+                logger.info(f"💼 Обрабатываем my_transactions для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_my_transactions(update, context)
+                
+            elif callback_data == "view_income":
+                logger.info(f"📈 Обрабатываем view_income для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_view_income(update, context)
+                
+            elif callback_data == "view_expenses":
+                logger.info(f"📉 Обрабатываем view_expenses для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_view_expenses(update, context)
+                
+            elif callback_data == "money_categories":
+                logger.info(f"🏷️ Обрабатываем money_categories для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_money_categories(update, context)
+                
+            elif callback_data == "money_analytics":
+                logger.info(f"📊 Обрабатываем money_analytics для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_money_analytics(update, context)
+                
             elif callback_data == "calculator":
                 logger.info(f"🧮 Обрабатываем calculator для пользователя {user_id}")
                 await self.show_calculator(update, context)
@@ -438,6 +483,13 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             
             log_user_action(user_id, "document_message", file_name)
             
+            # Проверяем, ожидает ли пользователь загрузку чека
+            from ..handlers.money_management import money_handler
+            if money_handler.user_states.get(user_id) == "waiting_for_receipt":
+                logger.info(f"💰 ROUTING TO MONEY HANDLER FOR RECEIPT")
+                await money_handler.handle_document_upload(update, context)
+                return
+            
             # Проверяем, создает ли пользователь правку
             if context.user_data.get('creating_revision_step') == 'files':
                 logger.info(f"📄 ROUTING TO REVISION DOCUMENT HANDLER")
@@ -466,6 +518,13 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             logger.info(f"� Creating revision step: {context.user_data.get('creating_revision_step')}")
             
             log_user_action(user_id, "photo_message")
+            
+            # Проверяем, ожидает ли пользователь загрузку чека
+            from ..handlers.money_management import money_handler
+            if money_handler.user_states.get(user_id) == "waiting_for_receipt":
+                logger.info(f"💰 ROUTING TO MONEY HANDLER FOR RECEIPT")
+                await money_handler.handle_document_upload(update, context)
+                return
             
             # Проверяем, создает ли пользователь правку
             if context.user_data.get('creating_revision_step') == 'files':

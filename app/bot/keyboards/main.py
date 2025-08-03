@@ -1,7 +1,8 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from typing import List, Optional
+from ...config.settings import settings
 
-def get_main_menu_keyboard() -> InlineKeyboardMarkup:
+def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
     """Главное меню бота"""
     keyboard = [
         [
@@ -24,6 +25,13 @@ def get_main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("⚙️ Настройки", callback_data="settings")
         ]
     ]
+    
+    # Добавляем кнопку "Админ консоль" только для главного админа
+    if user_id and user_id in settings.ADMIN_IDS:
+        keyboard.append([
+            InlineKeyboardButton("🔧 Админ консоль", callback_data="admin_console")
+        ])
+    
     return InlineKeyboardMarkup(keyboard)
 
 def get_back_to_main_keyboard() -> InlineKeyboardMarkup:
@@ -380,6 +388,49 @@ def get_bot_guide_steps_keyboard() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("🔙 Назад", callback_data="create_bot_guide")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_admin_console_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура админ консоли"""
+    keyboard = [
+        [
+            InlineKeyboardButton("💰 Управление финансами", callback_data="admin_money"),
+            InlineKeyboardButton("📊 Статистика", callback_data="admin_stats")
+        ],
+        [
+            InlineKeyboardButton("📱 Уведомления", callback_data="admin_notifications"),
+            InlineKeyboardButton("⚙️ Настройки бота", callback_data="admin_bot_settings")
+        ],
+        [
+            InlineKeyboardButton("📁 Файлы проектов", callback_data="admin_project_files"),
+            InlineKeyboardButton("👥 Пользователи", callback_data="admin_users")
+        ],
+        [
+            InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+def get_admin_money_keyboard() -> InlineKeyboardMarkup:
+    """Клавиатура управления финансами"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📄 Загрузить чек", callback_data="upload_receipt"),
+            InlineKeyboardButton("💼 Мои транзакции", callback_data="my_transactions")
+        ],
+        [
+            InlineKeyboardButton("📈 Доходы", callback_data="view_income"),
+            InlineKeyboardButton("📉 Расходы", callback_data="view_expenses")
+        ],
+        [
+            InlineKeyboardButton("📊 Аналитика", callback_data="money_analytics"),
+            InlineKeyboardButton("🏷️ Категории", callback_data="money_categories")
+        ],
+        [
+            InlineKeyboardButton("🔙 Админ консоль", callback_data="admin_console"),
+            InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
