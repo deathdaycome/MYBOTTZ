@@ -16,9 +16,16 @@ templates = Jinja2Templates(directory="app/admin/templates")
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, user: AdminUser = Depends(require_admin_auth)):
     """Страница настроек"""
+    # Получаем элементы навигации
+    from app.admin.app import get_navigation_items
+    navigation_items = get_navigation_items(user.role)
+    
     return templates.TemplateResponse("settings.html", {
         "request": request,
-        "user": user
+        "user": user,
+        "username": user.username,
+        "user_role": user.role,
+        "navigation_items": navigation_items
     })
 
 @router.get("/api/settings", response_class=JSONResponse)

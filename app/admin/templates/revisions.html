@@ -6,9 +6,14 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0 text-gray-800">Правки проектов</h1>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRevisionModal">
-            <i class="fas fa-plus"></i> Создать правку
-        </button>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeAllModals()" title="Закрыть все модальные окна">
+                <i class="fas fa-times"></i> Закрыть окна
+            </button>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRevisionModal">
+                <i class="fas fa-plus"></i> Создать правку
+            </button>
+        </div>
     </div>
 
     <!-- Статистика -->
@@ -207,6 +212,11 @@
                             <input type="number" class="form-control" id="revisionEstimatedTime" min="1">
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label for="revisionFiles" class="form-label">Прикрепить файлы (скриншоты, документы)</label>
+                        <input type="file" class="form-control" id="revisionFiles" multiple accept="image/*,application/pdf,.doc,.docx,.txt">
+                        <small class="form-text text-muted">Можно выбрать несколько файлов. Поддерживаются изображения, PDF, Word документы.</small>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -331,6 +341,32 @@
 </div>
 
 <style>
+/* Фиксы для модальных окон */
+.modal {
+    z-index: 1055 !important;
+}
+
+.modal-backdrop {
+    z-index: 1050 !important;
+}
+
+.modal.show {
+    display: block !important;
+}
+
+.modal-dialog {
+    margin: 1.75rem auto;
+    pointer-events: auto;
+}
+
+.modal-content {
+    pointer-events: auto;
+    background-color: #fff;
+    border: 1px solid rgba(0,0,0,.2);
+    border-radius: 0.3rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15);
+}
+
 .priority-low { color: #28a745; }
 .priority-normal { color: #007bff; }
 .priority-high { color: #fd7e14; }
@@ -415,6 +451,20 @@ document.addEventListener('DOMContentLoaded', function() {
     loadProjects();
     loadRevisions();
     loadStats();
+    
+    // Добавляем обработчики для модальных окон
+    const viewModal = document.getElementById('viewRevisionModal');
+    if (viewModal) {
+        viewModal.addEventListener('hidden.bs.modal', function() {
+            // Очищаем backdrop при закрытии
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(backdrop => backdrop.remove());
+            
+            // Восстанавливаем scroll
+            document.body.style.overflow = '';
+            document.body.classList.remove('modal-open');
+        });
+    }
 });
 
 // Загрузка проектов
@@ -424,7 +474,7 @@ async function loadProjects() {
         const data = await response.json();
         
         if (data.success) {
-            projects = data.data;
+            projects = data.projects;
             
             // Заполняем селекты проектов
             const projectSelects = ['projectFilter', 'revisionProject'];
@@ -538,34 +588,47 @@ async function loadStats() {
 // Создание правки
 async function createRevision() {
     const form = document.getElementById('createRevisionForm');
-    const formData = {
-        project_id: parseInt(document.getElementById('revisionProject').value),
-        title: document.getElementById('revisionTitle').value,
-        description: document.getElementById('revisionDescription').value,
-        priority: document.getElementById('revisionPriority').value
-    };
+    const projectId = parseInt(document.getElementById('revisionProject').value);
+    const title = document.getElementById('revisionTitle').value;
+    const description = document.getElementById('revisionDescription').value;
+    const priority = document.getElementById('revisionPriority').value;
+    const estimatedTime = document.getElementById('revisionEstimatedTime').value;
+    const files = document.getElementById('revisionFiles').files;
     
-    if (document.getElementById('revisionEstimatedTime').value) {
-        formData.estimated_time = parseInt(document.getElementById('revisionEstimatedTime').value);
-    }
-    
-    if (!formData.project_id || !formData.title || !formData.description) {
+    if (!projectId || !title || !description) {
         showAlert('error', 'Заполните все обязательные поля');
         return;
     }
     
     try {
+        // Сначала создаем правку
+        const revisionData = {
+            project_id: projectId,
+            title: title,
+            description: description,
+            priority: priority
+        };
+        
+        if (estimatedTime) {
+            revisionData.estimated_time = parseInt(estimatedTime);
+        }
+        
         const response = await fetch('/admin/api/revisions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(formData)
+            body: JSON.stringify(revisionData)
         });
         
         const data = await response.json();
         
         if (data.success) {
+            // Если есть файлы, загружаем их
+            if (files.length > 0) {
+                await uploadRevisionFiles(data.data.id, files);
+            }
+            
             showAlert('success', 'Правка создана успешно');
             form.reset();
             bootstrap.Modal.getInstance(document.getElementById('createRevisionModal')).hide();
@@ -577,6 +640,40 @@ async function createRevision() {
     } catch (error) {
         console.error('Error creating revision:', error);
         showAlert('error', 'Ошибка при создании правки');
+    }
+}
+
+// Загрузка файлов для правки
+async function uploadRevisionFiles(revisionId, files) {
+    try {
+        const formData = new FormData();
+        formData.append('revision_id', revisionId);
+        formData.append('message', 'Прикрепленные файлы к правке');
+        formData.append('is_internal', 'false');
+        
+        for (let i = 0; i < files.length; i++) {
+            formData.append('files', files[i]);
+        }
+        
+        const response = await fetch('/admin/api/revisions/messages', {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Ошибка при загрузке файлов');
+        }
+        
+        console.log('Files uploaded successfully');
+    } catch (error) {
+        console.error('Error uploading files:', error);
+        showAlert('warning', 'Правка создана, но файлы не удалось загрузить');
     }
 }
 
@@ -598,7 +695,31 @@ async function viewRevision(revisionId) {
         if (data.success) {
             currentRevisionId = revisionId;
             renderRevisionModal(data.data);
-            new bootstrap.Modal(document.getElementById('viewRevisionModal')).show();
+            
+            // Исправляем проблему с backdrop
+            const modalElement = document.getElementById('viewRevisionModal');
+            const modal = new bootstrap.Modal(modalElement, {
+                backdrop: 'static',
+                keyboard: true,
+                focus: true
+            });
+            
+            // Убеждаемся что предыдущие модальные окна закрыты
+            const existingModals = document.querySelectorAll('.modal.show');
+            existingModals.forEach(m => {
+                if (m !== modalElement) {
+                    const existingModal = bootstrap.Modal.getInstance(m);
+                    if (existingModal) {
+                        existingModal.hide();
+                    }
+                }
+            });
+            
+            // Убираем старые backdrop'ы
+            const oldBackdrops = document.querySelectorAll('.modal-backdrop');
+            oldBackdrops.forEach(backdrop => backdrop.remove());
+            
+            modal.show();
         } else {
             showAlert('error', data.error || 'Ошибка при загрузке правки');
         }
@@ -924,5 +1045,35 @@ function openImageModal(imageUrl, filename) {
     
     modal.show();
 }
+
+// Функция для принудительного закрытия всех модальных окон
+function closeAllModals() {
+    // Закрываем все открытые модальные окна
+    const modals = document.querySelectorAll('.modal.show');
+    modals.forEach(modalElement => {
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        }
+    });
+    
+    // Убираем все backdrop'ы
+    const backdrops = document.querySelectorAll('.modal-backdrop');
+    backdrops.forEach(backdrop => backdrop.remove());
+    
+    // Восстанавливаем scroll
+    document.body.style.overflow = '';
+    document.body.classList.remove('modal-open');
+    
+    // Убираем padding-right который Bootstrap может добавить
+    document.body.style.paddingRight = '';
+}
+
+// Добавляем глобальный обработчик для Escape
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeAllModals();
+    }
+});
 </script>
 {% endblock %}

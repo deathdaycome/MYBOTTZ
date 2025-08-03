@@ -48,12 +48,12 @@ async def get_admin_users():
 
 @router.get("/executors")
 async def get_executors():
-    """Получить список исполнителей - временно без аутентификации для отладки"""
+    """Получить список исполнителей"""
     try:
-        # Временно возвращаем пустой список исполнителей
+        executors = AuthService.get_executors()
         return {
             "success": True,
-            "executors": []
+            "executors": executors
         }
     except Exception as e:
         logger.error(f"Ошибка получения исполнителей: {e}")

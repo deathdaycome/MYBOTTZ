@@ -201,9 +201,10 @@ body.tasks-page .kanban-column {
     position: relative;
 }
 
-.task-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+.task-card:hover:not(.dragging) {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    cursor: grab;
 }
 
 .task-card.priority-urgent {
@@ -503,13 +504,76 @@ body.tasks-page .stats-container {
 
 /* Drag and Drop */
 .task-card.dragging {
-    opacity: 0.5;
-    transform: rotate(5deg);
+    opacity: 0.6;
+    transform: rotate(5deg) scale(1.05);
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+    z-index: 1000;
+    cursor: grabbing;
+}
+
+.task-card {
+    cursor: grab;
+    user-select: none;
+}
+
+.task-card:active {
+    cursor: grabbing;
 }
 
 .kanban-column.drag-over {
-    background: #f0f9ff;
-    border: 2px dashed #6366f1;
+    background: linear-gradient(135deg, #f0f9ff, #e0f2fe) !important;
+    border: 2px dashed #6366f1 !important;
+    transform: scale(1.02);
+    transition: all 0.3s ease;
+}
+
+.kanban-column.drag-over .column-header {
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 8px;
+    padding: 0.75rem;
+}
+
+.tasks-container {
+    min-height: 100px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.tasks-container:empty::before {
+    content: "Перетащите задачу сюда";
+    display: block;
+    text-align: center;
+    color: #94a3b8;
+    font-style: italic;
+    padding: 2rem 1rem;
+    border: 2px dashed #e2e8f0;
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+.kanban-column.drag-over .tasks-container:empty::before {
+    content: "Отпустите здесь";
+    color: #6366f1;
+    border-color: #6366f1;
+    background: rgba(99, 102, 241, 0.05);
+}
+
+/* Дополнительные стили для курсора */
+
+/* Пульсация для drop зон */
+@keyframes dragPulse {
+    0%, 100% { 
+        transform: scale(1.02); 
+        background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+    }
+    50% { 
+        transform: scale(1.04); 
+        background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+    }
+}
+
+.kanban-column.drag-over {
+    animation: dragPulse 1.5s ease-in-out infinite;
 }
 
 /* Заголовки */

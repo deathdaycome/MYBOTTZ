@@ -25,6 +25,14 @@ class User(Base):
     notes = Column(Text, nullable=True)  # Заметки админа
     is_active = Column(Boolean, default=True)
     
+    # Настройки бота и хостинга
+    bot_token = Column(String(500), nullable=True)  # API токен бота
+    timeweb_login = Column(String(255), nullable=True)  # Логин Timeweb
+    timeweb_password = Column(String(255), nullable=True)  # Пароль Timeweb
+    user_telegram_id = Column(String(50), nullable=True)  # ID пользователя в Telegram для связи
+    chat_id = Column(String(50), nullable=True)  # ID чата для уведомлений
+    bot_configured = Column(Boolean, default=False)  # Статус настройки бота
+    
     # Связи
     projects = relationship("Project", back_populates="user")
     messages = relationship("Message", back_populates="user")
@@ -45,7 +53,13 @@ class User(Base):
             "state": self.state,
             "preferences": self.preferences,
             "notes": self.notes,
-            "is_active": self.is_active
+            "is_active": self.is_active,
+            "bot_token": self.bot_token,
+            "timeweb_login": self.timeweb_login,
+            "timeweb_password": self.timeweb_password,
+            "user_telegram_id": self.user_telegram_id,
+            "chat_id": self.chat_id,
+            "bot_configured": self.bot_configured
         }
 
 class Project(Base):
@@ -262,14 +276,24 @@ class Portfolio(Base):
     
     def to_dict(self):
         """Преобразование в словарь для API"""
+        # Формируем полные URL для изображений для админ-панели (относительные пути)
+        main_image_url = None
+        if self.main_image:
+            main_image_url = f"/uploads/portfolio/{self.main_image}"
+        
+        image_paths_urls = []
+        if self.image_paths:
+            for img_path in self.image_paths:
+                image_paths_urls.append(f"/uploads/portfolio/{img_path}")
+        
         return {
             "id": self.id,
             "title": self.title,
             "subtitle": self.subtitle,
             "description": self.description,
             "category": self.category,
-            "main_image": self.main_image,
-            "image_paths": self.image_paths,
+            "main_image": main_image_url,
+            "image_paths": image_paths_urls,
             "technologies": self.technologies,
             "complexity": self.complexity,
             "complexity_level": self.complexity_level,
@@ -296,14 +320,29 @@ class Portfolio(Base):
     
     def to_bot_dict(self):
         """Преобразование для отображения в боте"""
+        from ..config.settings import settings
+        
+        # Формируем полные URL для изображений
+        main_image_url = None
+        if self.main_image:
+            # Убираем лишние слэши
+            clean_path = self.main_image.lstrip('/')
+            main_image_url = f"http://localhost:{settings.ADMIN_PORT}/uploads/portfolio/{clean_path}"
+        
+        image_paths_urls = []
+        if self.image_paths:
+            for img_path in self.image_paths[:3]:  # Максимум 3 изображения для бота
+                clean_path = img_path.lstrip('/')
+                image_paths_urls.append(f"http://localhost:{settings.ADMIN_PORT}/uploads/portfolio/{clean_path}")
+        
         return {
             "id": self.id,
             "title": self.title,
             "subtitle": self.subtitle,
             "description": self.description,
             "category": self.category,
-            "main_image": self.main_image,
-            "image_paths": self.image_paths[:3] if self.image_paths else [],  # Максимум 3 изображения для бота
+            "main_image": main_image_url,
+            "image_paths": image_paths_urls,
             "technologies": self.technologies.split(',') if self.technologies else [],
             "complexity": self.complexity,
             "complexity_level": self.complexity_level,

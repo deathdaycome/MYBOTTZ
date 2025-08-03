@@ -3,7 +3,8 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
-from datetime import datetime
+from datetime import datetime, timedelta
+from sqlalchemy import func
 import secrets
 from typing import Optional, Dict, Any, List
 import json
@@ -16,6 +17,24 @@ from ..database.models import User, Project, ConsultantSession, Portfolio, Setti
 from ..services.analytics_service import analytics_service, get_dashboard_data
 from ..services.auth_service import AuthService
 from .middleware.roles import RoleMiddleware
+
+def get_image_url(image_path: str, request: Request = None) -> str:
+    """Формирует правильный URL для изображения"""
+    if not image_path:
+        return None
+    
+    # Убираем префикс uploads/portfolio/ если он есть
+    clean_path = image_path.replace("uploads/portfolio/", "").replace("uploads/", "")
+    
+    # Формируем полный URL
+    if request:
+        # Используем хост из запроса
+        base_url = f"{request.url.scheme}://{request.url.netloc}"
+    else:
+        # Fallback для случаев без request (например API для бота)
+        base_url = f"http://localhost:{settings.ADMIN_PORT}"
+    
+    return f"{base_url}/uploads/portfolio/{clean_path}"
 
 # Импорт роутера портфолио
 try:
@@ -150,7 +169,19 @@ if services_router:
 
 # Подключаем роутер правок
 if revisions_router:
-    admin_router.include_router(revisions_router)
+    admin_router.include_router(revisions_router, prefix="")
+
+# Импорт роутера аналитики
+try:
+    from .routers.analytics import router as analytics_router
+    print("Роутер аналитики подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера аналитики: {e}")
+    analytics_router = None
+
+# Подключаем роутер аналитики (только API, страница уже есть в основном роутере)
+if analytics_router:
+    admin_router.include_router(analytics_router)
 
 # Настройка шаблонов
 templates = Jinja2Templates(directory="app/admin/templates")
@@ -234,12 +265,32 @@ async def dashboard(request: Request, username: str = Depends(authenticate)):
         navigation_items = get_navigation_items(user_role)
         
         if user_role == "executor":
-            # Перенаправляем исполнителя на специальную страницу
+            # Получаем данные для исполнителя
+            with get_db_context() as db:
+                # Получаем исполнителя
+                admin_user = db.query(AdminUser).filter(AdminUser.username == username).first()
+                
+                # Получаем проекты назначенные исполнителю
+                executor_projects = []
+                if admin_user:
+                    projects_raw = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id
+                    ).order_by(Project.created_at.desc()).all()
+                    
+                    # Конвертируем в словари
+                    for p in projects_raw:
+                        project_dict = p.to_dict()
+                        # Добавляем информацию о пользователе
+                        user = db.query(User).filter(User.id == p.user_id).first()
+                        project_dict['user'] = user.to_dict() if user else None
+                        executor_projects.append(project_dict)
+            
             return templates.TemplateResponse("executor_dashboard.html", {
                 "request": request,
                 "username": username,
                 "user_role": user_role,
-                "navigation_items": navigation_items
+                "navigation_items": navigation_items,
+                "projects": executor_projects
             })
         
         # Получаем статистику используя правильную функцию
@@ -416,7 +467,9 @@ async def projects_page(request: Request, username: str = Depends(authenticate))
         })
         
     except Exception as e:
+        import traceback
         logger.error(f"Ошибка в projects_page: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 @admin_router.get("/projects/{project_id}/detail", response_class=HTMLResponse)
@@ -552,27 +605,37 @@ async def contractors_page(request: Request, username: str = Depends(authenticat
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
 @admin_router.get("/analytics", response_class=HTMLResponse)
-@RoleMiddleware.require_role("owner")
-async def analytics_page(request: Request, username: str = Depends(authenticate), current_user: dict = None):
+async def analytics_page(request: Request, username: str = Depends(authenticate)):
     """Страница аналитики (только для владельца)"""
     try:
         user_role = get_user_role(username)
-        navigation_items = get_navigation_items(user_role)
         
-        # Получаем полный отчет
-        full_report = analytics_service.generate_full_report(30)
+        # Проверяем роль пользователя
+        if user_role != "owner":
+            raise HTTPException(status_code=403, detail="Доступ запрещен")
         
-        return templates.TemplateResponse("analytics.html", {
-            "request": request,
-            "username": username,
-            "user_role": user_role,
-            "navigation_items": navigation_items,
-            "report": full_report
-        })
+        # Получаем реальные данные из базы
+        analytics_data = _get_full_analytics_data()
         
+        # Генерируем HTML с реальными данными
+        analytics_html = _generate_analytics_html(analytics_data)
+        
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=analytics_html)
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка в analytics_page: {e}")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+        return HTMLResponse(content=f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; padding: 20px;">
+            <h1>Ошибка загрузки аналитики</h1>
+            <p>Произошла ошибка: {str(e)}</p>
+            <a href="/admin/" style="color: #007bff;">Вернуться на главную</a>
+        </body>
+        </html>
+        """, status_code=200)
 
 @admin_router.get("/settings", response_class=HTMLResponse)
 @RoleMiddleware.require_role("owner")
@@ -611,7 +674,7 @@ async def finance_page(request: Request, username: str = Depends(authenticate)):
         user_role = get_user_role(username)
         navigation_items = get_navigation_items(user_role)
         
-        return templates.TemplateResponse("finance.html", {
+        return templates.TemplateResponse("finance_improved.html", {
             "request": request,
             "username": username,
             "user_role": user_role,
@@ -678,7 +741,7 @@ async def portfolio_page(request: Request, username: str = Depends(authenticate)
             "other": "🔧 Другое"
         }
         
-        return templates.TemplateResponse("portfolio.html", {
+        return templates.TemplateResponse("portfolio_improved.html", {
             "request": request,
             "username": username,
             "user_role": get_user_role(username),
@@ -738,7 +801,7 @@ async def project_files_page(request: Request, username: str = Depends(authentic
             'total_size_mb': round(total_size / (1024 * 1024), 2) if total_size > 0 else 0
         }
         
-        return templates.TemplateResponse("project_files.html", {
+        return templates.TemplateResponse("project_files_improved.html", {
             "request": request,
             "username": username,
             "user_role": user_role,
@@ -766,10 +829,20 @@ async def api_portfolio(username: str = Depends(authenticate)):
             portfolio_items = []
             for p in portfolio_items_raw:
                 item_dict = p.to_dict()
+                
+                # Формируем правильный URL для главного изображения
+                main_image_url = None
+                if p.main_image:
+                    # Если в main_image есть путь, формируем полный URL
+                    main_image_url = f"/uploads/portfolio/{p.main_image}"
+                elif item_dict.get('image_paths') and item_dict['image_paths'][0]:
+                    # Fallback на первое изображение из image_paths
+                    main_image_url = f"/uploads/portfolio/{item_dict['image_paths'][0]}"
+                
                 # Добавляем дополнительные поля для JavaScript
                 item_dict.update({
-                    'main_image': item_dict.get('image_paths', [None])[0] if item_dict.get('image_paths') else None,
-                    'additional_images': item_dict.get('image_paths', [])[1:] if item_dict.get('image_paths') else [],
+                    'main_image': main_image_url,
+                    'additional_images': [f"/uploads/portfolio/{img}" for img in item_dict.get('image_paths', [])[1:]] if item_dict.get('image_paths') else [],
                     'active': True,  # Пока все активные
                     'cost': 0,  # Добавим поле стоимости
                     'duration': item_dict.get('development_time'),
@@ -895,6 +968,312 @@ async def delete_portfolio_item(item_id: int, username: str = Depends(authentica
     except Exception as e:
         logger.error(f"Ошибка в delete_portfolio_item: {e}")
         return {"success": False, "error": str(e)}
+
+@admin_router.get("/api/portfolio/{item_id}")
+async def get_portfolio_item(item_id: int, username: str = Depends(authenticate)):
+    """API для получения элемента портфолио для редактирования"""
+    try:
+        with get_db_context() as db:
+            portfolio_item = db.query(Portfolio).filter(Portfolio.id == item_id).first()
+            
+            if not portfolio_item:
+                return {"success": False, "error": "Элемент портфолио не найден"}
+            
+            project_dict = portfolio_item.to_dict()
+            
+            # Формируем правильные URL для изображений
+            if portfolio_item.main_image:
+                project_dict['main_image'] = f"/uploads/portfolio/{portfolio_item.main_image}"
+            
+            if project_dict.get('image_paths'):
+                project_dict['image_paths'] = [f"/uploads/portfolio/{img}" for img in project_dict['image_paths']]
+            
+            return {
+                "success": True,
+                "project": project_dict
+            }
+        
+    except Exception as e:
+        logger.error(f"Ошибка в get_portfolio_item: {e}")
+        return {"success": False, "error": str(e)}
+
+@admin_router.get("/portfolio/preview/{item_id}", response_class=HTMLResponse)
+async def preview_portfolio_item(item_id: int, username: str = Depends(authenticate)):
+    """Предварительный просмотр элемента портфолио"""
+    try:
+        with get_db_context() as db:
+            portfolio_item = db.query(Portfolio).filter(Portfolio.id == item_id).first()
+            
+            if not portfolio_item:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+            
+            # Преобразуем в словарь для шаблона
+            project = portfolio_item.to_dict()
+            
+            # Обрабатываем технологии
+            if project.get('technologies'):
+                if isinstance(project['technologies'], str):
+                    project['technologies_list'] = [tech.strip() for tech in project['technologies'].split(',')]
+                else:
+                    project['technologies_list'] = project['technologies']
+            else:
+                project['technologies_list'] = []
+            
+            # Обрабатываем изображения
+            if project.get('main_image'):
+                project['main_image_url'] = f"/uploads/portfolio/{project['main_image'].replace('uploads/portfolio/', '')}"
+            
+            if project.get('image_paths'):
+                project['gallery_images'] = [
+                    f"/uploads/portfolio/{img.replace('uploads/portfolio/', '')}"
+                    for img in project['image_paths']
+                ]
+            else:
+                project['gallery_images'] = []
+            
+            # Определяем сложность
+            complexity_names = {
+                'simple': '🟢 Простая',
+                'medium': '🟡 Средняя', 
+                'complex': '🔴 Сложная',
+                'premium': '🟣 Премиум'
+            }
+            complexity_display = complexity_names.get(project.get('complexity', 'medium'), '🟡 Средняя')
+            
+            # Формируем технологии
+            tech_tags_html = ""
+            if project.get('technologies_list'):
+                tech_tags_html = ''.join(f'<span class="tech-tag">{tech}</span>' for tech in project['technologies_list'])
+            
+            # Формируем ссылки
+            links_html = ""
+            if project.get('demo_link'):
+                links_html += f'<a href="{project.get("demo_link")}" class="project-link" target="_blank"><i class="fas fa-rocket me-2"></i>Демо-версия</a>'
+            if project.get('repository_link'):
+                links_html += f'<a href="{project.get("repository_link")}" class="project-link" target="_blank"><i class="fab fa-github me-2"></i>Репозиторий</a>'
+            
+            # Формируем галерею
+            gallery_html = ""
+            if project.get('gallery_images'):
+                gallery_images_html = ''.join(f'<div class="col-md-6"><img src="{img}" class="gallery-image" alt="Изображение проекта"></div>' for img in project['gallery_images'])
+                gallery_html = f'<div class="gallery"><h5><i class="fas fa-images me-2"></i>Галерея:</h5><div class="row">{gallery_images_html}</div></div>'
+            
+            # Создаем HTML для предварительного просмотра
+            preview_html = f"""
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Предварительный просмотр: {project.get('title', 'Проект')}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }}
+        
+        .preview-container {{
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }}
+        
+        .project-card {{
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }}
+        
+        .project-header {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }}
+        
+        .project-title {{
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }}
+        
+        .project-subtitle {{
+            font-size: 1.2rem;
+            opacity: 0.9;
+            margin-bottom: 0;
+        }}
+        
+        .project-image {{
+            width: 100%;
+            height: 300px;
+            object-fit: cover;
+        }}
+        
+        .project-body {{
+            padding: 30px;
+        }}
+        
+        .project-description {{
+            font-size: 1.1rem;
+            line-height: 1.7;
+            color: #444;
+            margin-bottom: 30px;
+        }}
+        
+        .project-meta {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }}
+        
+        .meta-item {{
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }}
+        
+        .meta-label {{
+            font-size: 0.9rem;
+            color: #666;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }}
+        
+        .meta-value {{
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #333;
+        }}
+        
+        .tech-tags {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 20px 0;
+        }}
+        
+        .tech-tag {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }}
+        
+        .project-links {{
+            margin-top: 30px;
+        }}
+        
+        .project-link {{
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: transform 0.2s;
+        }}
+        
+        .project-link:hover {{
+            transform: translateY(-2px);
+            color: white;
+        }}
+        
+        .gallery {{
+            margin-top: 30px;
+        }}
+        
+        .gallery-image {{
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }}
+        
+        .complexity-badge {{
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }}
+        
+        .complexity-simple {{ background: #d4edda; color: #155724; }}
+        .complexity-medium {{ background: #fff3cd; color: #856404; }}
+        .complexity-complex {{ background: #f8d7da; color: #721c24; }}
+        .complexity-premium {{ background: #e2e3f1; color: #383d41; }}
+    </style>
+</head>
+<body>
+    <div class="preview-container">
+        <div class="project-card">
+            <div class="project-header">
+                <h1 class="project-title">{project.get('title', 'Без названия')}</h1>
+                {f'<p class="project-subtitle">{project.get("subtitle")}</p>' if project.get('subtitle') else ''}
+            </div>
+            
+            {f'<img src="{project.get("main_image_url")}" alt="{project.get("title")}" class="project-image">' if project.get('main_image_url') else ''}
+            
+            <div class="project-body">
+                {f'<div class="project-description">{project.get("description", "")}</div>' if project.get('description') else ''}
+                
+                <div class="project-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Сложность</div>
+                        <div class="meta-value">
+                            <span class="complexity-badge complexity-{project.get('complexity', 'medium')}">
+                                {complexity_display}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    {f'<div class="meta-item"><div class="meta-label">Время разработки</div><div class="meta-value">{project.get("development_time")} дн.</div></div>' if project.get('development_time') else ''}
+                    
+                    <div class="meta-item">
+                        <div class="meta-label">Стоимость</div>
+                        <div class="meta-value">
+                            {f"{project.get('cost'):,.0f}₽" if project.get('show_cost') and project.get('cost') else 'По запросу'}
+                        </div>
+                    </div>
+                    
+                    <div class="meta-item">
+                        <div class="meta-label">Статус</div>
+                        <div class="meta-value">
+                            {'⭐ Рекомендуемый' if project.get('is_featured') else '👁 Обычный'}
+                        </div>
+                    </div>
+                </div>
+                
+                {f'<div><h5><i class="fas fa-tools me-2"></i>Технологии:</h5><div class="tech-tags">{tech_tags_html}</div></div>' if project.get('technologies_list') else ''}
+                
+                {f'<div class="project-links"><h5><i class="fas fa-link me-2"></i>Ссылки:</h5>{links_html}</div>' if links_html else ''}
+                
+                {gallery_html}
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+            """
+            
+            return preview_html
+        
+    except Exception as e:
+        logger.error(f"Ошибка в preview_portfolio_item: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка загрузки предварительного просмотра")
 
 @admin_router.put("/api/portfolio/{item_id}")
 async def update_portfolio_item(
@@ -1269,34 +1648,38 @@ async def update_project_status_direct(
         logger.error(f"[DIRECT] Ошибка смены статуса проекта {project_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
 def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
     """Получение элементов навигации в зависимости от роли"""
-    base_items = [
-        {"name": "Главная", "url": "/", "icon": "fas fa-tachometer-alt"}
-    ]
     
     if user_role == "owner":
         # Владелец видит все разделы
-        return base_items + [
+        return [
+            {"name": "Дашборд", "url": "/", "icon": "fas fa-tachometer-alt"},
             {"name": "Проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
-            {"name": "Планировщик задач", "url": "/tasks", "icon": "fas fa-tasks"},
-            {"name": "Пользователи", "url": "/users", "icon": "fas fa-users"},
-            {"name": "Исполнители", "url": "/contractors", "icon": "fas fa-users-cog"},
-            {"name": "Портфолио", "url": "/portfolio", "icon": "fas fa-briefcase"},
             {"name": "База проектов", "url": "/project-files", "icon": "fas fa-database"},
+            {"name": "Портфолио", "url": "/portfolio", "icon": "fas fa-briefcase"},
+            {"name": "Правки", "url": "/revisions", "icon": "fas fa-edit"},
+            {"name": "Планировщик задач", "url": "/tasks/", "icon": "fas fa-tasks"},
+            {"name": "Мои задачи", "url": "/tasks/user/my-tasks", "icon": "fas fa-clipboard-list"},
             {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"},
-            {"name": "Аналитика", "url": "/analytics", "icon": "fas fa-chart-bar"},
-            {"name": "Настройки", "url": "/settings", "icon": "fas fa-cogs"}
+            {"name": "Пользователи", "url": "/users", "icon": "fas fa-users"},
+            {"name": "Исполнители", "url": "/contractors", "icon": "fas fa-user-tie"},
+            {"name": "Сервисы", "url": "/services", "icon": "fas fa-server"},
+            {"name": "Аналитика", "url": "/analytics", "icon": "fas fa-chart-line"},
+            {"name": "Уведомления", "url": "/notifications", "icon": "fas fa-bell"},
+            {"name": "Настройки", "url": "/settings", "icon": "fas fa-cog"}
         ]
     else:
         # Исполнитель видит ограниченный набор
-        return base_items + [
+        return [
+            {"name": "Дашборд", "url": "/", "icon": "fas fa-tachometer-alt"},
             {"name": "Мои проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
-            {"name": "Мои задачи", "url": "/tasks", "icon": "fas fa-tasks"},
-            {"name": "База проектов", "url": "/project-files", "icon": "fas fa-database"},
+            {"name": "Мои файлы", "url": "/project-files", "icon": "fas fa-folder"},
             {"name": "Правки", "url": "/revisions", "icon": "fas fa-edit"},
-            {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"},
-            {"name": "Настройки", "url": "/settings", "icon": "fas fa-cogs"}
+            {"name": "Планировщик задач", "url": "/tasks/", "icon": "fas fa-tasks"},
+            {"name": "Мои задачи", "url": "/tasks/user/my-tasks", "icon": "fas fa-clipboard-list"},
+            {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"}
         ]
 @admin_router.post("/api/projects/{project_id}/assign-executor")
 async def assign_executor_to_project(
@@ -1339,4 +1722,906 @@ async def assign_executor_to_project(
     except Exception as e:
         logger.error(f"Ошибка назначения исполнителя: {str(e)}")
         return {"success": False, "error": str(e)}
+
+def _get_full_analytics_data() -> Dict[str, Any]:
+    """Получение полных данных аналитики из базы данных"""
+    try:
+        with get_db_context() as db:
+            # Общая статистика проектов
+            total_projects = db.query(Project).count()
+            active_projects = db.query(Project).filter(
+                Project.status.in_(['new', 'review', 'accepted', 'in_progress', 'testing'])
+            ).count()
+            completed_projects = db.query(Project).filter(Project.status == 'completed').count()
+            cancelled_projects = db.query(Project).filter(Project.status == 'cancelled').count()
+            
+            # Финансовая статистика
+            total_estimated_cost = db.query(func.sum(Project.estimated_cost)).scalar() or 0
+            total_completed_cost = db.query(func.sum(Project.final_cost)).filter(
+                Project.status == 'completed'
+            ).scalar() or 0
+            
+            # Открытые заказы (не завершенные)
+            open_orders_sum = db.query(func.sum(Project.estimated_cost)).filter(
+                Project.status.in_(['new', 'review', 'accepted', 'in_progress', 'testing'])
+            ).scalar() or 0
+            
+            # Платежи клиентов
+            total_client_payments = db.query(func.sum(Project.client_paid_total)).scalar() or 0
+            
+            # Выплаты исполнителям
+            total_executor_payments = db.query(func.sum(Project.executor_paid_total)).scalar() or 0
+            
+            # Средние показатели
+            avg_project_cost = db.query(func.avg(Project.estimated_cost)).scalar() or 0
+            avg_completion_time = db.query(func.avg(Project.estimated_hours)).scalar() or 0
+            
+            # Статистика по статусам
+            status_stats = {}
+            status_names = {
+                'new': 'Новые',
+                'review': 'На рассмотрении', 
+                'accepted': 'Приняты',
+                'in_progress': 'В работе',
+                'testing': 'Тестирование',
+                'completed': 'Завершены',
+                'cancelled': 'Отменены'
+            }
+            
+            for status_key, status_name in status_names.items():
+                count = db.query(Project).filter(Project.status == status_key).count()
+                sum_cost = db.query(func.sum(Project.estimated_cost)).filter(
+                    Project.status == status_key
+                ).scalar() or 0
+                status_stats[status_key] = {
+                    'name': status_name,
+                    'count': count,
+                    'sum': float(sum_cost)
+                }
+            
+            # Статистика по типам проектов
+            type_stats = {}
+            project_types = db.query(Project.project_type, func.count(Project.id)).group_by(
+                Project.project_type
+            ).all()
+            
+            for project_type, count in project_types:
+                if project_type:
+                    type_stats[project_type] = count
+            
+            # Статистика пользователей
+            total_users = db.query(User).count()
+            active_users = db.query(User).filter(User.projects.any()).count()
+            
+            # Прибыль (разница между платежами клиентов и выплатами исполнителям)
+            profit = total_client_payments - total_executor_payments
+            
+            # Конверсия завершенных проектов
+            completion_rate = (completed_projects / total_projects * 100) if total_projects > 0 else 0
+            
+            # Средняя стоимость завершенного проекта
+            avg_completed_cost = db.query(func.avg(Project.final_cost)).filter(
+                Project.status == 'completed'
+            ).scalar() or 0
+            
+            return {
+                'total_projects': total_projects,
+                'active_projects': active_projects,
+                'completed_projects': completed_projects,
+                'cancelled_projects': cancelled_projects,
+                'total_estimated_cost': float(total_estimated_cost),
+                'total_completed_cost': float(total_completed_cost),
+                'open_orders_sum': float(open_orders_sum),
+                'total_client_payments': float(total_client_payments),
+                'total_executor_payments': float(total_executor_payments),
+                'profit': float(profit),
+                'avg_project_cost': float(avg_project_cost),
+                'avg_completed_cost': float(avg_completed_cost),
+                'avg_completion_time': float(avg_completion_time),
+                'completion_rate': float(completion_rate),
+                'status_stats': status_stats,
+                'type_stats': type_stats,
+                'total_users': total_users,
+                'active_users': active_users
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка получения данных аналитики: {e}")
+        return {}
+
+def _generate_analytics_html(data: Dict[str, Any]) -> str:
+    """Генерация HTML страницы с полной аналитикой"""
+    
+    # Если данные пустые, показываем ошибку
+    if not data:
+        return """
+        <!DOCTYPE html>
+        <html lang="ru">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Аналитика - Ошибка</title>
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        </head>
+        <body>
+            <div class="container mt-5">
+                <h1>Ошибка загрузки аналитики</h1>
+                <p>Не удалось загрузить данные аналитики.</p>
+                <a href="/admin/" class="btn btn-primary">Вернуться на главную</a>
+            </div>
+        </body>
+        </html>
+        """
+    
+    # Форматирование чисел
+    def format_number(num):
+        if num is None:
+            return "0"
+        return f"{int(num):,}".replace(",", " ")
+    
+    def format_currency(num):
+        if num is None:
+            return "0₽"
+        return f"{int(num):,}₽".replace(",", " ")
+    
+    # Статистика по статусам для графика
+    status_labels = []
+    status_data = []
+    status_colors = {
+        'new': '#6366f1',
+        'review': '#f59e0b', 
+        'accepted': '#22c55e',
+        'in_progress': '#3b82f6',
+        'testing': '#8b5cf6',
+        'completed': '#10b981',
+        'cancelled': '#ef4444'
+    }
+    
+    for status_key, status_info in data.get('status_stats', {}).items():
+        if status_info['count'] > 0:
+            status_labels.append(f"'{status_info['name']}'")
+            status_data.append(status_info['count'])
+    
+    status_labels_str = "[" + ", ".join(status_labels) + "]"
+    status_data_str = "[" + ", ".join(map(str, status_data)) + "]"
+    status_colors_str = "[" + ", ".join([f"'{status_colors.get(k, '#64748b')}'" for k in data.get('status_stats', {}).keys() if data['status_stats'][k]['count'] > 0]) + "]"
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html lang="ru">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Полная аналитика - Админ панель</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <style>
+            body {{
+                font-family: 'Comfortaa', sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                padding: 20px;
+            }}
+            
+            .analytics-container {{
+                background: white;
+                border-radius: 20px;
+                padding: 30px;
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                margin: 0 auto;
+                max-width: 1400px;
+            }}
+            
+            .stat-card {{
+                background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+                border-radius: 16px;
+                padding: 25px;
+                text-align: center;
+                height: 100%;
+                transition: transform 0.3s ease, box-shadow 0.3s ease;
+                border: none;
+                position: relative;
+                overflow: hidden;
+            }}
+            
+            .stat-card:hover {{
+                transform: translateY(-5px);
+                box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            }}
+            
+            .stat-card::before {{
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 4px;
+                background: linear-gradient(90deg, #6366f1, #3b82f6);
+            }}
+            
+            .stat-value {{
+                font-size: 2.5rem;
+                font-weight: 700;
+                color: #1e293b;
+                margin-bottom: 8px;
+            }}
+            
+            .stat-label {{
+                color: #64748b;
+                font-weight: 500;
+                font-size: 0.95rem;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }}
+            
+            .stat-icon {{
+                font-size: 2.5rem;
+                margin-bottom: 15px;
+                opacity: 0.8;
+            }}
+            
+            .section-title {{
+                font-size: 1.75rem;
+                font-weight: 600;
+                color: #1e293b;
+                margin-bottom: 25px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }}
+            
+            .chart-container {{
+                background: white;
+                border-radius: 16px;
+                padding: 25px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+                height: 400px;
+                margin-bottom: 30px;
+            }}
+            
+            .profit-positive {{
+                color: #22c55e !important;
+            }}
+            
+            .profit-negative {{
+                color: #ef4444 !important;
+            }}
+            
+            .status-table {{
+                background: white;
+                border-radius: 16px;
+                overflow: hidden;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            }}
+            
+            .status-table th {{
+                background: linear-gradient(135deg, #64748b, #475569);
+                color: white;
+                font-weight: 600;
+                padding: 15px;
+                border: none;
+            }}
+            
+            .status-table td {{
+                padding: 15px;
+                border-color: #e2e8f0;
+                vertical-align: middle;
+            }}
+            
+            .status-badge {{
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-weight: 500;
+                font-size: 0.85rem;
+            }}
+            
+            .back-button {{
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                z-index: 1000;
+                background: rgba(255,255,255,0.9);
+                backdrop-filter: blur(10px);
+                border: none;
+                border-radius: 12px;
+                padding: 12px 20px;
+                font-weight: 500;
+                text-decoration: none;
+                color: #1e293b;
+                transition: all 0.3s ease;
+            }}
+            
+            .back-button:hover {{
+                background: white;
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                color: #1e293b;
+                text-decoration: none;
+            }}
+            
+            @media (max-width: 768px) {{
+                .analytics-container {{
+                    padding: 20px;
+                    margin: 10px;
+                }}
+                
+                .stat-value {{
+                    font-size: 2rem;
+                }}
+                
+                .section-title {{
+                    font-size: 1.5rem;
+                }}
+            }}
+        </style>
+    </head>
+    <body>
+        <a href="/admin/" class="back-button">
+            <i class="fas fa-arrow-left me-2"></i>Назад в админ панель
+        </a>
+        
+        <div class="analytics-container">
+            <div class="text-center mb-5">
+                <h1 class="display-4 fw-bold text-primary mb-2">
+                    <i class="fas fa-chart-line me-3"></i>Полная аналитика
+                </h1>
+                <p class="text-muted fs-5">Комплексный анализ бизнес-показателей</p>
+            </div>
+            
+            <!-- Основные показатели -->
+            <div class="section-title">
+                <i class="fas fa-tachometer-alt text-primary"></i>
+                Основные показатели
+            </div>
+            
+            <div class="row g-4 mb-5">
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-primary">
+                            <i class="fas fa-project-diagram"></i>
+                        </div>
+                        <div class="stat-value">{format_number(data.get('total_projects', 0))}</div>
+                        <div class="stat-label">Всего проектов</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-warning">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-value">{format_number(data.get('active_projects', 0))}</div>
+                        <div class="stat-label">Активных проектов</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-success">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-value">{format_number(data.get('completed_projects', 0))}</div>
+                        <div class="stat-label">Завершено</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-info">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="stat-value">{format_number(data.get('completion_rate', 0))}%</div>
+                        <div class="stat-label">Конверсия</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Финансовые показатели -->
+            <div class="section-title">
+                <i class="fas fa-money-bill-wave text-success"></i>
+                Финансовые показатели
+            </div>
+            
+            <div class="row g-4 mb-5">
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-primary">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="stat-value">{format_currency(data.get('total_estimated_cost', 0))}</div>
+                        <div class="stat-label">Общая стоимость</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-warning">
+                            <i class="fas fa-hourglass-half"></i>
+                        </div>
+                        <div class="stat-value">{format_currency(data.get('open_orders_sum', 0))}</div>
+                        <div class="stat-label">Открытые заказы</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-success">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                        <div class="stat-value">{format_currency(data.get('total_client_payments', 0))}</div>
+                        <div class="stat-label">Платежи клиентов</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon {'text-success' if data.get('profit', 0) >= 0 else 'text-danger'}">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-value {'profit-positive' if data.get('profit', 0) >= 0 else 'profit-negative'}">{format_currency(data.get('profit', 0))}</div>
+                        <div class="stat-label">Прибыль</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Дополнительные показатели -->
+            <div class="section-title">
+                <i class="fas fa-chart-bar text-info"></i>
+                Дополнительные показатели
+            </div>
+            
+            <div class="row g-4 mb-5">
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-secondary">
+                            <i class="fas fa-calculator"></i>
+                        </div>
+                        <div class="stat-value">{format_currency(data.get('avg_project_cost', 0))}</div>
+                        <div class="stat-label">Средняя стоимость</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-info">
+                            <i class="fas fa-star"></i>
+                        </div>
+                        <div class="stat-value">{format_currency(data.get('avg_completed_cost', 0))}</div>
+                        <div class="stat-label">Средняя завершенных</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-warning">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-value">{format_number(data.get('total_users', 0))}</div>
+                        <div class="stat-label">Всего пользователей</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-3 col-md-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-success">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="stat-value">{format_number(data.get('active_users', 0))}</div>
+                        <div class="stat-label">Активных пользователей</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- График распределения по статусам -->
+            <div class="section-title">
+                <i class="fas fa-pie-chart text-primary"></i>
+                Распределение проектов по статусам
+            </div>
+            
+            <div class="row mb-5">
+                <div class="col-lg-6">
+                    <div class="chart-container">
+                        <canvas id="statusChart"></canvas>
+                    </div>
+                </div>
+                <div class="col-lg-6">
+                    <div class="status-table">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Статус</th>
+                                    <th>Количество</th>
+                                    <th>Сумма</th>
+                                </tr>
+                            </thead>
+                            <tbody>"""
+    
+    # Добавляем строки таблицы статусов
+    for status_key, status_info in data.get('status_stats', {}).items():
+        badge_color = {
+            'new': 'bg-primary',
+            'review': 'bg-warning', 
+            'accepted': 'bg-success',
+            'in_progress': 'bg-info',
+            'testing': 'bg-secondary',
+            'completed': 'bg-success',
+            'cancelled': 'bg-danger'
+        }.get(status_key, 'bg-secondary')
+        
+        html_content += f"""
+                                <tr>
+                                    <td>
+                                        <span class="status-badge {badge_color} text-white">
+                                            {status_info['name']}
+                                        </span>
+                                    </td>
+                                    <td><strong>{format_number(status_info['count'])}</strong></td>
+                                    <td><strong>{format_currency(status_info['sum'])}</strong></td>
+                                </tr>"""
+    
+    html_content += f"""
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Выплаты исполнителям -->
+            <div class="section-title">
+                <i class="fas fa-hand-holding-usd text-warning"></i>
+                Выплаты исполнителям
+            </div>
+            
+            <div class="row g-4 mb-5">
+                <div class="col-lg-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-warning">
+                            <i class="fas fa-money-check-alt"></i>
+                        </div>
+                        <div class="stat-value">{format_currency(data.get('total_executor_payments', 0))}</div>
+                        <div class="stat-label">Всего выплачено исполнителям</div>
+                    </div>
+                </div>
+                
+                <div class="col-lg-6">
+                    <div class="stat-card">
+                        <div class="stat-icon text-info">
+                            <i class="fas fa-balance-scale"></i>
+                        </div>
+                        <div class="stat-value">{format_currency(data.get('total_client_payments', 0) - data.get('total_executor_payments', 0))}</div>
+                        <div class="stat-label">Баланс (Клиенты - Исполнители)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-5">
+                <small class="text-muted">
+                    <i class="fas fa-clock me-1"></i>
+                    Данные обновлены: {datetime.now().strftime('%d.%m.%Y %H:%M')}
+                </small>
+            </div>
+        </div>
+        
+        <script>
+            // График распределения по статусам
+            const ctx = document.getElementById('statusChart').getContext('2d');
+            const statusChart = new Chart(ctx, {{
+                type: 'doughnut',
+                data: {{
+                    labels: {status_labels_str},
+                    datasets: [{{
+                        data: {status_data_str},
+                        backgroundColor: {status_colors_str},
+                        borderWidth: 0
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {{
+                        legend: {{
+                            position: 'bottom',
+                            labels: {{
+                                padding: 20,
+                                font: {{
+                                    family: 'Comfortaa',
+                                    size: 12
+                                }}
+                            }}
+                        }},
+                        tooltip: {{
+                            callbacks: {{
+                                label: function(context) {{
+                                    return context.label + ': ' + context.parsed + ' проектов';
+                                }}
+                            }}
+                        }}
+                    }}
+                }}
+            }});
+        </script>
+    </body>
+    </html>
+    """
+    
+    return html_content
+
+
+# =============================================================================
+# ПУБЛИЧНЫЕ API ENDPOINTS ДЛЯ ПОРТФОЛИО (для бота)
+# =============================================================================
+
+@admin_router.get("/api/portfolio/public/categories")
+async def get_public_portfolio_categories():
+    """Получить список категорий портфолио для бота"""
+    try:
+        with get_db_context() as db:
+            # Получаем уникальные категории из видимых проектов
+            categories_raw = db.query(Portfolio.category).filter(
+                Portfolio.is_visible == True
+            ).distinct().all()
+            
+            # Преобразуем в список с названиями
+            category_map = {
+                "telegram_bots": "🤖 Telegram боты",
+                "web_development": "🌐 Веб-разработка", 
+                "mobile_apps": "📱 Мобильные приложения",
+                "ai_integration": "🧠 AI интеграции",
+                "automation": "⚙️ Автоматизация",
+                "ecommerce": "🛒 E-commerce",
+                "other": "🔧 Другое"
+            }
+            
+            categories = []
+            for (cat,) in categories_raw:
+                if cat in category_map:
+                    categories.append({
+                        "key": cat,
+                        "name": category_map[cat],
+                        "emoji": category_map[cat].split()[0]
+                    })
+            
+            return {
+                "success": True,
+                "categories": categories
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка получения категорий портфолио: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "categories": []
+        }
+
+@admin_router.get("/api/portfolio/public/featured")
+async def get_public_featured_portfolio():
+    """Получить рекомендуемые проекты портфолио для бота"""
+    try:
+        with get_db_context() as db:
+            projects = db.query(Portfolio).filter(
+                Portfolio.is_visible == True,
+                Portfolio.is_featured == True
+            ).order_by(Portfolio.sort_order.asc(), Portfolio.created_at.desc()).limit(10).all()
+            
+            projects_data = []
+            for project in projects:
+                project_dict = project.to_dict()
+                
+                # Добавляем полные URL для изображений
+                if project_dict.get('main_image'):
+                    project_dict['main_image'] = get_image_url(project_dict['main_image'])
+                
+                if project_dict.get('image_paths'):
+                    project_dict['image_paths'] = [
+                        get_image_url(img) for img in project_dict['image_paths']
+                    ]
+                
+                projects_data.append(project_dict)
+            
+            return {
+                "success": True,
+                "projects": projects_data,
+                "count": len(projects_data)
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка получения рекомендуемых проектов: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "projects": []
+        }
+
+@admin_router.get("/api/portfolio/public/category/{category}")
+async def get_public_portfolio_by_category(category: str, page: int = 0, limit: int = 5):
+    """Получить проекты портфолио по категории для бота"""
+    try:
+        with get_db_context() as db:
+            offset = page * limit
+            
+            projects = db.query(Portfolio).filter(
+                Portfolio.is_visible == True,
+                Portfolio.category == category
+            ).order_by(
+                Portfolio.sort_order.asc(), 
+                Portfolio.created_at.desc()
+            ).offset(offset).limit(limit).all()
+            
+            total_count = db.query(Portfolio).filter(
+                Portfolio.is_visible == True,
+                Portfolio.category == category
+            ).count()
+            
+            projects_data = []
+            for project in projects:
+                project_dict = project.to_dict()
+                
+                # Добавляем полные URL для изображений
+                if project_dict.get('main_image'):
+                    project_dict['main_image'] = get_image_url(project_dict['main_image'])
+                
+                if project_dict.get('image_paths'):
+                    project_dict['image_paths'] = [
+                        get_image_url(img) for img in project_dict['image_paths']
+                    ]
+                
+                projects_data.append(project_dict)
+            
+            return {
+                "success": True,
+                "projects": projects_data,
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total_count,
+                    "has_more": (offset + limit) < total_count
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка получения проектов категории {category}: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "projects": []
+        }
+
+@admin_router.get("/api/portfolio/public/{project_id}")
+async def get_public_portfolio_item(project_id: int):
+    """Получить детальную информацию о проекте портфолио для бота"""
+    try:
+        with get_db_context() as db:
+            project = db.query(Portfolio).filter(
+                Portfolio.id == project_id,
+                Portfolio.is_visible == True
+            ).first()
+            
+            if not project:
+                return {
+                    "success": False,
+                    "error": "Проект не найден или недоступен"
+                }
+            
+            # Увеличиваем счетчик просмотров
+            project.views_count = (project.views_count or 0) + 1
+            db.commit()
+            
+            project_dict = project.to_dict()
+            
+            # Добавляем полные URL для изображений
+            if project_dict.get('main_image'):
+                project_dict['main_image'] = get_image_url(project_dict['main_image'])
+            
+            if project_dict.get('image_paths'):
+                project_dict['image_paths'] = [
+                    get_image_url(img) for img in project_dict['image_paths']
+                ]
+            
+            return {
+                "success": True,
+                "project": project_dict
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка получения проекта {project_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@admin_router.get("/api/portfolio/public/list")
+async def get_public_portfolio_list(
+    category: str = None, 
+    featured: bool = None,
+    page: int = 0, 
+    limit: int = 5
+):
+    """Получить список проектов портфолио с фильтрами для бота"""
+    try:
+        with get_db_context() as db:
+            query = db.query(Portfolio).filter(Portfolio.is_visible == True)
+            
+            if category:
+                query = query.filter(Portfolio.category == category)
+            
+            if featured is not None:
+                query = query.filter(Portfolio.is_featured == featured)
+            
+            total_count = query.count()
+            offset = page * limit
+            
+            projects = query.order_by(
+                Portfolio.sort_order.asc(), 
+                Portfolio.created_at.desc()
+            ).offset(offset).limit(limit).all()
+            
+            projects_data = []
+            for project in projects:
+                project_dict = project.to_dict()
+                
+                # Добавляем полные URL для изображений
+                if project_dict.get('main_image'):
+                    project_dict['main_image'] = get_image_url(project_dict['main_image'])
+                
+                if project_dict.get('image_paths'):
+                    project_dict['image_paths'] = [
+                        get_image_url(img) for img in project_dict['image_paths']
+                    ]
+                
+                projects_data.append(project_dict)
+            
+            return {
+                "success": True,
+                "projects": projects_data,
+                "pagination": {
+                    "page": page,
+                    "limit": limit,
+                    "total": total_count,
+                    "has_more": (offset + limit) < total_count
+                }
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка получения списка портфолио: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "projects": []
+        }
+
+@admin_router.post("/api/portfolio/public/{project_id}/like")
+async def like_portfolio_project(project_id: int):
+    """Лайкнуть проект портфолио"""
+    try:
+        with get_db_context() as db:
+            project = db.query(Portfolio).filter(
+                Portfolio.id == project_id,
+                Portfolio.is_visible == True
+            ).first()
+            
+            if not project:
+                return {
+                    "success": False,
+                    "error": "Проект не найден"
+                }
+            
+            # Увеличиваем счетчик лайков
+            project.likes_count = (project.likes_count or 0) + 1
+            db.commit()
+            
+            return {
+                "success": True,
+                "likes": project.likes_count,
+                "message": "Спасибо за лайк!"
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка лайка проекта {project_id}: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 

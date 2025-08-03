@@ -54,12 +54,19 @@ async def my_tasks_page(request: Request, current_user: dict = Depends(get_curre
             # Для исполнителей показываем только его самого в "сотрудниках"
             employees = [current_user]
             
+            # Получаем элементы навигации
+            from app.admin.app import get_navigation_items
+            navigation_items = get_navigation_items(current_user['role'])
+            
             return templates.TemplateResponse("my_tasks.html", {
                 "request": request,
                 "tasks": tasks_data,
                 "employees": employees,
                 "stats": stats,
-                "current_user": current_user
+                "current_user": current_user,
+                "username": current_user['username'],
+                "user_role": current_user['role'],
+                "navigation_items": navigation_items
             })
             
     except Exception as e:
@@ -121,12 +128,19 @@ async def tasks_page(request: Request, current_user: dict = Depends(get_current_
                 "overdue": len([t for t in tasks_data if t["is_overdue"]])
             }
             
+            # Получаем элементы навигации
+            from app.admin.app import get_navigation_items
+            navigation_items = get_navigation_items(current_user['role'])
+            
             return templates.TemplateResponse("tasks_new.html", {
                 "request": request,
                 "tasks": tasks_data,
                 "employees": employees,
                 "stats": stats,
-                "current_user": current_user
+                "current_user": current_user,
+                "username": current_user['username'],
+                "user_role": current_user['role'],
+                "navigation_items": navigation_items
             })
             
     except Exception as e:
@@ -146,10 +160,17 @@ async def task_detail_page(request: Request, task_id: int, current_user: dict = 
             if current_user["role"] == "executor" and task.assigned_to_id != current_user["id"]:
                 raise HTTPException(status_code=403, detail="Нет доступа к этой задаче")
             
+            # Получаем элементы навигации
+            from app.admin.app import get_navigation_items
+            navigation_items = get_navigation_items(current_user['role'])
+            
             return templates.TemplateResponse("task_detail.html", {
                 "request": request,
                 "task": task,
-                "current_user": current_user
+                "current_user": current_user,
+                "username": current_user['username'],
+                "user_role": current_user['role'],
+                "navigation_items": navigation_items
             })
             
     except HTTPException:
@@ -308,19 +329,39 @@ async def get_task(
 @router.put("/api/tasks/{task_id}")
 async def update_task(
     task_id: int,
-    title: Optional[str] = Form(None),
-    description: Optional[str] = Form(None),
-    status: Optional[str] = Form(None),
-    priority: Optional[str] = Form(None),
-    deadline: Optional[str] = Form(None),
-    estimated_hours: Optional[int] = Form(None),
-    actual_hours: Optional[int] = Form(None),
-    assigned_to_id: Optional[int] = Form(None),
-    color: Optional[str] = Form(None),
+    request: Request,
     current_user: dict = Depends(get_current_admin_user)
 ):
     """Обновить задачу"""
     try:
+        # Определяем тип контента и извлекаем данные
+        content_type = request.headers.get("content-type", "")
+        
+        if "application/json" in content_type:
+            # JSON запрос
+            body = await request.json()
+            title = body.get("title")
+            description = body.get("description")
+            status = body.get("status")
+            priority = body.get("priority")
+            deadline = body.get("deadline")
+            estimated_hours = body.get("estimated_hours")
+            actual_hours = body.get("actual_hours")
+            assigned_to_id = body.get("assigned_to_id")
+            color = body.get("color")
+        else:
+            # Form данные
+            form = await request.form()
+            title = form.get("title")
+            description = form.get("description")
+            status = form.get("status")
+            priority = form.get("priority")
+            deadline = form.get("deadline")
+            estimated_hours = int(form.get("estimated_hours")) if form.get("estimated_hours") else None
+            actual_hours = int(form.get("actual_hours")) if form.get("actual_hours") else None
+            assigned_to_id = int(form.get("assigned_to_id")) if form.get("assigned_to_id") else None
+            color = form.get("color")
+        
         with get_db_context() as db:
             task = db.query(Task).filter(Task.id == task_id).first()
             

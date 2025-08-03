@@ -23,13 +23,18 @@ class PortfolioHandler:
 
     def __init__(self):
         self.items_per_page = 3
-        self.base_url = f"http://147.45.215.199:{settings.ADMIN_PORT}"
-        self.media_base_url = f"http://147.45.215.199:{settings.ADMIN_PORT}/uploads/portfolio"
+        self.base_url = f"http://localhost:{settings.ADMIN_PORT}"
+        self.media_base_url = f"http://localhost:{settings.ADMIN_PORT}/uploads/portfolio"
     
     def get_image_url(self, image_path: str) -> str:
         """Получить полный URL изображения"""
         if not image_path:
             return ""
+        
+        # Если путь уже содержит полный URL, возвращаем как есть
+        if image_path.startswith("http://") or image_path.startswith("https://"):
+            return image_path
+        
         # Удаляем префикс uploads/ если он есть в пути
         clean_path = image_path.replace("uploads/portfolio/", "").replace("uploads/", "")
         return f"{self.base_url}/uploads/portfolio/{clean_path}"
@@ -43,7 +48,7 @@ class PortfolioHandler:
             
             # Получаем категории через API
             try:
-                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/categories", timeout=5)
+                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/categories", timeout=15)
                 if response.status_code == 200:
                     data = response.json()
                     categories = data.get("categories", [])
@@ -90,12 +95,12 @@ class PortfolioHandler:
                 ])
                 
                 for category in categories:
-                    category_id = category.get("id", "")
-                    category_name = category.get("name", category_id)
+                    category_key = category.get("key", "")
+                    category_name = category.get("name", category_key)
                     keyboard_buttons.append([
                         InlineKeyboardButton(
                             category_name,
-                            callback_data=f"portfolio_category_{category_id}"
+                            callback_data=f"portfolio_category_{category_key}"
                         )
                     ])
                 
@@ -150,7 +155,8 @@ class PortfolioHandler:
                 featured_only = True
                 category_name = "⭐ Рекомендуемые работы"
             else:
-                category = query.data.replace('portfolio_category_', '')
+                # Убираем префикс portfolio_ чтобы получить название категории
+                category = query.data.replace('portfolio_', '')
                 featured_only = False
                 category_name = self._get_category_name(category)
             
@@ -191,26 +197,17 @@ class PortfolioHandler:
         """Показать детали проекта"""
         try:
             query = update.callback_query
-            project_id = int(query.data.split('_')[2])
+            project_id = int(query.data.split('_')[1])
             user_id = update.effective_user.id
             
             log_user_action(user_id, "show_project_details", project_id)
             
-            # Получаем проект через API
+            # Получаем проект из базы данных напрямую
             try:
-                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/{project_id}", timeout=5)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get("success"):
-                        project = data.get("data")
-                    else:
-                        raise Exception("Проект не найден")
-                else:
-                    # Fallback: получаем из базы напрямую
-                    project = await self._get_project_from_db(project_id)
-            except:
-                # Fallback: получаем из базы напрямую
                 project = await self._get_project_from_db(project_id)
+            except Exception as e:
+                logger.error(f"Ошибка получения проекта {project_id} из БД: {e}")
+                project = None
             
             if not project:
                 await query.answer("❌ Проект не найден", show_alert=True)
@@ -222,10 +219,19 @@ class PortfolioHandler:
             # Создаем клавиатуру для проекта
             keyboard = self._create_project_keyboard(project)
             
-            # Если есть главное изображение, отправляем с фото
+            # Всегда пытаемся показать с изображением
+            image_url = None
             main_image = project.get("main_image")
             if main_image:
                 image_url = self.get_image_url(main_image)
+            
+            # Если нет основного изображения, берем из галереи
+            if not image_url:
+                image_paths = project.get("image_paths", [])
+                if image_paths:
+                    image_url = self.get_image_url(image_paths[0])
+            
+            if image_url:
                 try:
                     await query.edit_message_media(
                         media=InputMediaPhoto(
@@ -258,14 +264,14 @@ class PortfolioHandler:
         """Показать галерею проекта"""
         try:
             query = update.callback_query
-            project_id = int(query.data.split('_')[2])
+            project_id = int(query.data.split('_')[1])
             user_id = update.effective_user.id
             
             log_user_action(user_id, "show_project_gallery", project_id)
             
             # Получаем проект
             try:
-                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/{project_id}", timeout=5)
+                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/{project_id}", timeout=15)
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("success"):
@@ -329,14 +335,14 @@ class PortfolioHandler:
         """Поставить лайк проекту"""
         try:
             query = update.callback_query
-            project_id = int(query.data.split('_')[2])
+            project_id = int(query.data.split('_')[1])
             user_id = update.effective_user.id
             
             log_user_action(user_id, "like_project", project_id)
             
             # Отправляем лайк через API
             try:
-                response = requests.post(f"{self.base_url}/admin/api/portfolio/public/{project_id}/like", timeout=5)
+                response = requests.post(f"{self.base_url}/admin/api/portfolio/public/{project_id}/like", timeout=15)
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("success"):
@@ -370,23 +376,12 @@ class PortfolioHandler:
             if category:
                 params["category"] = category
             
+            # Используем прямое обращение к базе данных чтобы избежать проблем с HTTP запросами
             try:
-                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/list", 
-                                      params=params, timeout=5)
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get("success"):
-                        projects = data.get("data", [])
-                        pagination = data.get("pagination", {})
-                    else:
-                        projects = []
-                        pagination = {}
-                else:
-                    # Fallback: получаем из базы напрямую
-                    projects, pagination = await self._get_projects_from_db(category, page, featured_only)
-            except:
-                # Fallback: получаем из базы напрямую
                 projects, pagination = await self._get_projects_from_db(category, page, featured_only)
+            except Exception as e:
+                logger.error(f"Ошибка получения проектов из БД: {e}")
+                projects, pagination = [], {}
             
             if not projects:
                 text = f"""
@@ -397,29 +392,32 @@ class PortfolioHandler:
                 keyboard = InlineKeyboardMarkup([[
                     InlineKeyboardButton("🔙 К категориям", callback_data="portfolio")
                 ]])
-            else:
-                # Формируем текст с проектами
-                text = f"📂 <b>{category_name}</b>\n\n"
                 
-                for i, project in enumerate(projects, 1):
-                    text += self._format_project_brief(project, (page - 1) * self.items_per_page + i)
-                    text += "\n" + "─" * 30 + "\n\n"
-                
-                # Создаем клавиатуру с проектами и пагинацией
-                keyboard = self._create_portfolio_keyboard(projects, category, page, pagination, featured_only)
-            
-            # Отправляем сообщение
-            if update.callback_query:
-                await update.callback_query.edit_message_text(
-                    text,
-                    reply_markup=keyboard,
-                    parse_mode='HTML'
-                )
+                # Отправляем сообщение об отсутствии проектов
+                if update.callback_query:
+                    await update.callback_query.edit_message_text(
+                        text,
+                        reply_markup=keyboard,
+                        parse_mode='HTML'
+                    )
+                else:
+                    await update.message.reply_text(
+                        text,
+                        reply_markup=keyboard,
+                        parse_mode='HTML'
+                    )
             else:
-                await update.message.reply_text(
-                    text,
-                    reply_markup=keyboard,
-                    parse_mode='HTML'
+                # Сохраняем данные для навигации
+                context.user_data['portfolio_projects'] = projects
+                context.user_data['portfolio_category'] = category or "featured"
+                
+                # Сразу показываем первый проект с изображением и навигацией
+                await self._show_project_with_navigation(
+                    update.callback_query, 
+                    projects[0], 
+                    projects, 
+                    0, 
+                    category or "featured"
                 )
                 
         except Exception as e:
@@ -481,12 +479,14 @@ class PortfolioHandler:
         title = project.get("title", "Без названия")
         subtitle = project.get("subtitle", "")
         description = project.get("description", "")
-        technologies = project.get("technologies", [])
+        technologies = project.get("technologies", "")
         complexity = project.get("complexity", "medium")
-        complexity_level = project.get("complexity_level", 5)
         development_time = project.get("development_time")
-        cost_display = project.get("cost_display")
+        cost = project.get("cost")
+        show_cost = project.get("show_cost", False)
         demo_link = project.get("demo_link")
+        repository_link = project.get("repository_link")
+        external_links = project.get("external_links", [])
         views_count = project.get("views_count", 0)
         likes_count = project.get("likes_count", 0)
         
@@ -503,38 +503,48 @@ class PortfolioHandler:
         if subtitle:
             text += f"\n<i>{subtitle}</i>"
         
-        text += "\n" + "=" * 30 + "\n"
+        text += "\n" + "─" * 25 + "\n"
         
         # Описание
         if description:
-            text += f"\n📋 <b>Описание:</b>\n{description}\n"
+            text += f"\n📝 <b>Описание:</b>\n{description}\n"
         
         # Технологии
         if technologies:
-            text += f"\n🛠 <b>Технологии:</b>\n"
-            for tech in technologies[:8]:  # Максимум 8 технологий
-                text += f"• {tech}\n"
-            if len(technologies) > 8:
-                text += f"• и еще {len(technologies) - 8} технологий\n"
+            tech_list = technologies.split(',') if isinstance(technologies, str) else technologies
+            tech_formatted = [tech.strip() for tech in tech_list]
+            text += f"\n🛠 <b>Технологии:</b>\n{', '.join(tech_formatted)}\n"
         
         # Характеристики проекта
-        text += f"\n📊 <b>Характеристики:</b>\n"
-        text += f"• {complexity_emoji.get(complexity, '⚪')} Сложность: {complexity.title()} ({complexity_level}/10)\n"
+        text += f"\n📊 <b>Характеристики:</b>"
+        text += f"\n{complexity_emoji.get(complexity, '⚪')} Сложность: {complexity.title()}"
         
         if development_time:
-            text += f"• ⏱ Время разработки: {development_time} дней\n"
+            text += f"\n⏱ Время разработки: {development_time} дн."
         
-        if cost_display:
-            text += f"• 💰 Стоимость: {cost_display} ₽\n"
+        if show_cost and cost:
+            text += f"\n💰 Стоимость: {cost:,.0f}₽"
+        elif not show_cost:
+            text += f"\n💰 Стоимость: По запросу"
         
-        # Демо и ссылки
-        if demo_link:
-            text += f"\n🚀 <b>Демо доступно!</b>\n"
+        # Ссылки
+        if demo_link or repository_link or external_links:
+            text += f"\n\n🔗 <b>Ссылки:</b>"
+            if demo_link:
+                text += f"\n🚀 <a href='{demo_link}'>Демо-версия</a>"
+            if repository_link:
+                text += f"\n📂 <a href='{repository_link}'>Исходный код</a>"
+            for link in external_links:
+                if isinstance(link, dict):
+                    link_title = link.get('title', 'Дополнительная ссылка')
+                    link_url = link.get('url', '')
+                    if link_url:
+                        text += f"\n🌐 <a href='{link_url}'>{link_title}</a>"
         
         # Статистика
-        text += f"\n📈 <b>Статистика:</b>\n"
-        text += f"• 👀 Просмотров: {views_count}\n"
-        text += f"• 👍 Лайков: {likes_count}"
+        text += f"\n\n📈 <b>Статистика:</b>"
+        text += f"\n👀 Просмотров: {views_count}"
+        text += f"\n👍 Лайков: {likes_count}"
         
         return text
     
@@ -546,10 +556,10 @@ class PortfolioHandler:
         # Первая строка - основные действия
         first_row = []
         
-        # Кнопка галереи (если есть дополнительные изображения)
-        image_paths = project.get("image_paths", [])
-        if image_paths:
-            first_row.append(InlineKeyboardButton("📷 Галерея", callback_data=f"gallery_{project_id}"))
+        # Убираем кнопку галереи, так как изображение теперь показывается сверху
+        # image_paths = project.get("image_paths", [])
+        # if image_paths:
+        #     first_row.append(InlineKeyboardButton("📷 Галерея", callback_data=f"gallery_{project_id}"))
         
         # Кнопка демо (если доступно)
         demo_link = project.get("demo_link")
@@ -570,6 +580,144 @@ class PortfolioHandler:
         ])
         
         return InlineKeyboardMarkup(keyboard_buttons)
+    
+    @standard_handler
+    async def show_project_gallery(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Показать галерею изображений проекта"""
+        try:
+            query = update.callback_query
+            project_id = int(query.data.split('_')[1])
+            user_id = update.effective_user.id
+            
+            log_user_action(user_id, "show_project_gallery", project_id)
+            
+            # Получаем проект через API
+            try:
+                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/{project_id}", timeout=15)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success"):
+                        project = data.get("project")
+                    else:
+                        raise Exception("Проект не найден")
+                else:
+                    project = await self._get_project_from_db(project_id)
+            except:
+                project = await self._get_project_from_db(project_id)
+            
+            if not project:
+                await query.answer("❌ Проект не найден", show_alert=True)
+                return
+            
+            # Получаем все изображения проекта
+            image_paths = project.get("image_paths", [])
+            main_image = project.get("main_image")
+            
+            # Объединяем все изображения
+            all_images = []
+            if main_image:
+                all_images.append(main_image)
+            all_images.extend(image_paths)
+            
+            if not all_images:
+                await query.answer("📷 У этого проекта нет изображений", show_alert=True)
+                return
+            
+            # Создаем медиа-группу
+            media_group = []
+            title = project.get("title", "Проект")
+            
+            for i, image_path in enumerate(all_images):
+                image_url = self.get_image_url(image_path)
+                if i == 0:
+                    # Первое изображение с описанием
+                    caption = f"🎯 <b>{title}</b>\n\n📷 Галерея проекта ({i+1}/{len(all_images)})"
+                    media_group.append(InputMediaPhoto(media=image_url, caption=caption, parse_mode='HTML'))
+                else:
+                    # Остальные изображения с номером
+                    caption = f"📷 {i+1}/{len(all_images)}"
+                    media_group.append(InputMediaPhoto(media=image_url, caption=caption))
+            
+            # Отправляем галерею
+            try:
+                await context.bot.send_media_group(
+                    chat_id=query.message.chat_id,
+                    media=media_group
+                )
+                
+                # Отправляем кнопку возврата
+                keyboard = InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 К проекту", callback_data=f"project_{project_id}")
+                ]])
+                
+                await context.bot.send_message(
+                    chat_id=query.message.chat_id,
+                    text="👆 Все изображения проекта",
+                    reply_markup=keyboard
+                )
+                
+                await query.answer("📷 Галерея загружена")
+                
+            except Exception as e:
+                logger.error(f"Ошибка отправки галереи: {e}")
+                await query.answer("❌ Ошибка загрузки галереи", show_alert=True)
+            
+        except Exception as e:
+            logger.error(f"Ошибка в show_project_gallery: {e}")
+            await query.answer("❌ Ошибка загрузки галереи", show_alert=True)
+    
+    @standard_handler
+    async def like_project(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Лайкнуть проект"""
+        try:
+            query = update.callback_query
+            project_id = int(query.data.split('_')[1])
+            user_id = update.effective_user.id
+            
+            log_user_action(user_id, "like_project", project_id)
+            
+            # Отправляем лайк через API
+            try:
+                response = requests.post(f"{self.base_url}/admin/api/portfolio/public/{project_id}/like", timeout=15)
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get("success"):
+                        likes_count = data.get("likes", 0)
+                        message = data.get("message", "Спасибо за лайк!")
+                        await query.answer(f"👍 {message} Всего лайков: {likes_count}")
+                        
+                        # Обновляем кнопку с новым количеством лайков
+                        if query.message.reply_markup:
+                            keyboard = query.message.reply_markup.inline_keyboard
+                            for row in keyboard:
+                                for button in row:
+                                    if button.callback_data and button.callback_data.startswith(f"like_{project_id}"):
+                                        button.text = f"👍 {likes_count}"
+                                        break
+                            
+                            # Обновляем сообщение с новой клавиатурой
+                            try:
+                                await query.edit_message_reply_markup(
+                                    reply_markup=InlineKeyboardMarkup(keyboard)
+                                )
+                            except:
+                                pass  # Игнорируем ошибки обновления клавиатуры
+                        
+                        return
+                    else:
+                        error_msg = data.get("error", "Ошибка")
+                        await query.answer(f"❌ {error_msg}", show_alert=True)
+                        return
+                else:
+                    await query.answer("❌ Ошибка сервера", show_alert=True)
+                    return
+            except Exception as e:
+                logger.error(f"Ошибка API лайка: {e}")
+                await query.answer("❌ Ошибка отправки лайка", show_alert=True)
+            
+        except Exception as e:
+            logger.error(f"Ошибка в like_project: {e}")
+            await query.answer("❌ Ошибка", show_alert=True)
     
     def _create_portfolio_keyboard(self, projects: list, category: str = None, page: int = 1, 
                                  pagination: dict = None, featured_only: bool = False) -> InlineKeyboardMarkup:
@@ -625,10 +773,23 @@ class PortfolioHandler:
         }
         return category_map.get(category, category.replace("_", " ").title())
     
+    def _get_category_emoji(self, category: str) -> str:
+        """Получить эмодзи для категории"""
+        category_emojis = {
+            "telegram_bots": "🤖",
+            "web_development": "🌐",
+            "mobile_apps": "📱",
+            "ai_integration": "🧠",
+            "automation": "⚙️",
+            "ecommerce": "🛒",
+            "other": "🔧"
+        }
+        return category_emojis.get(category, "📦")
+    
     async def _get_categories_from_db(self) -> list:
         """Fallback: получить категории из базы данных напрямую"""
         try:
-            async with get_db_context() as db:
+            with get_db_context() as db:
                 categories = db.query(Portfolio.category).filter(
                     Portfolio.category.isnot(None),
                     Portfolio.is_visible == True
@@ -639,8 +800,9 @@ class PortfolioHandler:
                 result = []
                 for cat in category_list:
                     result.append({
-                        "id": cat,
-                        "name": self._get_category_name(cat)
+                        "key": cat,
+                        "name": self._get_category_name(cat),
+                        "emoji": self._get_category_emoji(cat)
                     })
                 
                 return result
@@ -746,7 +908,7 @@ class PortfolioHandler:
     
     @standard_handler
     async def select_category(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка выбора категории портфолио."""
+        """Обработка выбора категории портфолио - показ первого проекта с навигацией."""
         try:
             query = update.callback_query
             await query.answer()
@@ -756,9 +918,9 @@ class PortfolioHandler:
             
             # Извлекаем категорию из callback_data
             category_map = {
-                "portfolio_telegram": "telegram_bot",
+                "portfolio_telegram": "telegram_bots",
                 "portfolio_whatsapp": "whatsapp", 
-                "portfolio_web": "web",
+                "portfolio_web": "web_development",
                 "portfolio_integration": "ai_integration",
                 "portfolio_featured": "featured",
                 "portfolio_all": "all"
@@ -768,52 +930,19 @@ class PortfolioHandler:
             
             log_user_action(user_id, "select_portfolio_category", category)
             
-            # Получаем проекты из выбранной категории
-            try:
-                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/list", 
-                                      params={"category": category}, timeout=5)
-                if response.status_code == 200:
-                    data = response.json()
-                    projects = data.get("data", [])
-                else:
-                    # Fallback: получаем из базы напрямую
-                    projects = await self._get_projects_from_db(category)
-            except Exception as e:
-                logger.error(f"Ошибка получения проектов: {e}")
-                projects = await self._get_projects_from_db(category)
+            # Используем новую логику из show_category_portfolio
+            # Преобразуем callback_data в новый формат
+            new_callback_data = f"portfolio_{category}"
             
-            if not projects:
-                category_names = {
-                    "telegram_bot": "🤖 Telegram боты",
-                    "whatsapp": "💬 WhatsApp боты",
-                    "web": "🌐 Веб-боты",
-                    "ai_integration": "🧠 AI интеграции",
-                    "featured": "⭐ Рекомендуемые",
-                    "all": "📊 Все проекты"
-                }
-                
-                text = f"""
-💼 <b>{category_names.get(category, 'Портфолио')}</b>
-
-В этой категории пока нет проектов.
-
-Перейдите в другую категорию или свяжитесь с нами для создания нового проекта!
-                """
-                
-                keyboard = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔙 К категориям", callback_data="portfolio")],
-                    [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
-                ])
-                
-                await query.edit_message_text(text, reply_markup=keyboard, parse_mode='HTML')
-                return
+            # Временно изменяем query.data для совместимости
+            original_data = query.data
+            query.data = new_callback_data
             
-            # Показываем первую страницу проектов
-            context.user_data['portfolio_category'] = category
-            context.user_data['portfolio_projects'] = projects
-            context.user_data['portfolio_page'] = 0
+            # Вызываем новую функцию
+            await self.show_category_portfolio(update, context)
             
-            await self._show_projects_page(query, projects, category, 0)
+            # Восстанавливаем оригинальные данные
+            query.data = original_data
             
         except Exception as e:
             logger.error(f"Ошибка в select_category: {e}")
@@ -824,6 +953,186 @@ class PortfolioHandler:
                     [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
                 ])
             )
+
+    async def _show_project_with_navigation(self, query, project, all_projects, current_index, category):
+        """Показать проект с фото, описанием и кнопками навигации"""
+        try:
+            # Формируем красивое описание проекта
+            title = project.get("title", "Без названия")
+            description = project.get("description", "Описание отсутствует")
+            technologies = project.get("technologies", "")
+            demo_link = project.get("demo_link", "")
+            repository_link = project.get("repository_link", "")
+            development_time = project.get("development_time", "")
+            cost = project.get("cost", "")
+            show_cost = project.get("show_cost", False)
+            
+            # Получаем имя категории
+            category_names = {
+                "telegram_bots": "🤖 Telegram боты",
+                "whatsapp": "💬 WhatsApp боты", 
+                "web_development": "🌐 Веб-разработка",
+                "ai_integration": "🧠 AI интеграции",
+                "featured": "⭐ Рекомендуемые",
+                "all": "📊 Все проекты"
+            }
+            category_name = category_names.get(category, category)
+            
+            # Формируем текст описания
+            text = f"💼 <b>{category_name}</b>\n\n"
+            text += f"🎯 <b>{title}</b>\n\n"
+            text += f"📝 {description}\n\n"
+            
+            if technologies:
+                # Обрабатываем как список (из to_bot_dict) или как строку (из других источников)
+                if isinstance(technologies, list):
+                    tech_list = technologies
+                else:
+                    tech_list = [tech.strip() for tech in technologies.split(',') if tech.strip()]
+                
+                if tech_list:
+                    text += f"🛠 <b>Технологии:</b>\n"
+                    text += f"{'  •  '.join(tech_list)}\n\n"
+            
+            if development_time:
+                text += f"⏱ <b>Время разработки:</b> {development_time} дней\n"
+            
+            if cost and show_cost:
+                text += f"💰 <b>Стоимость:</b> {cost:,.0f} ₽\n"
+            elif not show_cost:
+                text += f"💰 <b>Стоимость:</b> По запросу\n"
+            
+            text += f"\n📊 <b>Проект {current_index + 1} из {len(all_projects)}</b>"
+            
+            # Формируем кнопки навигации
+            nav_buttons = []
+            
+            # Кнопки предыдущий/следующий
+            nav_row = []
+            if current_index > 0:
+                nav_row.append(InlineKeyboardButton("⬅️ Предыдущий", callback_data=f"portfolio_nav_{current_index-1}"))
+            if current_index < len(all_projects) - 1:
+                nav_row.append(InlineKeyboardButton("➡️ Следующий", callback_data=f"portfolio_nav_{current_index+1}"))
+            
+            if nav_row:
+                nav_buttons.append(nav_row)
+            
+            # Кнопки действий с проектом
+            action_buttons = []
+            if demo_link:
+                action_buttons.append(InlineKeyboardButton("🌐 Демо", url=demo_link))
+            if repository_link:
+                action_buttons.append(InlineKeyboardButton("💻 Код", url=repository_link))
+            
+            project_id = project.get("id")
+            if project_id:
+                # Убираем кнопку галереи, так как изображение показывается сверху
+                # action_buttons.append(InlineKeyboardButton("📷 Галерея", callback_data=f"gallery_{project_id}"))
+                action_buttons.append(InlineKeyboardButton("❤️ Лайк", callback_data=f"like_{project_id}"))
+            
+            if action_buttons:
+                # Разбиваем кнопки по 2 в ряд
+                for i in range(0, len(action_buttons), 2):
+                    nav_buttons.append(action_buttons[i:i+2])
+            
+            # Кнопки возврата
+            nav_buttons.append([
+                InlineKeyboardButton("🔙 К категориям", callback_data="portfolio"),
+                InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
+            ])
+            
+            keyboard = InlineKeyboardMarkup(nav_buttons)
+            
+            # Получаем изображение проекта
+            main_image = project.get("main_image", "")
+            
+            # Всегда пытаемся показать с изображением
+            image_url = None
+            if main_image:
+                logger.error(f"🖼️ ОТЛАДКА: main_image получен: {repr(main_image)}")
+                image_url = self.get_image_url(main_image)
+                logger.error(f"🔗 ОТЛАДКА: image_url после get_image_url: {repr(image_url)}")
+            else:
+                logger.error(f"❌ ОТЛАДКА: main_image пустой или None")
+            
+            # Если нет основного изображения, берем из галереи
+            if not image_url:
+                image_paths = project.get("image_paths", [])
+                if image_paths:
+                    image_url = self.get_image_url(image_paths[0])
+            
+            if image_url:
+                try:
+                    # Сначала пытаемся отредактировать как медиа
+                    await query.edit_message_media(
+                        media=InputMediaPhoto(media=image_url, caption=text, parse_mode='HTML'),
+                        reply_markup=keyboard
+                    )
+                except Exception as e:
+                    logger.warning(f"Не удалось отредактировать сообщение как медиа: {e}")
+                    try:
+                        # Если не получилось отредактировать, удаляем старое и отправляем новое
+                        await query.delete_message()
+                        await query.message.reply_photo(
+                            photo=image_url,
+                            caption=text,
+                            reply_markup=keyboard,
+                            parse_mode='HTML'
+                        )
+                    except Exception as e2:
+                        logger.error(f"Не удалось отправить изображение {image_url}: {e2}")
+                        # В крайнем случае отправляем текстом
+                        await query.edit_message_text(text, reply_markup=keyboard, parse_mode='HTML')
+            else:
+                # Отправляем без фото
+                await query.edit_message_text(text, reply_markup=keyboard, parse_mode='HTML')
+                
+        except Exception as e:
+            logger.error(f"Ошибка в _show_project_with_navigation: {e}")
+            await query.edit_message_text(
+                "❌ Ошибка отображения проекта",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 К портфолио", callback_data="portfolio")]
+                ])
+            )
+
+    @standard_handler
+    async def navigate_project(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Навигация между проектами (предыдущий/следующий)"""
+        try:
+            query = update.callback_query
+            
+            # Безопасно извлекаем индекс
+            try:
+                data_parts = query.data.split('_')
+                if len(data_parts) >= 3:
+                    new_index = int(data_parts[2])
+                else:
+                    logger.error(f"Неверный формат callback_data: {query.data}")
+                    await query.answer("❌ Ошибка навигации", show_alert=True)
+                    return
+            except (ValueError, AttributeError) as e:
+                logger.error(f"Ошибка парсинга callback_data '{query.data}': {e}")
+                await query.answer("❌ Ошибка навигации", show_alert=True)
+                return
+            
+            # Получаем данные из контекста
+            projects = context.user_data.get('portfolio_projects', [])
+            category = context.user_data.get('portfolio_category', 'all')
+            
+            if not projects or new_index >= len(projects) or new_index < 0:
+                await query.answer("❌ Проект не найден", show_alert=True)
+                return
+            
+            # Обновляем индекс в контексте
+            context.user_data['current_project_index'] = new_index
+            
+            # Показываем проект с новым индексом
+            await self._show_project_with_navigation(query, projects[new_index], projects, new_index, category)
+            
+        except Exception as e:
+            logger.error(f"Ошибка в navigate_project: {e}")
+            await query.answer("❌ Ошибка навигации", show_alert=True)
 
     async def _get_projects_from_db(self, category: str) -> List[Dict]:
         """Получить проекты из базы данных"""
@@ -839,18 +1148,8 @@ class PortfolioHandler:
                 
                 portfolio_items = query.order_by(Portfolio.created_at.desc()).all()
                 
-                projects = []
-                for item in portfolio_items:
-                    projects.append({
-                        "id": item.id,
-                        "title": item.title,
-                        "description": item.description,
-                        "category": item.category,
-                        "image_url": self.get_image_url(item.main_image),
-                        "technologies": item.technologies,
-                        "link": item.link,
-                        "is_featured": item.is_featured
-                    })
+                # Используем to_bot_dict() для правильного формирования URL
+                projects = [item.to_bot_dict() for item in portfolio_items]
                 
                 return projects
                 
@@ -975,7 +1274,7 @@ class PortfolioHandler:
             
             # Получаем детали проекта
             try:
-                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/project/{project_id}", timeout=5)
+                response = requests.get(f"{self.base_url}/admin/api/portfolio/public/project/{project_id}", timeout=15)
                 if response.status_code == 200:
                     data = response.json()
                     project = data.get("project")
@@ -1067,16 +1366,10 @@ class PortfolioHandler:
                 ).first()
                 
                 if project:
-                    return {
-                        "id": project.id,
-                        "title": project.title,
-                        "description": project.description,
-                        "category": project.category,
-                        "image_url": self.get_image_url(project.main_image),
-                        "technologies": project.technologies,
-                        "link": project.link,
-                        "is_featured": project.is_featured
-                    }
+                    # Увеличиваем счетчик просмотров
+                    project.views_count = (project.views_count or 0) + 1
+                    db.commit()
+                    return project.to_bot_dict()
                 
                 return None
                 

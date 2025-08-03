@@ -21,6 +21,7 @@ from ...database.models import (
 )
 from ...config.logging import get_logger
 from ..middleware.auth import get_current_admin_user
+from ...middleware.auth import authenticate
 
 logger = get_logger(__name__)
 templates = Jinja2Templates(directory="app/admin/templates")
@@ -53,11 +54,25 @@ class RevisionMessageCreateModel(BaseModel):
     is_internal: bool = False
 
 @router.get("/revisions", response_class=HTMLResponse)
-async def revisions_page(request: Request, user: dict = Depends(get_current_admin_user)):
+async def revisions_page(request: Request, username: str = Depends(authenticate)):
     """Страница управления правками"""
+    # Получаем роль пользователя и элементы навигации
+    from app.admin.app import get_user_role, get_navigation_items
+    user_role = get_user_role(username)
+    navigation_items = get_navigation_items(user_role)
+    
+    # Debug logging
+    print(f"[DEBUG] Username: {username}")
+    print(f"[DEBUG] User role: {user_role}")
+    print(f"[DEBUG] Navigation items count: {len(navigation_items) if navigation_items else 0}")
+    if navigation_items:
+        print(f"[DEBUG] First 3 navigation items: {navigation_items[:3]}")
+    
     return templates.TemplateResponse("revisions.html", {
         "request": request,
-        "user": user
+        "username": username,
+        "user_role": user_role,
+        "navigation_items": navigation_items
     })
 
 @router.get("/api/revisions", response_class=JSONResponse)
@@ -463,45 +478,6 @@ async def complete_revision(
             "error": "Не удалось завершить правку"
         }, status_code=500)
 
-@router.get("/api/revisions/stats", response_class=JSONResponse)
-async def get_revisions_stats(
-    db: Session = Depends(get_db),
-    user: dict = Depends(get_current_admin_user)
-):
-    """Получить статистику по правкам"""
-    try:
-        total_revisions = db.query(ProjectRevision).count()
-        pending_revisions = db.query(ProjectRevision).filter(
-            ProjectRevision.status == "pending"
-        ).count()
-        completed_revisions = db.query(ProjectRevision).filter(
-            ProjectRevision.status == "completed"
-        ).count()
-        
-        # Для владельца показываем все правки, для исполнителя - только назначенные
-        if user["role"] != "owner":  # Обычный админ/исполнитель
-            my_revisions = db.query(ProjectRevision).filter(
-                ProjectRevision.assigned_to_id == user['id']
-            ).count()
-        else:  # Владелец
-            my_revisions = total_revisions
-        
-        return JSONResponse({
-            "success": True,
-            "data": {
-                "total_revisions": total_revisions,
-                "pending_revisions": pending_revisions,
-                "completed_revisions": completed_revisions,
-                "my_revisions": my_revisions
-            }
-        })
-    
-    except Exception as e:
-        logger.error(f"Error fetching revisions stats: {e}")
-        return JSONResponse({
-            "success": False,
-            "error": "Не удалось получить статистику"
-        }, status_code=500)
 
 @router.get("/api/revisions/files/{file_id}", response_class=FileResponse)
 async def download_revision_file(

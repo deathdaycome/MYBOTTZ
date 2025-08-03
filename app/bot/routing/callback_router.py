@@ -95,7 +95,7 @@ class CallbackRouter:
         # Отправляем сообщение об ошибке пользователю
         try:
             await update.callback_query.answer("❌ Неизвестная команда. Возвращайтесь в главное меню.")
-            from ...handlers.start import StartHandler
+            from ..handlers.start import StartHandler
             start_handler = StartHandler()
             await start_handler.start(update, context)
         except Exception as e:

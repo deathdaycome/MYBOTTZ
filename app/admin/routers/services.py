@@ -20,9 +20,16 @@ templates = Jinja2Templates(directory="app/admin/templates")
 @router.get("/services", response_class=HTMLResponse)
 async def services_page(request: Request, user: AdminUser = Depends(require_admin_auth)):
     """Страница управления сервисами"""
+    # Получаем элементы навигации
+    from app.admin.app import get_navigation_items
+    navigation_items = get_navigation_items(user.role)
+    
     return templates.TemplateResponse("services.html", {
         "request": request,
-        "user": user
+        "user": user,
+        "username": user.username,
+        "user_role": user.role,
+        "navigation_items": navigation_items
     })
 
 @router.get("/api/services", response_class=JSONResponse)

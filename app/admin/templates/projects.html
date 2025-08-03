@@ -600,7 +600,7 @@ html, body {
                 <i class="fas fa-gem"></i>
             </div>
             <div class="stat-value" id="totalRevenue">
-                {{ "{:,}".format((projects|sum(attribute="estimated_cost") or 0)|round|int).replace(",", " ") }}₽
+                {{ "{:,}".format((projects|selectattr("estimated_cost")|sum(attribute="estimated_cost") or 0)|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Общая стоимость</div>
         </div>
@@ -611,7 +611,7 @@ html, body {
                 <i class="fas fa-credit-card"></i>
             </div>
             <div class="stat-value" id="totalPaid">
-                {{ "{:,}".format((projects|sum(attribute="client_paid_total") or 0)|round|int).replace(",", " ") }}₽
+                {{ "{:,}".format((projects|selectattr("client_paid_total")|sum(attribute="client_paid_total") or 0)|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Получено от клиентов</div>
         </div>
@@ -622,7 +622,7 @@ html, body {
                 <i class="fas fa-clock-o"></i>
             </div>
             <div class="stat-value" id="remainingPayment">
-                {{ "{:,}".format(((projects|sum(attribute="estimated_cost") or 0) - (projects|sum(attribute="client_paid_total") or 0))|round|int).replace(",", " ") }}₽
+                {{ "{:,}".format(((projects|selectattr("estimated_cost")|sum(attribute="estimated_cost") or 0) - (projects|selectattr("client_paid_total")|sum(attribute="client_paid_total") or 0))|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Остаток по клиентам</div>
         </div>
@@ -637,7 +637,7 @@ html, body {
                 <i class="fas fa-piggy-bank"></i>
             </div>
             <div class="stat-value" id="totalPrepayments">
-                {{ "{:,}".format((projects|sum(attribute="prepayment_amount") or 0)|round|int).replace(",", " ") }}₽
+                {{ "{:,}".format((projects|selectattr("prepayment_amount")|sum(attribute="prepayment_amount") or 0)|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Общие предоплаты</div>
         </div>
@@ -648,7 +648,7 @@ html, body {
                 <i class="fas fa-handshake"></i>
             </div>
             <div class="stat-value" id="totalExecutorPayments">
-                {{ "{:,}".format((projects|sum(attribute="executor_paid_total") or 0)|round|int).replace(",", " ") }}₽
+                {{ "{:,}".format((projects|selectattr("executor_paid_total")|sum(attribute="executor_paid_total") or 0)|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Выплачено исполнителям</div>
         </div>
@@ -659,7 +659,7 @@ html, body {
                 <i class="fas fa-stopwatch"></i>
             </div>
             <div class="stat-value" id="remainingExecutorPayments">
-                {{ "{:,}".format(((projects|sum(attribute="executor_cost") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int).replace(",", " ") }}₽
+                {{ "{:,}".format(((projects|selectattr("executor_cost")|sum(attribute="executor_cost") or 0) - (projects|selectattr("executor_paid_total")|sum(attribute="executor_paid_total") or 0))|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Остаток к выплате</div>
         </div>
@@ -670,7 +670,7 @@ html, body {
                 <i class="fas fa-chart-line"></i>
             </div>
             <div class="stat-value" id="profit">
-                {{ "{:,}".format(((projects|sum(attribute="client_paid_total") or 0) - (projects|sum(attribute="executor_paid_total") or 0))|round|int).replace(",", " ") }}₽
+                {{ "{:,}".format(((projects|selectattr("client_paid_total")|sum(attribute="client_paid_total") or 0) - (projects|selectattr("executor_paid_total")|sum(attribute="executor_paid_total") or 0))|round|int).replace(",", " ") }}₽
             </div>
             <div class="stat-label">Текущая прибыль</div>
         </div>
@@ -936,6 +936,18 @@ html, body {
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
+                            <label for="editProjectType" class="form-label">Тип проекта</label>
+                            <select class="form-select" id="editProjectType">
+                                <option value="web">Веб-сайт</option>
+                                <option value="bot">Telegram Bot</option>
+                                <option value="mobile">Мобильное приложение</option>
+                                <option value="desktop">Десктопное приложение</option>
+                                <option value="integration">Интеграция</option>
+                                <option value="consultation">Консультация</option>
+                                <option value="other">Другое</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
                             <label for="editProjectStatus" class="form-label">Статус</label>
                             <select class="form-select" id="editProjectStatus">
                                 <option value="new">Новый</option>
@@ -948,6 +960,8 @@ html, body {
                                 <option value="on_hold">Приостановлен</option>
                             </select>
                         </div>
+                    </div>
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="editProjectComplexity" class="form-label">Сложность</label>
                             <select class="form-select" id="editProjectComplexity">
@@ -957,15 +971,62 @@ html, body {
                                 <option value="premium">Премиум</option>
                             </select>
                         </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editProjectPriority" class="form-label">Приоритет</label>
+                            <select class="form-select" id="editProjectPriority">
+                                <option value="low">Низкий</option>
+                                <option value="normal">Обычный</option>
+                                <option value="high">Высокий</option>
+                                <option value="urgent">Срочный</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="editProjectEstimatedCost" class="form-label">Ориентировочная стоимость (₽)</label>
-                            <input type="number" class="form-control" id="editProjectEstimatedCost" min="0">
+                            <input type="number" class="form-control" id="editProjectEstimatedCost" min="0" step="1000">
                         </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editProjectExecutorCost" class="form-label">Стоимость для исполнителя (₽)</label>
+                            <input type="number" class="form-control" id="editProjectExecutorCost" min="0" step="500">
+                        </div>
+                    </div>
+                    <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="editProjectFinalCost" class="form-label">Финальная стоимость (₽)</label>
                             <input type="number" class="form-control" id="editProjectFinalCost" min="0">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editProjectEstimatedHours" class="form-label">Часы (прогноз)</label>
+                            <input type="number" class="form-control" id="editProjectEstimatedHours" min="1" step="1">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editProjectPrepaymentAmount" class="form-label">Предоплата (₽)</label>
+                            <input type="number" class="form-control" id="editProjectPrepaymentAmount" min="0" step="1000">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editProjectClientPaidTotal" class="form-label">Уже заплачено клиентом (₽)</label>
+                            <input type="number" class="form-control" id="editProjectClientPaidTotal" min="0" step="1000">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editProjectExecutorPaidTotal" class="form-label">Выплачено исполнителю (₽)</label>
+                            <input type="number" class="form-control" id="editProjectExecutorPaidTotal" min="0" step="500">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editProjectAssignedExecutor" class="form-label">Назначить исполнителя</label>
+                            <select class="form-select" id="editProjectAssignedExecutor">
+                                <option value="">Выберите исполнителя</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editProjectDeadline" class="form-label">Дедлайн</label>
+                            <input type="datetime-local" class="form-control" id="editProjectDeadline">
                         </div>
                     </div>
                 </form>
@@ -1502,6 +1563,40 @@ html, body {
         }
     }
     
+    // Функция загрузки исполнителей для формы редактирования
+    async function loadExecutorsForEdit() {
+        try {
+            const response = await fetch('/admin/api/users/executors', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const executorSelect = document.getElementById('editProjectAssignedExecutor');
+                
+                if (executorSelect && data.executors) {
+                    // Очищаем существующие опции (кроме "Выберите исполнителя")
+                    while (executorSelect.children.length > 1) {
+                        executorSelect.removeChild(executorSelect.lastChild);
+                    }
+                    
+                    // Добавляем исполнителей
+                    data.executors.forEach(executor => {
+                        const option = document.createElement('option');
+                        option.value = executor.id;
+                        option.textContent = `${executor.first_name || executor.username} (${executor.username})`;
+                        executorSelect.appendChild(option);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки исполнителей для редактирования:', error);
+        }
+    }
+    
     // Функция загрузки исполнителей
     async function loadExecutors() {
         try {
@@ -1838,10 +1933,32 @@ html, body {
                 document.getElementById('editProjectId').value = project.id;
                 document.getElementById('editProjectTitle').value = project.title || '';
                 document.getElementById('editProjectDescription').value = project.description || '';
+                document.getElementById('editProjectType').value = project.project_type || 'web';
                 document.getElementById('editProjectStatus').value = project.status || 'new';
                 document.getElementById('editProjectComplexity').value = project.complexity || 'medium';
+                document.getElementById('editProjectPriority').value = project.priority || 'normal';
                 document.getElementById('editProjectEstimatedCost').value = project.estimated_cost || '';
+                document.getElementById('editProjectExecutorCost').value = project.executor_cost || '';
                 document.getElementById('editProjectFinalCost').value = project.final_cost || '';
+                document.getElementById('editProjectEstimatedHours').value = project.estimated_hours || '';
+                document.getElementById('editProjectPrepaymentAmount').value = project.prepayment_amount || '';
+                document.getElementById('editProjectClientPaidTotal').value = project.client_paid_total || '';
+                document.getElementById('editProjectExecutorPaidTotal').value = project.executor_paid_total || '';
+                
+                // Форматируем дату для datetime-local input
+                if (project.deadline) {
+                    const deadline = new Date(project.deadline);
+                    const formattedDeadline = deadline.toISOString().slice(0, 16);
+                    document.getElementById('editProjectDeadline').value = formattedDeadline;
+                } else {
+                    document.getElementById('editProjectDeadline').value = '';
+                }
+                
+                // Загружаем список исполнителей для формы редактирования
+                await loadExecutorsForEdit();
+                
+                // Устанавливаем выбранного исполнителя после загрузки списка
+                document.getElementById('editProjectAssignedExecutor').value = project.assigned_executor_id || '';
                 
                 const modal = new bootstrap.Modal(document.getElementById('editProjectModal'));
                 modal.show();
@@ -1858,10 +1975,19 @@ html, body {
         const projectId = document.getElementById('editProjectId').value;
         const title = document.getElementById('editProjectTitle').value;
         const description = document.getElementById('editProjectDescription').value;
+        const projectType = document.getElementById('editProjectType').value;
         const status = document.getElementById('editProjectStatus').value;
         const complexity = document.getElementById('editProjectComplexity').value;
+        const priority = document.getElementById('editProjectPriority').value;
         const estimatedCost = document.getElementById('editProjectEstimatedCost').value;
+        const executorCost = document.getElementById('editProjectExecutorCost').value;
         const finalCost = document.getElementById('editProjectFinalCost').value;
+        const estimatedHours = document.getElementById('editProjectEstimatedHours').value;
+        const prepaymentAmount = document.getElementById('editProjectPrepaymentAmount').value;
+        const clientPaidTotal = document.getElementById('editProjectClientPaidTotal').value;
+        const executorPaidTotal = document.getElementById('editProjectExecutorPaidTotal').value;
+        const assignedExecutor = document.getElementById('editProjectAssignedExecutor').value;
+        const deadline = document.getElementById('editProjectDeadline').value;
         
         if (!title.trim()) {
             showNotification('Название проекта обязательно', 'warning');
@@ -1873,15 +1999,24 @@ html, body {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 },
                 body: JSON.stringify({
                     title: title.trim(),
                     description: description.trim(),
+                    project_type: projectType,
                     status: status,
                     complexity: complexity,
+                    priority: priority,
                     estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
-                    final_cost: finalCost ? parseFloat(finalCost) : null
+                    executor_cost: executorCost ? parseFloat(executorCost) : null,
+                    final_cost: finalCost ? parseFloat(finalCost) : null,
+                    estimated_hours: estimatedHours ? parseInt(estimatedHours) : null,
+                    prepayment_amount: prepaymentAmount ? parseFloat(prepaymentAmount) : null,
+                    client_paid_total: clientPaidTotal ? parseFloat(clientPaidTotal) : null,
+                    executor_paid_total: executorPaidTotal ? parseFloat(executorPaidTotal) : null,
+                    assigned_executor_id: assignedExecutor || null,
+                    deadline: deadline || null
                 })
             });
             
@@ -2346,6 +2481,26 @@ html, body {
                                                     </button>
                                                 </div>
                                                 ` : '<p class="text-muted">Токен бота не указан</p>'}
+                                                
+                                                ${project.user_telegram_id ? `
+                                                <div class="mb-2">
+                                                    <small class="text-muted">Telegram ID клиента:</small><br>
+                                                    <code>${project.user_telegram_id}</code>
+                                                    <button class="btn btn-link btn-sm p-0 ms-2" onclick="copyToClipboard('${project.user_telegram_id}')">
+                                                        <i class="fas fa-copy"></i>
+                                                    </button>
+                                                </div>
+                                                ` : ''}
+                                                
+                                                ${project.chat_id ? `
+                                                <div class="mb-2">
+                                                    <small class="text-muted">ID чата для уведомлений:</small><br>
+                                                    <code>${project.chat_id}</code>
+                                                    <button class="btn btn-link btn-sm p-0 ms-2" onclick="copyToClipboard('${project.chat_id}')">
+                                                        <i class="fas fa-copy"></i>
+                                                    </button>
+                                                </div>
+                                                ` : ''}
                                             </div>
                                             <div class="col-md-6">
                                                 <h6><i class="fas fa-server me-2"></i>Timeweb</h6>

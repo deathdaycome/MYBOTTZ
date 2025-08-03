@@ -255,12 +255,23 @@ class TelegramBot:
                        priority=20, description="Показать проекты пользователя")
         
         # ПРИОРИТЕТ 3: Портфолио специфичное
+        # Категории портфолио (старый формат callback'ов)
         router.register(r"^portfolio_(telegram|whatsapp|web|integration|featured|all)$", portfolio_handler.select_category,
+                       priority=25, description="Выбор категории портфолио (старый формат)")
+        # Категории портфолио (новый формат callback'ов)
+        router.register(r"^portfolio_(telegram_bots|web_development|mobile_apps|ai_integration|automation|ecommerce|other|featured)$", portfolio_handler.show_category_portfolio,
                        priority=30, description="Категории портфолио")
-        router.register(r"^project_\d+$", portfolio_handler.select_project,
-                       priority=30, description="Выбор проекта в портфолио") 
-        router.register(r"^portfolio_page_\d+$", portfolio_handler.handle_portfolio_navigation,
+        router.register(r"^project_\d+$", portfolio_handler.show_project_details,
+                       priority=30, description="Детали проекта в портфолио") 
+        router.register(r"^gallery_\d+$", portfolio_handler.show_project_gallery,
+                       priority=30, description="Галерея изображений проекта")
+        router.register(r"^like_\d+$", portfolio_handler.like_project,
+                       priority=30, description="Лайкнуть проект")
+        router.register(r"^portfolio_page_\d+$", portfolio_handler.show_portfolio_page,
                        priority=30, description="Навигация по страницам портфолио")
+        # Навигация между проектами
+        router.register(r"^portfolio_nav_\d+$", portfolio_handler.navigate_project,
+                       priority=30, description="Навигация между проектами")
         
         # ПРИОРИТЕТ 4: ТЗ Creation (ConversationHandler маршруты)
         router.register(r"^create_tz$", tz_handler.show_tz_creation_menu,
@@ -283,8 +294,8 @@ class TelegramBot:
                        priority=50, description="AI консультант - вопросы")
         
         # ПРИОРИТЕТ 6: Настройки и служебное 
-        router.register(r"^(setup_timeweb|setup_telegram_id)$", common_handler.handle_callback,
-                       priority=60, description="Настройки подключения")
+        router.register(r"^(setup_timeweb|setup_bot_token|send_bot_token|get_telegram_id|get_chat_id|send_chat_id|detailed_chat_instructions|setup_telegram_id)$", common_handler.handle_callback,
+                       priority=60, description="Настройки подключения и конфигурации")
         router.register(r"^(bot_enter_token|bot_guide_steps)$", common_handler.handle_callback,
                        priority=60, description="Функции создания бота")
         router.register(r"^timeweb_info$", common_handler.handle_timeweb_info,

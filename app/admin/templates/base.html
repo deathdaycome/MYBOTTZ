@@ -594,88 +594,40 @@
         </div>
         
         <div class="sidebar-nav">
-            <a class="nav-link active" href="/admin/">
-                <i class="fas fa-tachometer-alt"></i>
-                Дашборд
-            </a>
+            <!-- DEBUG: navigation_items = {{ navigation_items|length if navigation_items else 'None' }}, role = {{ user_role }} -->
+            <!-- DEBUG ITEMS: {% for item in navigation_items %}{{ item.name }}{% if not loop.last %}, {% endif %}{% endfor %} -->
+            <!-- CACHE BUSTER: 2025-08-03-01:00 -->
             
-            <!-- Проекты доступны всем -->
-            <a class="nav-link" href="/admin/projects">
-                <i class="fas fa-project-diagram"></i>
-                {% if user_role == "executor" %}Мои проекты{% else %}Проекты{% endif %}
-            </a>
-            
-            <!-- Файлы проектов -->
-            <a class="nav-link" href="/admin/project-files">
-                <i class="{% if user_role == 'executor' %}fas fa-folder{% else %}fas fa-database{% endif %}"></i>
-                {% if user_role == "executor" %}Мои файлы{% else %}База проектов{% endif %}
-            </a>
-            
-            <!-- Портфолио доступно только владельцам -->
-            {% if user_role == "owner" %}
-            <a class="nav-link" href="/admin/portfolio">
-                <i class="fas fa-briefcase"></i>
-                Портфолио
-            </a>
-            {% endif %}
-            
-            <!-- Правки доступны всем -->
-            <a class="nav-link" href="/admin/revisions">
-                <i class="fas fa-edit"></i>
-                Правки
-            </a>
-            
-            <!-- Планировщик задач -->
-            <a class="nav-link" href="/admin/tasks/">
-                <i class="fas fa-tasks"></i>
-                Планировщик задач
-            </a>
-            
-            <!-- Мои задачи -->
-            <a class="nav-link" href="/admin/tasks/user/my-tasks">
-                <i class="fas fa-clipboard-list"></i>
-                Мои задачи
-            </a>
-            
-            <!-- Финансы доступны всем -->
-            <a class="nav-link" href="/admin/finance">
-                <i class="fas fa-money-bill-wave"></i>
-                Финансы
-            </a>
-            
-            {% if user_role == "owner" %}
-            <!-- Только для владельца -->
-            <a class="nav-link" href="/admin/users">
-                <i class="fas fa-users"></i>
-                Пользователи
-            </a>
-            <a class="nav-link" href="/admin/contractors">
-                <i class="fas fa-user-tie"></i>
-                Исполнители
-            </a>
-            <a class="nav-link" href="/admin/services">
-                <i class="fas fa-server"></i>
-                Сервисы
-            </a>
-            <a class="nav-link" href="/admin/analytics">
-                <i class="fas fa-chart-line"></i>
-                Аналитика
-            </a>
-            <a class="nav-link" href="/admin/notifications">
-                <i class="fas fa-bell"></i>
-                Уведомления
-            </a>
-            <a class="nav-link" href="/admin/settings">
-                <i class="fas fa-cog"></i>
-                Настройки
-            </a>
+            {% if navigation_items and navigation_items|length > 0 %}
+                <!-- Динамическое меню исполнителя -->
+                {% for item in navigation_items %}
+                <a class="nav-link" href="/admin{{ item.url }}">
+                    <i class="{{ item.icon }}"></i>
+                    {{ item.name }}
+                </a>
+                {% endfor %}
+            {% else %}
+                <!-- Аварийное меню если что-то пошло не так -->
+                <div style="color: red; padding: 10px;">ERROR: navigation_items not found!</div>
+                <a class="nav-link" href="/admin/">
+                    <i class="fas fa-tachometer-alt"></i>
+                    Дашборд
+                </a>
+                <a class="nav-link" href="/admin/projects">
+                    <i class="fas fa-project-diagram"></i>
+                    Мои проекты
+                </a>
+                <a class="nav-link" href="/admin/revisions">
+                    <i class="fas fa-edit"></i>
+                    Правки
+                </a>
             {% endif %}
         </div>
         
         <div class="mt-auto p-3 border-top" style="border-color: rgba(255,255,255,0.1) !important;">
             <div class="d-flex align-items-center text-muted">
                 <i class="fas fa-user-circle me-2"></i>
-                <small>{% if user_role == "owner" %}Владелец{% else %}Исполнитель{% endif %}</small>
+                <small>{% if user_role|default("owner") == "owner" %}Владелец{% else %}Исполнитель{% endif %}</small>
             </div>
             <small class="text-success">
                 <i class="fas fa-circle" style="font-size: 0.5rem;"></i>

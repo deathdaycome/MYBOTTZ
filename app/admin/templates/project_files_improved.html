@@ -1,0 +1,1278 @@
+{% extends "base.html" %}
+
+{% block title %}{% if user_role == "executor" %}Мои файлы{% else %}База проектов{% endif %}{% endblock %}
+
+{% block page_title %}
+{% if user_role == "executor" %}
+    <i class="fas fa-folder me-2"></i>Мои файлы проектов
+{% else %}
+    <i class="fas fa-database me-2"></i>База проектов
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        --warning-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        --danger-gradient: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        --info-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        --card-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --card-shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.1);
+    }
+
+    .main-content {
+        background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+        min-height: 100vh;
+    }
+
+    /* Улучшенные карточки статистики */
+    .stats-card {
+        border-radius: 16px;
+        border: none;
+        background: white;
+        box-shadow: var(--card-shadow);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        height: 100%;
+    }
+
+    .stats-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: var(--primary-gradient);
+    }
+
+    .stats-card.success::before {
+        background: var(--success-gradient);
+    }
+
+    .stats-card.info::before {
+        background: var(--info-gradient);
+    }
+
+    .stats-card.warning::before {
+        background: var(--warning-gradient);
+    }
+
+    .stats-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--card-shadow-hover);
+    }
+
+    .stats-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        margin-bottom: 15px;
+    }
+
+    .stats-icon.primary {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        color: #667eea;
+    }
+
+    .stats-icon.success {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(22, 163, 74, 0.1));
+        color: #22c55e;
+    }
+
+    .stats-icon.info {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(29, 78, 216, 0.1));
+        color: #3b82f6;
+    }
+
+    .stats-icon.warning {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1));
+        color: #f59e0b;
+    }
+
+    .stats-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0;
+    }
+
+    .stats-label {
+        color: #64748b;
+        font-size: 0.875rem;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin: 0;
+    }
+
+    /* Улучшенная секция поиска */
+    .search-section {
+        background: white;
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: var(--card-shadow);
+        margin-bottom: 24px;
+        border: none;
+    }
+
+    .search-input-group {
+        position: relative;
+    }
+
+    .search-input {
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 20px 12px 50px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: #f8fafc;
+    }
+
+    .search-input:focus {
+        border-color: #667eea;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        outline: none;
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 16px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9ca3af;
+        z-index: 2;
+    }
+
+    .search-clear {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: #9ca3af;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .search-clear:hover {
+        color: #ef4444;
+        background: rgba(239, 68, 68, 0.1);
+    }
+
+    .search-counter {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    /* Улучшенные карточки проектов */
+    .project-card {
+        background: white;
+        border-radius: 16px;
+        border: none;
+        box-shadow: var(--card-shadow);
+        transition: all 0.3s ease;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .project-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, #22c55e, #16a34a);
+    }
+
+    .project-card.no-files::before {
+        background: linear-gradient(90deg, #f59e0b, #d97706);
+    }
+
+    .project-card:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--card-shadow-hover);
+    }
+
+    .project-header {
+        padding: 20px 20px 0 20px;
+    }
+
+    .project-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-bottom: 8px;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .project-description {
+        color: #64748b;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .project-meta {
+        padding: 0 20px;
+        margin-bottom: 16px;
+    }
+
+    .project-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #64748b;
+        font-size: 0.8rem;
+        margin-bottom: 6px;
+    }
+
+    .project-meta-item i {
+        width: 16px;
+        color: #9ca3af;
+    }
+
+    .files-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .files-badge.has-files {
+        background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(22, 163, 74, 0.1));
+        color: #16a34a;
+        border: 1px solid rgba(34, 197, 94, 0.2);
+    }
+
+    .files-badge.no-files {
+        background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(217, 119, 6, 0.1));
+        color: #d97706;
+        border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    .project-actions {
+        padding: 0 20px 20px 20px;
+        border-top: 1px solid #f1f5f9;
+        background: #f8fafc;
+    }
+
+    .action-btn {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .action-btn.primary {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        color: white;
+    }
+
+    .action-btn.primary:hover {
+        background: linear-gradient(135deg, #5a67d8, #6b46c1);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .action-btn.success {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: white;
+    }
+
+    .action-btn.success:hover {
+        background: linear-gradient(135deg, #16a34a, #15803d);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+    }
+
+    .action-btn.warning {
+        background: linear-gradient(135deg, #f59e0b, #d97706);
+        color: white;
+    }
+
+    .action-btn.warning:hover {
+        background: linear-gradient(135deg, #d97706, #b45309);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    }
+
+    /* Состояния карточек */
+    .project-card.hidden {
+        opacity: 0;
+        transform: scale(0.95);
+        pointer-events: none;
+    }
+
+    .project-card.animate-in {
+        animation: slideInUp 0.3s ease-out;
+    }
+
+    @keyframes slideInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Подсветка поиска */
+    mark {
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-weight: 600;
+        color: #92400e;
+    }
+
+    /* Пустые состояния */
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #64748b;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        color: #cbd5e1;
+        margin-bottom: 24px;
+    }
+
+    .empty-state-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #475569;
+        margin-bottom: 12px;
+    }
+
+    .empty-state-text {
+        font-size: 1rem;
+        line-height: 1.6;
+        margin-bottom: 24px;
+    }
+
+    /* Модальные окна */
+    .modal-content {
+        border: none;
+        border-radius: 16px;
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
+    }
+
+    .modal-header {
+        border-bottom: 1px solid #f1f5f9;
+        padding: 20px 24px;
+        background: #f8fafc;
+        border-radius: 16px 16px 0 0;
+    }
+
+    .modal-title {
+        font-weight: 600;
+        color: #1e293b;
+    }
+
+    .modal-body {
+        padding: 24px;
+    }
+
+    .modal-footer {
+        border-top: 1px solid #f1f5f9;
+        padding: 16px 24px;
+        background: #f8fafc;
+        border-radius: 0 0 16px 16px;
+    }
+
+    /* Drag & Drop зона */
+    .file-drop-area {
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 40px 20px;
+        text-align: center;
+        background: #f8fafc;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .file-drop-area:hover {
+        border-color: #667eea;
+        background: #f0f4ff;
+    }
+
+    .file-drop-area.drag-over {
+        border-color: #22c55e;
+        background: #ecfdf5;
+        transform: scale(1.02);
+    }
+
+    .file-drop-icon {
+        font-size: 3rem;
+        color: #cbd5e1;
+        margin-bottom: 16px;
+    }
+
+    .file-drop-text {
+        font-size: 1rem;
+        color: #64748b;
+        margin-bottom: 8px;
+    }
+
+    .file-drop-hint {
+        font-size: 0.875rem;
+        color: #9ca3af;
+    }
+
+    .selected-file {
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: white;
+        padding: 16px;
+        border-radius: 12px;
+        margin-top: 16px;
+    }
+
+    .selected-file-icon {
+        font-size: 2rem;
+        margin-bottom: 8px;
+    }
+
+    .selected-file-name {
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .selected-file-size {
+        opacity: 0.9;
+        font-size: 0.875rem;
+    }
+
+    /* Прогресс бар */
+    .upload-progress {
+        background: #f1f5f9;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-top: 16px;
+    }
+
+    .upload-progress-bar {
+        background: linear-gradient(90deg, #22c55e, #16a34a);
+        height: 8px;
+        border-radius: 8px;
+        transition: width 0.3s ease;
+    }
+
+    /* Адаптивность */
+    @media (max-width: 768px) {
+        .stats-value {
+            font-size: 1.5rem;
+        }
+        
+        .search-section {
+            padding: 16px;
+        }
+        
+        .project-header,
+        .project-meta,
+        .project-actions {
+            padding-left: 16px;
+            padding-right: 16px;
+        }
+        
+        .action-btn {
+            font-size: 0.75rem;
+            padding: 6px 10px;
+        }
+    }
+
+    /* Анимации */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
+
+    .animate-pulse {
+        animation: pulse 0.5s ease-in-out;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Поиск проектов -->
+<div class="search-section">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <div class="search-input-group">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" 
+                       class="form-control search-input" 
+                       id="projectSearch" 
+                       placeholder="Поиск проектов по названию, описанию или имени клиента..." 
+                       onkeyup="searchProjects()"
+                       autocomplete="off">
+                <button class="search-clear" onclick="clearSearch()" id="clearSearchBtn" style="display: none;">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted">
+                    <i class="fas fa-lightbulb me-1"></i>
+                    Введите любую часть названия проекта, описания или имени клиента для поиска
+                </small>
+            </div>
+        </div>
+        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+            <div class="search-counter" id="searchCounter">
+                <i class="fas fa-list-ul"></i>
+                <span id="foundProjects">{{ projects|length }}</span> из <span id="totalProjects">{{ projects|length }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card">
+            <div class="card-body text-center p-4">
+                <div class="stats-icon primary mx-auto">
+                    <i class="fas fa-project-diagram"></i>
+                </div>
+                <h3 class="stats-value">{{ projects|length }}</h3>
+                <p class="stats-label">Всего проектов</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card success">
+            <div class="card-body text-center p-4">
+                <div class="stats-icon success mx-auto">
+                    <i class="fas fa-file-archive"></i>
+                </div>
+                {% set projects_with_files = projects|selectattr("files_count", "greaterthan", 0)|list %}
+                <h3 class="stats-value">{{ projects_with_files|length }}</h3>
+                <p class="stats-label">С файлами</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card info">
+            <div class="card-body text-center p-4">
+                <div class="stats-icon info mx-auto">
+                    <i class="fas fa-files"></i>
+                </div>
+                {% set total_files = projects|sum(attribute="files_count") %}
+                <h3 class="stats-value">{{ total_files }}</h3>
+                <p class="stats-label">Общее кол-во файлов</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card stats-card warning">
+            <div class="card-body text-center p-4">
+                <div class="stats-icon warning mx-auto">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                {% set projects_without_files = projects|selectattr("files_count", "equalto", 0)|list %}
+                <h3 class="stats-value">{{ projects_without_files|length }}</h3>
+                <p class="stats-label">Без файлов</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Проекты -->
+{% if projects %}
+<div class="row" id="projectsContainer">
+    {% for project in projects %}
+    <div class="col-lg-6 col-xl-4 mb-4 project-card-wrapper" 
+         data-search-text="{{ (project.title|lower ~ ' ' ~ (project.description or '')|lower ~ ' ' ~ ((project.user.first_name or project.user.username or '') if project.user else '')|lower ~ ' ' ~ (project.status or '')|lower) }}">
+        <div class="card project-card {% if project.files_count == 0 %}no-files{% endif %} animate-fade-in">
+            <div class="project-header">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <h5 class="project-title" data-highlight>{{ project.title }}</h5>
+                    <span class="files-badge {% if project.files_count > 0 %}has-files{% else %}no-files{% endif %}">
+                        <i class="fas fa-{% if project.files_count > 0 %}file-archive{% else %}folder-open{% endif %}"></i>
+                        {{ project.files_count }}
+                    </span>
+                </div>
+                
+                {% if project.description %}
+                <p class="project-description" data-highlight>
+                    {{ project.description }}
+                </p>
+                {% endif %}
+            </div>
+            
+            <div class="project-meta">
+                <div class="project-meta-item">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>
+                        {% if project.created_at %}
+                            {{ project.created_at[:10] }}
+                        {% else %}
+                            Дата неизвестна
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="project-meta-item" data-highlight>
+                    <i class="fas fa-user"></i>
+                    <span>
+                        {% if project.user %}
+                            {{ project.user.first_name or project.user.username or 'Неизвестно' }}
+                        {% else %}
+                            Клиент неизвестен
+                        {% endif %}
+                    </span>
+                </div>
+                {% if project.status %}
+                <div class="project-meta-item">
+                    <i class="fas fa-info-circle"></i>
+                    <span>{{ project.status }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="project-actions pt-3">
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="action-btn primary" onclick="viewProjectFiles({{ project.id }})">
+                        <i class="fas fa-eye"></i>
+                        Файлы
+                    </button>
+                    <button class="action-btn success" onclick="uploadFile({{ project.id }})">
+                        <i class="fas fa-upload"></i>
+                        Загрузить
+                    </button>
+                    {% if user_role == "owner" %}
+                    <button class="action-btn warning" onclick="editProject({{ project.id }})">
+                        <i class="fas fa-edit"></i>
+                        Редактировать
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Сообщение о том что ничего не найдено -->
+<div class="empty-state" id="noResults" style="display: none;">
+    <div class="empty-state-icon">
+        <i class="fas fa-search"></i>
+    </div>
+    <h3 class="empty-state-title">Ничего не найдено</h3>
+    <p class="empty-state-text">
+        По вашему запросу "<span id="searchQuery"></span>" проекты не найдены.<br>
+        Попробуйте изменить поисковый запрос.
+    </p>
+    <button class="btn btn-primary" onclick="clearSearch()">
+        <i class="fas fa-times me-2"></i>Очистить поиск
+    </button>
+</div>
+
+{% else %}
+<!-- Пустое состояние -->
+<div class="empty-state">
+    <div class="empty-state-icon">
+        <i class="fas fa-inbox"></i>
+    </div>
+    <h3 class="empty-state-title">
+        {% if user_role == "executor" %}
+            Нет назначенных проектов
+        {% else %}
+            Нет проектов
+        {% endif %}
+    </h3>
+    <p class="empty-state-text">
+        {% if user_role == "executor" %}
+            Пока вам не назначены проекты для выполнения.
+        {% else %}
+            В системе пока нет созданных проектов.
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<!-- Модальное окно для просмотра файлов -->
+<div class="modal fade" id="filesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-files me-2"></i>Файлы проекта
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="filesModalBody">
+                <div class="text-center py-4">
+                    <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+                    <p class="mt-3 text-muted">Загрузка файлов...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для загрузки файла -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-upload me-2"></i>Загрузить файл
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Выберите файл:</label>
+                        <div class="file-drop-area" id="fileDropArea">
+                            <div class="file-drop-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <div class="file-drop-text">
+                                <strong>Нажмите для выбора файла</strong>
+                            </div>
+                            <div class="file-drop-hint">
+                                или перетащите файл сюда
+                            </div>
+                            <input type="file" class="d-none" id="fileInput" name="file" required 
+                                   onchange="updateFileName()" 
+                                   accept=".zip,.rar,.7z,.tar,.gz,.pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif">
+                        </div>
+                        <small class="form-text text-muted mt-2">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Разрешены: ZIP, RAR, 7Z, PDF, DOC, DOCX, TXT, JPG, PNG (макс. 100МБ)
+                        </small>
+                        <div id="selectedFile" class="selected-file" style="display: none;">
+                            <div class="d-flex align-items-center">
+                                <div class="selected-file-icon me-3">
+                                    <i class="fas fa-file-check"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="selected-file-name" id="fileName"></div>
+                                    <div class="selected-file-size" id="fileSize"></div>
+                                </div>
+                                <div class="ms-3">
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fileDescription" class="form-label fw-bold">Описание (необязательно):</label>
+                        <textarea class="form-control" id="fileDescription" name="description" 
+                                  rows="3" placeholder="Краткое описание файла..."></textarea>
+                    </div>
+                    <input type="hidden" id="uploadProjectId" name="project_id">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-1"></i>Отмена
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-upload me-1"></i>Загрузить файл
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Функция поиска проектов
+function searchProjects() {
+    const searchInput = document.getElementById('projectSearch');
+    const query = searchInput.value.toLowerCase().trim();
+    const projectCards = document.querySelectorAll('.project-card-wrapper');
+    const noResults = document.getElementById('noResults');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    const foundProjectsSpan = document.getElementById('foundProjects');
+    const searchQuerySpan = document.getElementById('searchQuery');
+    
+    let visibleCount = 0;
+    
+    projectCards.forEach(card => {
+        const searchText = card.getAttribute('data-search-text');
+        if (!query || searchText.includes(query)) {
+            card.style.display = 'block';
+            visibleCount++;
+            // Подсветка найденных фрагментов
+            highlightMatches(card, query);
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    // Обновляем счетчик и состояние UI
+    foundProjectsSpan.textContent = visibleCount;
+    
+    if (query) {
+        clearBtn.style.display = 'block';
+        searchQuerySpan.textContent = query;
+        
+        if (visibleCount === 0) {
+            noResults.style.display = 'block';
+            document.getElementById('projectsContainer').style.display = 'none';
+        } else {
+            noResults.style.display = 'none';
+            document.getElementById('projectsContainer').style.display = 'block';
+        }
+    } else {
+        clearBtn.style.display = 'none';
+        noResults.style.display = 'none';
+        document.getElementById('projectsContainer').style.display = 'block';
+        // Убираем подсветку
+        removeHighlights();
+    }
+}
+
+// Функция очистки поиска
+function clearSearch() {
+    const searchInput = document.getElementById('projectSearch');
+    searchInput.value = '';
+    searchProjects();
+    searchInput.focus();
+}
+
+// Функция подсветки найденных фрагментов
+function highlightMatches(card, query) {
+    if (!query) return;
+    
+    const elementsToHighlight = card.querySelectorAll('[data-highlight]');
+    elementsToHighlight.forEach(element => {
+        const originalText = element.getAttribute('data-original-text') || element.textContent;
+        if (!element.hasAttribute('data-original-text')) {
+            element.setAttribute('data-original-text', originalText);
+        }
+        
+        if (originalText.toLowerCase().includes(query)) {
+            const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+            const highlightedText = originalText.replace(regex, '<mark>$1</mark>');
+            element.innerHTML = highlightedText;
+        } else {
+            element.textContent = originalText;
+        }
+    });
+}
+
+// Функция удаления подсветки
+function removeHighlights() {
+    const highlightedElements = document.querySelectorAll('[data-original-text]');
+    highlightedElements.forEach(element => {
+        const originalText = element.getAttribute('data-original-text');
+        element.textContent = originalText;
+    });
+}
+
+// Экранирование специальных символов для регулярного выражения
+function escapeRegex(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Просмотр файлов проекта
+function viewProjectFiles(projectId) {
+    const modal = new bootstrap.Modal(document.getElementById('filesModal'));
+    modal.show();
+    
+    document.getElementById('filesModalBody').innerHTML = `
+        <div class="text-center py-4">
+            <i class="fas fa-spinner fa-spin fa-2x text-primary"></i>
+            <p class="mt-3 text-muted">Загрузка файлов...</p>
+        </div>
+    `;
+    
+    fetch(`/admin/api/files/project/${projectId}`, {
+        headers: {
+            'Authorization': 'Basic ' + btoa('admin:qwerty123')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        let html = '';
+        
+        if (data.success && data.files && data.files.length > 0) {
+            html = '<div class="list-group list-group-flush">';
+            data.files.forEach(file => {
+                const uploadDate = new Date(file.uploaded_at).toLocaleDateString('ru-RU');
+                const fileSize = formatFileSize(file.file_size);
+                
+                html += `
+                    <div class="list-group-item border-0 py-3">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                <i class="fas fa-file-alt fa-2x text-primary"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">${file.original_filename}</h6>
+                                <p class="mb-2 text-muted">${file.description || 'Без описания'}</p>
+                                <small class="text-muted">
+                                    <i class="fas fa-calendar me-1"></i>${uploadDate} • 
+                                    <i class="fas fa-weight me-1"></i>${fileSize} • 
+                                    <i class="fas fa-tag me-1"></i>${file.file_type}
+                                </small>
+                            </div>
+                            <div class="ms-3">
+                                <div class="btn-group-vertical">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="downloadFile(${file.id})" title="Скачать">
+                                        <i class="fas fa-download"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteFile(${file.id})" title="Удалить">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+        } else {
+            html = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-inbox"></i>
+                    </div>
+                    <h5 class="empty-state-title">Нет файлов</h5>
+                    <p class="empty-state-text">В этом проекте пока нет загруженных файлов.</p>
+                </div>
+            `;
+        }
+        
+        document.getElementById('filesModalBody').innerHTML = html;
+    })
+    .catch(error => {
+        document.getElementById('filesModalBody').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Ошибка загрузки файлов
+            </div>
+        `;
+    });
+}
+
+// Загрузка файла
+function uploadFile(projectId) {
+    document.getElementById('uploadProjectId').value = projectId;
+    
+    // Очищаем форму
+    document.getElementById('uploadForm').reset();
+    document.getElementById('selectedFile').style.display = 'none';
+    document.getElementById('clearSearchBtn').style.display = 'none';
+    
+    // Настраиваем drag & drop
+    setupDragAndDrop();
+    
+    const modal = new bootstrap.Modal(document.getElementById('uploadModal'));
+    modal.show();
+}
+
+// Настройка drag & drop
+function setupDragAndDrop() {
+    const dropArea = document.getElementById('fileDropArea');
+    const fileInput = document.getElementById('fileInput');
+    
+    if (!dropArea || !fileInput) return;
+    
+    // Клик по области для выбора файла
+    dropArea.addEventListener('click', () => {
+        fileInput.click();
+    });
+    
+    // Drag & Drop события
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+    });
+    
+    function highlight(e) {
+        dropArea.classList.add('drag-over');
+    }
+    
+    function unhighlight(e) {
+        dropArea.classList.remove('drag-over');
+    }
+    
+    dropArea.addEventListener('drop', handleDrop, false);
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files.length > 0) {
+            fileInput.files = files;
+            updateFileName();
+        }
+    }
+}
+
+// Обновление информации о выбранном файле
+function updateFileName() {
+    const fileInput = document.getElementById('fileInput');
+    const selectedFileDiv = document.getElementById('selectedFile');
+    const fileNameSpan = document.getElementById('fileName');
+    const fileSizeSpan = document.getElementById('fileSize');
+    
+    if (fileInput && fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        
+        fileNameSpan.textContent = file.name;
+        fileSizeSpan.textContent = formatFileSize(file.size);
+        selectedFileDiv.style.display = 'block';
+        selectedFileDiv.classList.add('animate-fade-in');
+        
+        // Обновляем кнопку загрузки
+        const submitBtn = document.querySelector('#uploadModal .btn-primary');
+        submitBtn.innerHTML = '<i class="fas fa-upload me-1"></i>Загрузить файл';
+        submitBtn.classList.add('animate-pulse');
+        
+        setTimeout(() => {
+            selectedFileDiv.classList.remove('animate-fade-in');
+            submitBtn.classList.remove('animate-pulse');
+        }, 500);
+    } else {
+        selectedFileDiv.style.display = 'none';
+        
+        const submitBtn = document.querySelector('#uploadModal .btn-primary');
+        submitBtn.innerHTML = '<i class="fas fa-upload me-1"></i>Загрузить файл';
+    }
+}
+
+// Форматирование размера файла
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Скачивание файла
+function downloadFile(fileId) {
+    window.open(`/admin/api/files/download/${fileId}`, '_blank');
+}
+
+// Удаление файла
+function deleteFile(fileId) {
+    if (confirm('Вы уверены, что хотите удалить этот файл?')) {
+        fetch(`/admin/api/files/delete/${fileId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': 'Basic ' + btoa('admin:qwerty123')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Файл успешно удален', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('filesModal')).hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification('Ошибка удаления файла: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showNotification('Ошибка удаления файла', 'error');
+        });
+    }
+}
+
+// Редактирование проекта
+function editProject(projectId) {
+    window.location.href = `/admin/projects/edit/${projectId}`;
+}
+
+// Показ уведомлений
+function showNotification(message, type = 'info') {
+    // Создаем toast уведомление
+    const toastHtml = `
+        <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    // Добавляем в контейнер уведомлений
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+    
+    container.insertAdjacentHTML('beforeend', toastHtml);
+    
+    // Показываем toast
+    const toastElement = container.lastElementChild;
+    const toast = new bootstrap.Toast(toastElement);
+    toast.show();
+    
+    // Удаляем после скрытия
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+
+// Обработка формы загрузки
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const projectId = document.getElementById('uploadProjectId').value;
+    const fileInput = document.getElementById('fileInput');
+    const submitBtn = document.querySelector('#uploadModal .btn-primary');
+    const originalText = submitBtn.innerHTML;
+    
+    // Проверяем, что файл выбран
+    if (!fileInput.files.length) {
+        showNotification('Пожалуйста, выберите файл для загрузки', 'error');
+        return;
+    }
+    
+    // Показываем индикатор загрузки
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Загружается...';
+    
+    fetch(`/admin/api/files/upload/${projectId}`, {
+        method: 'POST',
+        headers: {
+            'Authorization': 'Basic ' + btoa('admin:qwerty123')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Файл успешно загружен!', 'success');
+            
+            // Сбрасываем форму
+            this.reset();
+            document.getElementById('selectedFile').style.display = 'none';
+            
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+                location.reload();
+            }, 1500);
+        } else {
+            showNotification('Ошибка загрузки: ' + (data.message || 'Неизвестная ошибка'), 'error');
+            
+            // Восстанавливаем кнопку
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        showNotification('Ошибка загрузки файла', 'error');
+        
+        // Восстанавливаем кнопку
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+    });
+});
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('projectSearch');
+    
+    if (searchInput) {
+        // Фокус на поле поиска при нажатии Ctrl+F
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'f') {
+                e.preventDefault();
+                searchInput.focus();
+            }
+        });
+        
+        // Очистка поиска при нажатии Escape
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                clearSearch();
+            }
+        });
+    }
+    
+    // Анимация появления карточек
+    const cards = document.querySelectorAll('.project-card');
+    cards.forEach((card, index) => {
+        setTimeout(() => {
+            card.classList.add('animate-fade-in');
+        }, index * 50);
+    });
+});
+</script>
+{% endblock %}

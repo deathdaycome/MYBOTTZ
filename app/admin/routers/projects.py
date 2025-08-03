@@ -317,39 +317,45 @@ async def get_project(
             project_dict["estimated_cost"] = project.executor_cost or 0
             project_dict.pop("executor_cost", None)
         
-        # Добавляем информацию о новых полях из metadata
-        if project.project_metadata:
-            # Информация о боте
-            project_dict["bot_token"] = project.project_metadata.get('bot_token', '')
+        # Добавляем информацию из новых полей пользователя и metadata проекта
+        bot_token = ""
+        timeweb_login = ""
+        timeweb_password = ""
+        user_telegram_id = ""
+        chat_id = ""
+        
+        # Приоритет: сначала данные пользователя, потом из metadata проекта
+        if user:
+            bot_token = user.bot_token or ""
+            timeweb_login = user.timeweb_login or ""
+            timeweb_password = user.timeweb_password or ""
+            user_telegram_id = user.user_telegram_id or ""
+            chat_id = user.chat_id or ""
             
-            # Информация о Timeweb
-            if 'timeweb_login' in project.project_metadata or 'timeweb_credentials' in project.project_metadata:
-                # Новый формат
-                if 'timeweb_login' in project.project_metadata:
-                    project_dict["timeweb"] = {
-                        "login": project.project_metadata.get('timeweb_login', ''),
-                        "password": project.project_metadata.get('timeweb_password', ''),  # В детальном просмотре показываем пароль
-                        "has_credentials": bool(project.project_metadata.get('timeweb_login', '')),
-                        "created_at": project.project_metadata.get('created_at', '')
-                    }
-                # Старый формат для совместимости
-                elif 'timeweb_credentials' in project.project_metadata:
-                    timeweb_data = project.project_metadata['timeweb_credentials']
-                    project_dict["timeweb"] = {
-                        "login": timeweb_data.get('login', ''),
-                        "password": timeweb_data.get('password', ''),  # В детальном просмотре показываем пароль
-                        "has_credentials": True,
-                        "created_at": timeweb_data.get('created_at', '')
-                    }
-            else:
-                project_dict["timeweb"] = {
-                    "has_credentials": False
-                }
-        else:
-            project_dict["bot_token"] = ''
-            project_dict["timeweb"] = {
-                "has_credentials": False
-            }
+        # Если нет данных в полях пользователя, пробуем metadata проекта
+        if project.project_metadata:
+            if not bot_token:
+                bot_token = project.project_metadata.get('bot_token', '')
+            
+            if not timeweb_login and 'timeweb_credentials' in project.project_metadata:
+                timeweb_data = project.project_metadata['timeweb_credentials']
+                timeweb_login = timeweb_data.get('login', '')
+                timeweb_password = timeweb_data.get('password', '')
+            
+            if not user_telegram_id:
+                user_telegram_id = project.project_metadata.get('user_telegram_id', '')
+        
+        # Добавляем данные в ответ
+        project_dict["bot_token"] = bot_token
+        project_dict["user_telegram_id"] = user_telegram_id  
+        project_dict["chat_id"] = chat_id
+        
+        # Информация о Timeweb
+        project_dict["timeweb"] = {
+            "login": timeweb_login,
+            "password": timeweb_password,  # В детальном просмотре показываем пароль
+            "has_credentials": bool(timeweb_login),
+        }
         
         return {
             "success": True,
@@ -695,6 +701,7 @@ async def create_project_root(
             estimated_cost=data.get('estimated_cost'),
             executor_cost=data.get('executor_cost'),
             estimated_hours=data.get('estimated_hours'),
+            assigned_executor_id=data.get('assigned_executor_id'),
             deadline=datetime.fromisoformat(data['deadline']) if data.get('deadline') else None,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()

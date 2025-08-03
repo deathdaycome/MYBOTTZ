@@ -173,7 +173,13 @@
                                     {% if user.email %}
                                     <div><i class="fas fa-envelope me-1"></i> {{ user.email }}</div>
                                     {% endif %}
-                                    {% if not user.phone and not user.email %}
+                                    {% if user.user_telegram_id %}
+                                    <div><i class="fab fa-telegram me-1"></i> ID: {{ user.user_telegram_id }}</div>
+                                    {% endif %}
+                                    {% if user.chat_id %}
+                                    <div><i class="fas fa-comments me-1"></i> Чат: {{ user.chat_id }}</div>
+                                    {% endif %}
+                                    {% if not user.phone and not user.email and not user.user_telegram_id and not user.chat_id %}
                                     <span class="text-muted">Не указаны</span>
                                     {% endif %}
                                 </div>
@@ -183,6 +189,12 @@
                                     <div><strong>Проекты:</strong> {{ user.projects_count or 0 }}</div>
                                     <div><strong>Консультации:</strong> {{ user.sessions_count or 0 }}</div>
                                     <div><strong>Состояние:</strong> <span class="badge bg-info">{{ user.state or 'main_menu' }}</span></div>
+                                    {% if user.bot_token %}
+                                    <div><strong>Бот:</strong> <span class="badge bg-success">✓</span></div>
+                                    {% endif %}
+                                    {% if user.timeweb_login %}
+                                    <div><strong>Timeweb:</strong> <span class="badge bg-primary">✓</span></div>
+                                    {% endif %}
                                 </div>
                             </td>
                             <td>

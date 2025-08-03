@@ -134,6 +134,9 @@ async def get_finance_transactions(
         # Фильтрация по пользователю: исполнители видят только свои транзакции
         if current_user["role"] == "executor":
             query = query.filter(FinanceTransaction.created_by_id == current_user["id"])
+            print(f"[DEBUG FINANCE] Executor {current_user['username']} (ID: {current_user['id']}) requesting transactions")
+        else:
+            print(f"[DEBUG FINANCE] Owner {current_user['username']} requesting ALL transactions")
         # Владелец видит все транзакции (без дополнительного фильтра)
         
         if type:
@@ -153,6 +156,8 @@ async def get_finance_transactions(
         
         total = query.count()
         transactions = query.order_by(desc(FinanceTransaction.date)).offset(offset).limit(limit).all()
+        
+        print(f"[DEBUG FINANCE] Returning {len(transactions)} transactions (total: {total}) for user {current_user['username']} (role: {current_user['role']})")
         
         return {
             "success": True,
@@ -248,6 +253,9 @@ async def get_finance_summary(
         # Фильтрация по пользователю: исполнители видят только свои транзакции
         if current_user["role"] == "executor":
             query = query.filter(FinanceTransaction.created_by_id == current_user["id"])
+            print(f"[DEBUG FINANCE SUMMARY] Executor {current_user['username']} (ID: {current_user['id']}) requesting summary")
+        else:
+            print(f"[DEBUG FINANCE SUMMARY] Owner {current_user['username']} requesting summary")
         
         # Доходы
         income_query = query.filter(FinanceTransaction.type == "income")

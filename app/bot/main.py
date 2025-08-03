@@ -88,8 +88,13 @@ def setup_handlers(app: Application):
     logger.info("🔧 Добавляем callback query handlers...")
     # Callback query handlers
     app.add_handler(CallbackQueryHandler(
+        portfolio_handler.show_portfolio_categories, 
+        pattern="^portfolio$"
+    ))
+    
+    app.add_handler(CallbackQueryHandler(
         common_handler.handle_callback, 
-        pattern="^(main_menu|back|consultant|projects|portfolio|about|calculator|faq|consultation|contacts|my_projects|create_tz|create_bot_guide|settings|setup_timeweb|setup_bot_token|timeweb_registered)$"
+        pattern="^(main_menu|back|consultant|projects|about|calculator|faq|consultation|contacts|my_projects|create_tz|create_bot_guide|settings|setup_timeweb|setup_bot_token|send_bot_token|get_telegram_id|get_chat_id|send_chat_id|detailed_chat_instructions|timeweb_registered)$"
     ))
     
     # Revision handlers
@@ -143,6 +148,37 @@ def setup_handlers(app: Application):
     app.add_handler(CallbackQueryHandler(
         projects_handler.show_project_details,
         pattern="^project_details_"
+    ))
+    
+    # Portfolio handlers
+    app.add_handler(CallbackQueryHandler(
+        portfolio_handler.show_project_details,
+        pattern="^project_"
+    ))
+    
+    app.add_handler(CallbackQueryHandler(
+        portfolio_handler.show_category_portfolio,
+        pattern="^portfolio_category_"
+    ))
+    
+    app.add_handler(CallbackQueryHandler(
+        portfolio_handler.show_portfolio_page,
+        pattern="^page_"
+    ))
+    
+    app.add_handler(CallbackQueryHandler(
+        portfolio_handler.show_project_gallery,
+        pattern="^gallery_"
+    ))
+    
+    app.add_handler(CallbackQueryHandler(
+        portfolio_handler.like_project,
+        pattern="^like_"
+    ))
+    
+    app.add_handler(CallbackQueryHandler(
+        portfolio_handler.navigate_project,
+        pattern="^portfolio_nav_"
     ))
     
     # Дополнительные обработчики для timeweb

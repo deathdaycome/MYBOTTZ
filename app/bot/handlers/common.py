@@ -266,6 +266,26 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 logger.info(f"🤖 Обрабатываем setup_bot_token для пользователя {user_id}")
                 await self.setup_bot_token(update, context)
                 
+            elif callback_data == "send_bot_token":
+                logger.info(f"📤 Обрабатываем send_bot_token для пользователя {user_id}")
+                await self.request_bot_token(update, context)
+                
+            elif callback_data == "get_telegram_id":
+                logger.info(f"🆔 Обрабатываем get_telegram_id для пользователя {user_id}")
+                await self.show_telegram_id(update, context)
+                
+            elif callback_data == "get_chat_id":
+                logger.info(f"💬 Обрабатываем get_chat_id для пользователя {user_id}")
+                await self.show_chat_id_instructions(update, context)
+                
+            elif callback_data == "send_chat_id":
+                logger.info(f"📤 Обрабатываем send_chat_id для пользователя {user_id}")
+                await self.request_chat_id(update, context)
+                
+            elif callback_data == "detailed_chat_instructions":
+                logger.info(f"❓ Обрабатываем detailed_chat_instructions для пользователя {user_id}")
+                await self.show_detailed_chat_instructions(update, context)
+                
             elif callback_data.startswith("project_chat_"):
                 logger.info(f"💬 Обрабатываем project_chat для пользователя {user_id}")
                 await self.show_project_chat(update, context)
@@ -331,6 +351,7 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 context.user_data.pop('waiting_timeweb_settings', None)
                 context.user_data.pop('waiting_bot_token', None)
                 context.user_data.pop('waiting_timeweb_credentials', None)
+                context.user_data.pop('waiting_chat_id', None)
                 # Для команд не делаем ничего - пусть обрабатывается CommandHandler
                 return
             
@@ -359,6 +380,12 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             if context.user_data.get('waiting_bot_token_settings'):
                 logger.info(f"🔑 Обрабатываем токен бота для пользователя {user_id}")
                 await self.save_bot_token_settings(update, context)
+                return
+            
+            # Проверяем, ожидаем ли мы ID чата
+            if context.user_data.get('waiting_chat_id'):
+                logger.info(f"💬 Обрабатываем ID чата для пользователя {user_id}")
+                await self.save_chat_id(update, context)
                 return
             
             # Проверяем, создает ли пользователь правку
@@ -870,6 +897,13 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
         # Токен должен быть в формате: числа:буквы-цифры
         pattern = r'^\d+:[A-Za-z0-9_-]+$'
         return bool(re.match(pattern, token)) and len(token) > 20
+    
+    def _validate_chat_id(self, chat_id: str) -> bool:
+        """Валидация формата ID чата"""
+        import re
+        # ID чата должен быть числом (может быть отрицательным для групп)
+        pattern = r'^-?\d+$'
+        return bool(re.match(pattern, chat_id)) and len(chat_id) >= 3
     
     @standard_handler
     async def handle_bot_creation_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1427,6 +1461,10 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                     InlineKeyboardButton("🤖 Настроить бота", callback_data="setup_bot_token")
                 ],
                 [
+                    InlineKeyboardButton("🆔 Мой Telegram ID", callback_data="get_telegram_id"),
+                    InlineKeyboardButton("💬 ID чата", callback_data="get_chat_id")
+                ],
+                [
                     InlineKeyboardButton("📊 Мои проекты", callback_data="my_projects"),
                     InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
                 ]
@@ -1492,12 +1530,12 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             logger.error(f"Ошибка в setup_timeweb: {e}")
     
     @standard_handler
-    async def setup_bot_token(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Настройка API токена бота"""
+    async def request_bot_token(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Запрос токена бота после показа инструкций"""
         try:
-            text = """🤖 <b>Ввод API токена бота</b>
+            text = """📤 <b>Отправьте токен бота</b>
 
-Отправьте токен от @BotFather:
+Отправьте токен, который вы получили от @BotFather:
 
 <b>Формат токена:</b>
 <code>1234567890:ABCdefGHIjklMNOpqrsTUVwxyz</code>
@@ -1505,20 +1543,55 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
 <b>⚠️ Важно:</b>
 • Скопируйте токен полностью
 • Не добавляйте лишние символы
-• Токен сохраняется только в вашем профиле
-
-<b>Как получить токен:</b>
-1. Откройте @BotFather в Telegram
-2. Отправьте /newbot
-3. Следуйте инструкциям
-4. Скопируйте токен"""
+• Токен будет сохранен в вашем профиле"""
             
             # Устанавливаем флаг ожидания токена
             context.user_data['waiting_bot_token_settings'] = True
             logger.info(f"🔑 Установлен флаг waiting_bot_token_settings для пользователя {update.effective_user.id}")
             
             keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Назад к инструкции", callback_data="setup_bot_token")],
+                [InlineKeyboardButton("❌ Отменить", callback_data="settings")]
+            ])
+            
+            await update.callback_query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в request_bot_token: {e}")
+    
+    @standard_handler
+    async def setup_bot_token(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Показ инструкций по созданию бота и запрос токена"""
+        try:
+            text = """🤖 <b>Создание бота в BotFather</b>
+
+<b>📋 Пошаговая инструкция:</b>
+
+<b>1️⃣ Откройте @BotFather</b>
+• Найдите @BotFather в Telegram
+• Нажмите "Начать" или отправьте /start
+
+<b>2️⃣ Создайте нового бота</b>
+• Отправьте команду: <code>/newbot</code>
+• Введите имя бота (например: "Мой Бизнес Бот")
+• Введите username бота (должен заканчиваться на "bot")
+
+<b>3️⃣ Получите токен</b>
+• BotFather пришлет вам API токен
+• Формат: <code>1234567890:ABCdefGHIjklMNOpqrsTUVwxyz</code>
+• <b>ВАЖНО:</b> Скопируйте токен полностью!
+
+<b>4️⃣ Отправьте токен</b>
+• После создания бота нажмите кнопку ниже
+• Вставьте полученный токен"""
+            
+            keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔗 Открыть @BotFather", url="https://t.me/botfather")],
+                [InlineKeyboardButton("📤 Отправить токен", callback_data="send_bot_token")],
                 [InlineKeyboardButton("❌ Отменить", callback_data="settings")]
             ])
             
@@ -1606,6 +1679,227 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             )
 
     @standard_handler
+    async def show_telegram_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Показать Telegram ID пользователя и сохранить его"""
+        try:
+            user_id = update.effective_user.id
+            
+            # Сохраняем ID в базу данных
+            with get_db_context() as db:
+                user = get_user_by_telegram_id(db, user_id)
+                if user:
+                    user.user_telegram_id = str(user_id)
+                    db.commit()
+                    logger.info(f"🆔 Сохранен Telegram ID для пользователя {user_id}")
+            
+            text = f"""🆔 <b>Ваш Telegram ID</b>
+
+<b>ID:</b> <code>{user_id}</code>
+
+<b>✅ Сохранено!</b>
+Ваш Telegram ID автоматически сохранен в профиле.
+
+<b>💡 Для чего используется:</b>
+• Связь между проектами и вашим аккаунтом
+• Уведомления о статусе проектов
+• Техническая поддержка
+
+<b>📋 Инструкция для разработчика:</b>
+Предоставьте этот ID разработчику для настройки связи между вашим ботом и системой управления."""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📋 Скопировать ID", callback_data="copy_telegram_id")],
+                [InlineKeyboardButton("⚙️ К настройкам", callback_data="settings")]
+            ])
+            
+            await update.callback_query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в show_telegram_id: {e}")
+    
+    @standard_handler
+    async def show_chat_id_instructions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Показать инструкции по получению ID чата"""
+        try:
+            text = """💬 <b>Получение ID чата</b>
+
+<b>📋 Пошаговая инструкция:</b>
+
+<b>1️⃣ Создайте группу или канал</b>
+• Создайте группу для уведомлений
+• Или используйте существующий канал
+
+<b>2️⃣ Добавьте бота в группу</b>
+• Добавьте вашего бота как администратора
+• Дайте ему права на отправку сообщений
+
+<b>3️⃣ Получите ID чата</b>
+• Перешлите любое сообщение из группы
+• Или отправьте команду /chatinfo в группе
+
+<b>4️⃣ Отправьте ID</b>
+• Нажмите кнопку ниже для отправки
+• ID выглядит как: -1001234567890"""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📤 Отправить ID чата", callback_data="send_chat_id")],
+                [InlineKeyboardButton("❓ Подробная инструкция", callback_data="detailed_chat_instructions")],
+                [InlineKeyboardButton("⚙️ К настройкам", callback_data="settings")]
+            ])
+            
+            await update.callback_query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в show_chat_id_instructions: {e}")
+
+    @standard_handler
+    async def request_chat_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Запрос ID чата"""
+        try:
+            text = """📤 <b>Отправьте ID чата</b>
+
+Отправьте ID чата для уведомлений:
+
+<b>Формат ID чата:</b>
+<code>-1001234567890</code> (для групп/каналов)
+<code>123456789</code> (для личных чатов)
+
+<b>⚠️ Важно:</b>
+• Скопируйте ID полностью
+• ID начинается с минуса для групп
+• Бот должен быть добавлен в чат
+
+<b>💡 Как получить ID:</b>
+• Перешлите сообщение из чата боту @username_to_id_bot
+• Или используйте команду /chatinfo в группе"""
+            
+            # Устанавливаем флаг ожидания ID чата
+            context.user_data['waiting_chat_id'] = True
+            logger.info(f"💬 Установлен флаг waiting_chat_id для пользователя {update.effective_user.id}")
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Назад к инструкции", callback_data="get_chat_id")],
+                [InlineKeyboardButton("❌ Отменить", callback_data="settings")]
+            ])
+            
+            await update.callback_query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в request_chat_id: {e}")
+
+    @standard_handler
+    async def show_detailed_chat_instructions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Показать подробные инструкции по получению ID чата"""
+        try:
+            text = """❓ <b>Подробная инструкция</b>
+
+<b>📱 Способ 1: Через специального бота</b>
+1. Найдите бота @username_to_id_bot
+2. Перешлите ему любое сообщение из нужного чата
+3. Бот пришлет вам ID чата
+
+<b>🤖 Способ 2: Через API</b>
+1. Добавьте своего бота в группу
+2. Дайте ему права администратора
+3. Отправьте любое сообщение в группу
+4. Посмотрите логи бота или используйте метод getUpdates
+
+<b>💻 Способ 3: Через веб-интерфейс</b>
+1. Откройте Telegram Web (web.telegram.org)
+2. Откройте нужный чат
+3. Посмотрите в адресной строке: ...#-1001234567890
+
+<b>📋 Что важно знать:</b>
+• ID групп начинается с -100
+• ID каналов начинается с -100
+• ID личных чатов - положительные числа
+• ID супергрупп очень длинные"""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔗 Открыть @username_to_id_bot", url="https://t.me/username_to_id_bot")],
+                [InlineKeyboardButton("📤 Отправить ID", callback_data="send_chat_id")],
+                [InlineKeyboardButton("🔙 К инструкции", callback_data="get_chat_id")]
+            ])
+            
+            await update.callback_query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в show_detailed_chat_instructions: {e}")
+
+    @standard_handler
+    async def save_chat_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Сохранение ID чата"""
+        try:
+            user_id = update.effective_user.id
+            message_text = update.message.text.strip()
+            logger.info(f"💬 Начинаем сохранение ID чата для пользователя {user_id}, ID: {message_text}")
+            
+            # Проверяем, ожидаем ли мы ID чата
+            if not context.user_data.get('waiting_chat_id'):
+                logger.info(f"💬 Флаг waiting_chat_id не установлен для пользователя {user_id}")
+                return
+            
+            # Проверяем формат ID чата
+            if not self._validate_chat_id(message_text):
+                logger.warning(f"💬 Неверный формат ID чата от пользователя {user_id}: {message_text}")
+                await update.message.reply_text(
+                    "❌ Неверный формат ID чата. ID должен быть числом (например: -1001234567890 для групп или 123456789 для личных чатов)",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔙 К настройкам", callback_data="settings")]
+                    ])
+                )
+                return
+            
+            # Сохраняем в базу данных
+            with get_db_context() as db:
+                user = get_user_by_telegram_id(db, user_id)
+                if user:
+                    # Сохраняем в новое поле chat_id
+                    user.chat_id = message_text
+                    
+                    # Также сохраняем в preferences для совместимости
+                    if not user.preferences:
+                        user.preferences = {}
+                    user.preferences['chat_id'] = message_text
+                    user.preferences['chat_id_added_at'] = datetime.utcnow().isoformat()
+                    
+                    db.commit()
+                    logger.info(f"💬 ID чата сохранен для пользователя {user_id} в поле chat_id и preferences")
+                else:
+                    logger.error(f"💬 Пользователь {user_id} не найден в базе данных")
+            
+            # Очищаем флаг ожидания
+            context.user_data.pop('waiting_chat_id', None)
+            
+            await update.message.reply_text(
+                "✅ <b>ID чата сохранен!</b>\n\n"
+                "Теперь этот чат будет использоваться для уведомлений о ваших проектах и отображаться в админ-панели.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⚙️ К настройкам", callback_data="settings")]
+                ]),
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в save_chat_id: {e}")
+
+    @standard_handler
     async def save_bot_token_settings(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Сохранение настроек API токена бота"""
         try:
@@ -1633,13 +1927,17 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             with get_db_context() as db:
                 user = get_user_by_telegram_id(db, user_id)
                 if user:
+                    # Сохраняем в новое поле bot_token
+                    user.bot_token = message_text
+                    
+                    # Также сохраняем в preferences для совместимости
                     if not user.preferences:
                         user.preferences = {}
-                    
                     user.preferences['bot_token'] = message_text
                     user.preferences['bot_token_added_at'] = datetime.utcnow().isoformat()
+                    
                     db.commit()
-                    logger.info(f"🔑 Токен бота сохранен для пользователя {user_id} в preferences")
+                    logger.info(f"🔑 Токен бота сохранен для пользователя {user_id} в поле bot_token и preferences")
                 else:
                     logger.error(f"🔑 Пользователь {user_id} не найден в базе данных")
             
