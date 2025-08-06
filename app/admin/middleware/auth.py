@@ -1,5 +1,6 @@
-from fastapi import HTTPException, Depends, status
+from fastapi import HTTPException, Depends, status, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 import secrets
 
@@ -90,3 +91,8 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
 def get_current_admin_user(credentials: HTTPBasicCredentials = Depends(security)) -> dict:
     """Получить текущего администратора (алиас для require_admin_auth)"""
     return require_admin_auth(credentials)
+
+def authenticate(credentials: HTTPBasicCredentials = Depends(security)) -> str:
+    """Аутентификация пользователя, возвращает имя пользователя"""
+    user_data = require_admin_auth(credentials)
+    return user_data["username"]

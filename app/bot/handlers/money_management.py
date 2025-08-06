@@ -14,10 +14,11 @@ import json
 from datetime import datetime
 import uuid
 import mimetypes
+from sqlalchemy import func
 
 from ...config.settings import settings
 from ...database.database import get_db_context
-from ...database.models import MoneyTransaction, MoneyCategory, ReceiptFile, AdminUser
+from ...database.models import FinanceTransaction, FinanceCategory, ReceiptFile, AdminUser
 from ...utils.decorators import standard_handler
 from ..keyboards.main import get_admin_console_keyboard, get_admin_money_keyboard
 
@@ -88,12 +89,12 @@ class MoneyManagementHandler:
         
         # Получаем статистику
         with get_db_context() as db:
-            total_income = db.query(MoneyTransaction).filter(
-                MoneyTransaction.type == "income"
+            total_income = db.query(FinanceTransaction).filter(
+                FinanceTransaction.type == "income"
             ).count()
             
-            total_expenses = db.query(MoneyTransaction).filter(
-                MoneyTransaction.type == "expense"
+            total_expenses = db.query(FinanceTransaction).filter(
+                FinanceTransaction.type == "expense"
             ).count()
             
             total_receipts = db.query(ReceiptFile).count()
@@ -260,16 +261,24 @@ class MoneyManagementHandler:
                 db.commit()
                 db.refresh(receipt_file)
             
-            # Обновляем сообщение с результатом
-            await processing_msg.edit_text(
-                "✅ Документ принят и обработан!\n🔍 Анализирую содержимое..."
-            )
+                # Получаем данные для передачи в _show_ocr_result
+                receipt_file_id = receipt_file.id
+                receipt_filename = receipt_file.filename
             
-            # Показываем результат OCR и просим выбрать тип операции
-            await self._show_ocr_result(update, context, receipt_file, ocr_result)
+            # Сохраняем данные файла в состоянии пользователя
+            self.user_states[user_id] = {
+                "state": "choosing_transaction_type",
+                "receipt_file_id": receipt_file_id,
+                "receipt_filename": receipt_filename,
+                "ocr_result": ocr_result,
+                "file_path": file_path
+            }
             
-            # Сбрасываем состояние
-            self.user_states[user_id] = f"confirm_transaction_{receipt_file.id}"
+            # Удаляем сообщение о обработке
+            await processing_msg.delete()
+            
+            # Показываем выбор типа транзакции
+            await self._show_transaction_type_selection(update, context, ocr_result)
             
         except Exception as e:
             logger.error(f"Ошибка обработки файла: {e}")
@@ -280,95 +289,182 @@ class MoneyManagementHandler:
             self.user_states.pop(user_id, None)
     
     async def _process_ocr(self, file_path: str) -> dict:
-        """Обработка файла с помощью OCR"""
+        """Обработка файла с помощью OCR через нейросеть"""
+        logger.info(f"🔍 Начинаем AI OCR обработку файла: {file_path}")
         try:
-            # Для изображений используем pytesseract
-            if file_path.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-                image = Image.open(file_path)
-                text = pytesseract.image_to_string(image, lang='rus+eng')
-                
-                # Ищем сумму в тексте
-                import re
-                
-                # Паттерны для поиска сумм
-                amount_patterns = [
-                    r'(?:итого|сумма|к оплате|total)[:\s]*(\d+[.,]\d{2})',
-                    r'(\d+[.,]\d{2})\s*(?:руб|₽|rub)',
-                    r'(\d{1,6}[.,]\d{2})',  # Общий паттерн для суммы
-                ]
-                
-                # Паттерны для поиска даты
-                date_patterns = [
-                    r'(\d{1,2}[./]\d{1,2}[./]\d{2,4})',
-                    r'(\d{1,2}\.\d{1,2}\.\d{2,4})',
-                    r'(\d{4}-\d{1,2}-\d{1,2})',
-                ]
-                
-                amounts = []
-                dates = []
-                
-                # Ищем суммы
-                for pattern in amount_patterns:
-                    matches = re.findall(pattern, text, re.IGNORECASE)
-                    amounts.extend(matches)
-                
-                # Ищем даты
-                for pattern in date_patterns:
-                    matches = re.findall(pattern, text)
-                    dates.extend(matches)
-                
-                # Берем наибольшую сумму (скорее всего итоговая)
-                parsed_amount = None
-                if amounts:
-                    try:
-                        float_amounts = [float(amt.replace(',', '.')) for amt in amounts]
-                        parsed_amount = max(float_amounts)
-                    except:
-                        pass
-                
-                # Берем первую найденную дату
-                parsed_date = None
-                if dates:
-                    try:
-                        date_str = dates[0]
-                        # Пытаемся распарсить дату в разных форматах
-                        for date_format in ['%d.%m.%Y', '%d/%m/%Y', '%Y-%m-%d', '%d.%m.%y']:
-                            try:
-                                parsed_date = datetime.strptime(date_str, date_format)
-                                break
-                            except:
-                                continue
-                    except:
-                        pass
-                
-                return {
-                    'success': True,
-                    'raw_text': text,
-                    'amount': parsed_amount,
-                    'date': parsed_date.isoformat() if parsed_date else None,
-                    'confidence': 0.8 if parsed_amount else 0.3,
-                    'extracted_amounts': amounts,
-                    'extracted_dates': dates
-                }
+            import base64
+            import aiohttp
+            import json
+            from ...config.settings import get_settings
             
+            settings = get_settings()
+            
+            # Кодируем изображение в base64
+            with open(file_path, 'rb') as image_file:
+                image_data = base64.b64encode(image_file.read()).decode('utf-8')
+            
+            # Определяем MIME тип
+            if file_path.lower().endswith(('.jpg', '.jpeg')):
+                mime_type = 'image/jpeg'
+            elif file_path.lower().endswith('.png'):
+                mime_type = 'image/png'
+            elif file_path.lower().endswith('.gif'):
+                mime_type = 'image/gif'
+            elif file_path.lower().endswith('.pdf'):
+                mime_type = 'application/pdf'
             else:
-                # Для PDF используем другие методы (пока заглушка)
-                return {
-                    'success': False,
-                    'error': 'PDF обработка пока не поддерживается',
-                    'confidence': 0.0
-                }
-                
+                mime_type = 'image/jpeg'
+            
+            # Создаем промпт для AI
+            system_prompt = """Ты эксперт по распознаванию текста на изображениях чеков и документов. Твоя задача - извлечь из изображения:
+1. Сумму (итоговую сумму к оплате)
+2. Дату операции
+3. Название организации/магазина
+
+Верни ответ СТРОГО в JSON формате:
+{
+    "amount": число_без_пробелов_и_валюты,
+    "date": "дата_в_формате_DD.MM.YYYY",
+    "organization": "название_организации",
+    "success": true_или_false,
+    "confidence": число_от_0_до_1
+}
+
+Если ничего не найдено, верни success: false."""
+
+            user_prompt = "Распознай текст на этом изображении чека/документа и извлеки сумму, дату и название организации."
+            
+            # Подготавливаем запрос
+            headers = {
+                'Authorization': f'Bearer {settings.OPENROUTER_API_KEY}',
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://telegram-bot.local',
+                'X-Title': 'Telegram Receipt OCR Bot'
+            }
+            
+            data = {
+                'model': settings.DEFAULT_MODEL,  # Claude 3.5 Sonnet или GPT-4 Vision
+                'messages': [
+                    {
+                        'role': 'system',
+                        'content': system_prompt
+                    },
+                    {
+                        'role': 'user',
+                        'content': [
+                            {
+                                'type': 'text',
+                                'text': user_prompt
+                            },
+                            {
+                                'type': 'image_url',
+                                'image_url': {
+                                    'url': f'data:{mime_type};base64,{image_data}'
+                                }
+                            }
+                        ]
+                    }
+                ],
+                'max_tokens': 1024,
+                'temperature': 0.1
+            }
+            
+            logger.info(f"🤖 Отправляем запрос к AI модели: {settings.DEFAULT_MODEL}")
+            
+            # Делаем запрос к OpenRouter
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{settings.OPENROUTER_BASE_URL}/chat/completions",
+                    headers=headers,
+                    json=data,
+                    timeout=aiohttp.ClientTimeout(total=30)
+                ) as response:
+                    
+                    if response.status != 200:
+                        error_text = await response.text()
+                        logger.error(f"❌ AI API ошибка {response.status}: {error_text}")
+                        return {
+                            'success': False,
+                            'error': f'AI API ошибка: {response.status}',
+                            'confidence': 0.0
+                        }
+                    
+                    result = await response.json()
+                    ai_response = result['choices'][0]['message']['content']
+                    
+                    logger.info(f"🤖 AI ответ: {ai_response[:200]}...")
+                    
+                    # Парсим JSON ответ от AI
+                    try:
+                        # Извлекаем JSON из ответа (может быть обернут в ```json)
+                        json_start = ai_response.find('{')
+                        json_end = ai_response.rfind('}') + 1
+                        if json_start != -1 and json_end > json_start:
+                            json_str = ai_response[json_start:json_end]
+                            ocr_data = json.loads(json_str)
+                        else:
+                            ocr_data = json.loads(ai_response)
+                        
+                        # Преобразуем дату если она есть
+                        parsed_date = None
+                        if ocr_data.get('date'):
+                            try:
+                                parsed_date = datetime.strptime(ocr_data['date'], '%d.%m.%Y')
+                            except:
+                                # Пробуем другие форматы
+                                for fmt in ['%Y-%m-%d', '%d/%m/%Y', '%d.%m.%y']:
+                                    try:
+                                        parsed_date = datetime.strptime(ocr_data['date'], fmt)
+                                        break
+                                    except:
+                                        continue
+                        
+                        return {
+                            'success': ocr_data.get('success', True),
+                            'amount': float(ocr_data.get('amount', 0)) if ocr_data.get('amount') else None,
+                            'date': parsed_date.isoformat() if parsed_date else None,
+                            'organization': ocr_data.get('organization', ''),
+                            'confidence': float(ocr_data.get('confidence', 0.8)),
+                            'raw_response': ai_response,
+                            'source': 'ai_ocr'
+                        }
+                        
+                    except json.JSONDecodeError as e:
+                        logger.error(f"❌ Ошибка парсинга JSON от AI: {e}")
+                        logger.error(f"AI response: {ai_response}")
+                        
+                        # Пытаемся извлечь данные из текста
+                        amount = None
+                        date_str = None
+                        
+                        # Простой поиск чисел как сумм
+                        import re
+                        amount_matches = re.findall(r'(\d+\.?\d*)', ai_response)
+                        if amount_matches:
+                            amount = float(amount_matches[0])
+                        
+                        return {
+                            'success': amount is not None,
+                            'amount': amount,
+                            'date': None,
+                            'organization': '',
+                            'confidence': 0.3,
+                            'raw_response': ai_response,
+                            'source': 'ai_ocr_fallback',
+                            'error': f'JSON parse error: {str(e)}'
+                        }
+                    
         except Exception as e:
-            logger.error(f"OCR Error: {e}")
+            logger.error(f"❌ AI OCR Error: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'confidence': 0.0
+                'confidence': 0.0,
+                'source': 'ai_ocr_error'
             }
     
     async def _show_ocr_result(self, update: Update, context: ContextTypes.DEFAULT_TYPE, 
-                              receipt_file: ReceiptFile, ocr_result: dict):
+                              receipt_file_id: int, receipt_filename: str, ocr_result: dict):
         """Показать результат OCR и запросить подтверждение"""
         
         if ocr_result['success'] and ocr_result.get('amount'):
@@ -398,12 +494,12 @@ class MoneyManagementHandler:
             
             keyboard = [
                 [
-                    InlineKeyboardButton("📈 Доход", callback_data=f"transaction_income_{receipt_file.id}"),
-                    InlineKeyboardButton("📉 Расход", callback_data=f"transaction_expense_{receipt_file.id}")
+                    InlineKeyboardButton("📈 Доход", callback_data=f"transaction_income_{receipt_file_id}"),
+                    InlineKeyboardButton("📉 Расход", callback_data=f"transaction_expense_{receipt_file_id}")
                 ],
                 [
-                    InlineKeyboardButton("✏️ Изменить сумму", callback_data=f"edit_amount_{receipt_file.id}"),
-                    InlineKeyboardButton("📅 Изменить дату", callback_data=f"edit_date_{receipt_file.id}")
+                    InlineKeyboardButton("✏️ Изменить сумму", callback_data=f"edit_amount_{receipt_file_id}"),
+                    InlineKeyboardButton("📅 Изменить дату", callback_data=f"edit_date_{receipt_file_id}")
                 ],
                 [
                     InlineKeyboardButton("❌ Отмена", callback_data="admin_money")
@@ -434,7 +530,7 @@ class MoneyManagementHandler:
             
             keyboard = [
                 [
-                    InlineKeyboardButton("✏️ Ввести вручную", callback_data=f"manual_entry_{receipt_file.id}")
+                    InlineKeyboardButton("✏️ Ввести вручную", callback_data=f"manual_entry_{receipt_file_id}")
                 ],
                 [
                     InlineKeyboardButton("🔄 Загрузить другой чек", callback_data="upload_receipt"),
@@ -489,28 +585,37 @@ class MoneyManagementHandler:
                 except:
                     pass
             
-            # Определяем категорию по умолчанию
-            default_category = "Прочие доходы" if transaction_type == "income" else "Прочие расходы"
+            # Находим подходящую категорию
+            category_query = db.query(FinanceCategory).filter(
+                FinanceCategory.type == transaction_type,
+                FinanceCategory.is_active == True
+            )
+            
+            # Пытаемся найти категорию "Прочие доходы" или "Прочие расходы"
+            default_category_name = "Прочие доходы" if transaction_type == "income" else "Прочие расходы"
+            category = category_query.filter(FinanceCategory.name.contains("Прочие")).first()
+            
+            # Если не найдена, берем первую доступную категорию данного типа
+            if not category:
+                category = category_query.first()
+            
+            if not category:
+                await update.message.reply_text("❌ Ошибка: не найдены категории для транзакций")
+                return
             
             # Создаем транзакцию
-            transaction = MoneyTransaction(
+            transaction = FinanceTransaction(
                 amount=amount,
                 type=transaction_type,
-                category=default_category,
                 description=f"Транзакция из чека {receipt_file.filename}",
                 date=transaction_date,
-                receipt_file_path=receipt_file.file_path,
-                ocr_data=ocr_data,
-                is_ocr_processed=True,
-                source="ocr",
+                category_id=category.id,
+                receipt_url=receipt_file.file_path,
+                notes=f"OCR данные: {json.dumps(ocr_data, ensure_ascii=False)}",
                 created_by_id=receipt_file.uploaded_by_id
             )
             
             db.add(transaction)
-            
-            # Связываем чек с транзакцией
-            receipt_file.transaction_id = transaction.id
-            
             db.commit()
             
             # Показываем подтверждение
@@ -523,7 +628,7 @@ class MoneyManagementHandler:
 {type_emoji} <b>Тип:</b> {type_name}
 💰 <b>Сумма:</b> {amount:,.2f} ₽
 📅 <b>Дата:</b> {transaction_date.strftime('%d.%m.%Y')}
-🏷️ <b>Категория:</b> {default_category}
+🏷️ <b>Категория:</b> {category.name}
 📄 <b>Чек:</b> сохранен
 
 Транзакция добавлена в вашу базу данных.
@@ -565,8 +670,8 @@ class MoneyManagementHandler:
         
         with get_db_context() as db:
             # Получаем последние 10 транзакций
-            transactions = db.query(MoneyTransaction).order_by(
-                MoneyTransaction.created_at.desc()
+            transactions = db.query(FinanceTransaction).order_by(
+                FinanceTransaction.created_at.desc()
             ).limit(10).all()
             
             if not transactions:
@@ -657,10 +762,10 @@ class MoneyManagementHandler:
             from datetime import datetime, timedelta
             last_month = datetime.now() - timedelta(days=30)
             
-            income_transactions = db.query(MoneyTransaction).filter(
-                MoneyTransaction.type == "income",
-                MoneyTransaction.date >= last_month
-            ).order_by(MoneyTransaction.date.desc()).all()
+            income_transactions = db.query(FinanceTransaction).filter(
+                FinanceTransaction.type == "income",
+                FinanceTransaction.date >= last_month
+            ).order_by(FinanceTransaction.date.desc()).all()
             
             if not income_transactions:
                 text = """
@@ -734,10 +839,10 @@ class MoneyManagementHandler:
             from datetime import datetime, timedelta
             last_month = datetime.now() - timedelta(days=30)
             
-            expense_transactions = db.query(MoneyTransaction).filter(
-                MoneyTransaction.type == "expense",
-                MoneyTransaction.date >= last_month
-            ).order_by(MoneyTransaction.date.desc()).all()
+            expense_transactions = db.query(FinanceTransaction).filter(
+                FinanceTransaction.type == "expense",
+                FinanceTransaction.date >= last_month
+            ).order_by(FinanceTransaction.date.desc()).all()
             
             if not expense_transactions:
                 text = """
@@ -875,40 +980,40 @@ class MoneyManagementHandler:
             last_week = now - timedelta(days=7)
             
             # Общая статистика
-            total_transactions = db.query(MoneyTransaction).count()
-            total_income = db.query(MoneyTransaction).filter(
-                MoneyTransaction.type == "income"
+            total_transactions = db.query(FinanceTransaction).count()
+            total_income = db.query(FinanceTransaction).filter(
+                FinanceTransaction.type == "income"
             ).count()
-            total_expenses = db.query(MoneyTransaction).filter(
-                MoneyTransaction.type == "expense"
+            total_expenses = db.query(FinanceTransaction).filter(
+                FinanceTransaction.type == "expense"
             ).count()
             
             # Суммы за месяц
-            month_income_sum = db.execute(
-                "SELECT COALESCE(SUM(amount), 0) FROM money_transactions WHERE type = 'income' AND date >= ?",
-                (last_month,)
-            ).scalar() or 0
+            month_income_sum = db.query(FinanceTransaction).filter(
+                FinanceTransaction.type == "income",
+                FinanceTransaction.date >= last_month
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
             
             month_expense_sum = db.execute(
-                "SELECT COALESCE(SUM(amount), 0) FROM money_transactions WHERE type = 'expense' AND date >= ?",
+                "SELECT COALESCE(SUM(amount), 0) FROM finance_transactions WHERE type = 'expense' AND date >= ?",
                 (last_month,)
             ).scalar() or 0
             
             # Суммы за неделю
             week_income_sum = db.execute(
-                "SELECT COALESCE(SUM(amount), 0) FROM money_transactions WHERE type = 'income' AND date >= ?",
+                "SELECT COALESCE(SUM(amount), 0) FROM finance_transactions WHERE type = 'income' AND date >= ?",
                 (last_week,)
             ).scalar() or 0
             
             week_expense_sum = db.execute(
-                "SELECT COALESCE(SUM(amount), 0) FROM money_transactions WHERE type = 'expense' AND date >= ?",
+                "SELECT COALESCE(SUM(amount), 0) FROM finance_transactions WHERE type = 'expense' AND date >= ?",
                 (last_week,)
             ).scalar() or 0
             
             # Топ категории за месяц
             top_income_categories = db.execute("""
                 SELECT category, SUM(amount) as total
-                FROM money_transactions 
+                FROM finance_transactions 
                 WHERE type = 'income' AND date >= ?
                 GROUP BY category 
                 ORDER BY total DESC 
@@ -917,7 +1022,7 @@ class MoneyManagementHandler:
             
             top_expense_categories = db.execute("""
                 SELECT category, SUM(amount) as total
-                FROM money_transactions 
+                FROM finance_transactions 
                 WHERE type = 'expense' AND date >= ?
                 GROUP BY category 
                 ORDER BY total DESC 
@@ -992,6 +1097,211 @@ class MoneyManagementHandler:
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode='HTML'
         )
+
+
+    async def _show_transaction_type_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE, ocr_result: dict):
+        """Показывает выбор типа транзакции после OCR"""
+        
+        # Извлекаем данные из OCR для показа пользователю
+        amount = ocr_result.get('amount', 'не определена')
+        date = ocr_result.get('date', 'не определена')
+        confidence = ocr_result.get('confidence', 0)
+        
+        text = f"""
+📄 <b>Чек обработан!</b>
+
+🔍 <b>Распознанные данные:</b>
+💰 Сумма: {amount} ₽
+📅 Дата: {date}
+🎯 Точность: {confidence}%
+
+❓ <b>Выберите тип транзакции:</b>
+        """
+        
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        
+        keyboard = [
+            [InlineKeyboardButton("📈 Доход", callback_data="transaction_type_income")],
+            [InlineKeyboardButton("📉 Расход", callback_data="transaction_type_expense")],
+            [InlineKeyboardButton("❌ Отмена", callback_data="admin_money")]
+        ]
+        keyboard_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(text, reply_markup=keyboard_markup, parse_mode='HTML')
+    
+    async def handle_transaction_type_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка выбора типа транзакции"""
+        user_id = update.effective_user.id
+        callback_data = update.callback_query.data
+        
+        if not self.is_admin(user_id):
+            await update.callback_query.answer("❌ У вас нет доступа к этой функции")
+            return
+        
+        await update.callback_query.answer()
+        
+        # Извлекаем тип транзакции
+        transaction_type = callback_data.split("_")[-1]  # income или expense
+        
+        # Получаем состояние пользователя
+        user_state = self.user_states.get(user_id)
+        if not user_state or user_state.get("state") != "choosing_transaction_type":
+            await update.callback_query.edit_message_text("❌ Сессия истекла. Начните заново.")
+            return
+        
+        # Обновляем состояние
+        user_state["transaction_type"] = transaction_type
+        user_state["state"] = "choosing_category"
+        
+        # Показываем выбор категории
+        await self._show_category_selection(update, context, transaction_type)
+    
+    async def _show_category_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE, transaction_type: str):
+        """Показывает выбор категории для выбранного типа транзакции"""
+        
+        with get_db_context() as db:
+            # Получаем категории для выбранного типа
+            categories = db.query(FinanceCategory).filter(
+                FinanceCategory.type == transaction_type,
+                FinanceCategory.is_active == True
+            ).all()
+            
+            type_emoji = "📈" if transaction_type == "income" else "📉"
+            type_name = "доходов" if transaction_type == "income" else "расходов"
+            
+            text = f"""
+{type_emoji} <b>Выберите категорию {type_name}:</b>
+            """
+            
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            
+            keyboard = []
+            for category in categories:
+                callback_data = f"category_{category.id}"
+                keyboard.append([InlineKeyboardButton(
+                    f"{category.icon or '📂'} {category.name}", 
+                    callback_data=callback_data
+                )])
+            
+            keyboard.append([InlineKeyboardButton("🔙 Назад к типу", callback_data="back_to_transaction_type")])
+            keyboard.append([InlineKeyboardButton("❌ Отмена", callback_data="admin_money")])
+            
+            keyboard_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.callback_query.edit_message_text(
+                text, 
+                reply_markup=keyboard_markup, 
+                parse_mode='HTML'
+            )
+    
+    async def handle_category_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка выбора категории"""
+        user_id = update.effective_user.id
+        callback_data = update.callback_query.data
+        
+        if not self.is_admin(user_id):
+            await update.callback_query.answer("❌ У вас нет доступа к этой функции")
+            return
+        
+        await update.callback_query.answer()
+        
+        # Извлекаем ID категории
+        category_id = int(callback_data.split("_")[1])
+        
+        # Получаем состояние пользователя
+        user_state = self.user_states.get(user_id)
+        if not user_state or user_state.get("state") != "choosing_category":
+            await update.callback_query.edit_message_text("❌ Сессия истекла. Начните заново.")
+            return
+        
+        # Создаем транзакцию
+        await self._create_transaction(
+            update, 
+            context, 
+            user_state["receipt_file_id"],
+            user_state["receipt_filename"], 
+            user_state["ocr_result"],
+            user_state["transaction_type"],
+            category_id
+        )
+        
+        # Очищаем состояние
+        self.user_states.pop(user_id, None)
+    
+    async def _create_transaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE, 
+                                receipt_file_id: int, receipt_filename: str, ocr_result: dict, 
+                                transaction_type: str, category_id: int):
+        """Создает транзакцию с выбранным типом и категорией"""
+        
+        with get_db_context() as db:
+            # Получаем категорию
+            category = db.query(FinanceCategory).filter(FinanceCategory.id == category_id).first()
+            if not category:
+                await update.callback_query.edit_message_text("❌ Ошибка: категория не найдена")
+                return
+            
+            # Получаем файл чека
+            receipt_file = db.query(ReceiptFile).filter(ReceiptFile.id == receipt_file_id).first()
+            if not receipt_file:
+                await update.callback_query.edit_message_text("❌ Ошибка: файл чека не найден")
+                return
+            
+            # Извлекаем данные из OCR
+            amount = float(ocr_result.get('amount', 0))
+            transaction_date = datetime.now()
+            
+            # Пытаемся парсить дату из OCR
+            if ocr_result.get('date'):
+                try:
+                    transaction_date = datetime.fromisoformat(ocr_result['date'])
+                except:
+                    pass
+            
+            # Создаем транзакцию
+            transaction = FinanceTransaction(
+                amount=amount,
+                type=transaction_type,
+                description=f"Транзакция из чека {receipt_filename}",
+                date=transaction_date,
+                category_id=category_id,
+                receipt_url=receipt_file.file_path,
+                notes=f"OCR данные: {json.dumps(ocr_result, ensure_ascii=False)}",
+                created_by_id=receipt_file.uploaded_by_id
+            )
+            
+            db.add(transaction)
+            db.commit()
+            
+            # Показываем подтверждение
+            type_emoji = "📈" if transaction_type == "income" else "📉"
+            type_name = "Доход" if transaction_type == "income" else "Расход"
+            
+            text = f"""
+✅ <b>Транзакция создана!</b>
+
+{type_emoji} <b>Тип:</b> {type_name}
+💰 <b>Сумма:</b> {amount:,.2f} ₽
+📅 <b>Дата:</b> {transaction_date.strftime('%d.%m.%Y')}
+🏷️ <b>Категория:</b> {category.name}
+📄 <b>Чек:</b> сохранен
+
+Транзакция добавлена в вашу базу данных.
+            """
+            
+            from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+            
+            keyboard = [
+                [InlineKeyboardButton("📤 Добавить еще чек", callback_data="upload_receipt")],
+                [InlineKeyboardButton("💰 Управление финансами", callback_data="admin_money")],
+                [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
+            ]
+            keyboard_markup = InlineKeyboardMarkup(keyboard)
+            
+            await update.callback_query.edit_message_text(
+                text, 
+                reply_markup=keyboard_markup, 
+                parse_mode='HTML'
+            )
 
 
 # Создаем экземпляр обработчика

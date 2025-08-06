@@ -2625,3 +2625,99 @@ async def like_portfolio_project(project_id: int):
             "error": str(e)
         }
 
+# Роуты для аутентификации
+@admin_router.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Страница входа в админ-панель"""
+    return templates.TemplateResponse("login.html", {
+        "request": request
+    })
+
+@admin_router.post("/logout")
+async def logout():
+    """Выход из системы"""
+    return RedirectResponse(url="/admin/login", status_code=302)
+
+@admin_router.get("/logout-auth")
+async def logout_auth(request: Request, switch: str = None):
+    """Специальный роут для очистки HTTP Basic Auth"""
+    from fastapi.responses import HTMLResponse
+    
+    # Определяем URL для перенаправления
+    redirect_url = "/admin/login?switch=true" if switch else "/admin/login"
+    
+    # HTML страница которая очищает аутентификацию и перенаправляет
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Выход из системы</title>
+        <meta charset="UTF-8">
+        <style>
+            body {{ 
+                font-family: 'Arial', sans-serif; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                height: 100vh; 
+                margin: 0; 
+            }}
+            .logout-container {{ 
+                background: white; 
+                padding: 2rem; 
+                border-radius: 10px; 
+                text-align: center; 
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }}
+            .spinner {{
+                border: 4px solid #f3f3f3;
+                border-top: 4px solid #667eea;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 1rem auto;
+            }}
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="logout-container">
+            <h3>🚪 Выход из системы</h3>
+            <div class="spinner"></div>
+            <p>Очистка данных аутентификации...</p>
+            <p><small>Если перенаправление не произошло автоматически, <a href="{redirect_url}">нажмите здесь</a></small></p>
+        </div>
+        
+        <script>
+            // Попытка очистить HTTP Basic Auth через подмену заголовков
+            function clearAuth() {{
+                // Создаем XMLHttpRequest с неверными учетными данными для сброса кэша
+                fetch('/admin/', {{
+                    method: 'GET',
+                    headers: {{
+                        'Authorization': 'Basic ' + btoa('logout:logout')
+                    }}
+                }}).catch(() => {{
+                    // Игнорируем ошибку - это ожидаемо
+                }}).finally(() => {{
+                    // Перенаправляем на страницу логина через 2 секунды
+                    setTimeout(() => {{
+                        window.location.href = '{redirect_url}';
+                    }}, 2000);
+                }});
+            }}
+            
+            // Запускаем очистку при загрузке страницы
+            document.addEventListener('DOMContentLoaded', clearAuth);
+        </script>
+    </body>
+    </html>
+    """
+    
+    return HTMLResponse(content=html_content, status_code=200)
+

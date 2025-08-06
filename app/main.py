@@ -307,6 +307,24 @@ class TelegramBot:
         router.register(r"^bot_creation_understood$", common_handler.handle_bot_creation_understood,
                        priority=60, description="Понял инструкции по созданию бота")
         
+        # ПРИОРИТЕТ 6.5: Админские функции (высокий приоритет)
+        router.register(r"^admin_console$", common_handler.handle_callback,
+                       priority=65, description="Админ консоль")
+        router.register(r"^admin_money$", common_handler.handle_callback,
+                       priority=65, description="Управление финансами")
+        router.register(r"^upload_receipt$", common_handler.handle_callback,
+                       priority=65, description="Загрузка чека")
+        router.register(r"^transaction_(income|expense)_\d+$", common_handler.handle_callback,
+                       priority=65, description="Обработка типа транзакции")
+        router.register(r"^transaction_type_(income|expense)$", common_handler.handle_callback,
+                       priority=65, description="Выбор типа транзакции OCR")
+        router.register(r"^category_\d+$", common_handler.handle_callback,
+                       priority=65, description="Выбор категории транзакции")
+        router.register(r"^back_to_transaction_type$", common_handler.handle_callback,
+                       priority=65, description="Возврат к выбору типа транзакции")
+        router.register(r"^(my_transactions|view_income|view_expenses|money_analytics|money_categories)$", 
+                       common_handler.handle_callback, priority=65, description="Финансовые отчеты")
+        
         # ПРИОРИТЕТ 7 (САМЫЙ НИЗКИЙ): Основное меню и общие команды
         router.register(r"^main_menu$", start_handler.start,
                        priority=70, description="Главное меню")

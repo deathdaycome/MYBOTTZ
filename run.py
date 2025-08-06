@@ -144,3 +144,4 @@ def main():
 if __name__ == "__main__":
     # Удаляем создание placeholder-изображения, так как оно уже есть в check_directories
     main()
+    

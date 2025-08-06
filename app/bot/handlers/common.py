@@ -213,6 +213,26 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 from ..handlers.money_management import money_handler
                 await money_handler.handle_upload_receipt(update, context)
                 
+            elif callback_data.startswith("transaction_type_"):
+                logger.info(f"🔄 Обрабатываем выбор типа транзакции для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_transaction_type_selection(update, context)
+                
+            elif callback_data.startswith("category_"):
+                logger.info(f"🏷️ Обрабатываем выбор категории для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                await money_handler.handle_category_selection(update, context)
+                
+            elif callback_data == "back_to_transaction_type":
+                logger.info(f"🔙 Возврат к выбору типа транзакции для пользователя {user_id}")
+                from ..handlers.money_management import money_handler
+                # Показываем заново выбор типа транзакции
+                user_state = money_handler.user_states.get(user_id)
+                if user_state and user_state.get("ocr_result"):
+                    await money_handler._show_transaction_type_selection(update, context, user_state["ocr_result"])
+                else:
+                    await update.callback_query.edit_message_text("❌ Данные сессии утеряны. Начните заново.")
+                    
             elif callback_data.startswith("transaction_"):
                 logger.info(f"💳 Обрабатываем transaction для пользователя {user_id}")
                 from ..handlers.money_management import money_handler

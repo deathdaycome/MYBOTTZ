@@ -625,14 +625,26 @@
         </div>
         
         <div class="mt-auto p-3 border-top" style="border-color: rgba(255,255,255,0.1) !important;">
-            <div class="d-flex align-items-center text-muted">
-                <i class="fas fa-user-circle me-2"></i>
-                <small>{% if user_role|default("owner") == "owner" %}Владелец{% else %}Исполнитель{% endif %}</small>
+            <div class="d-flex align-items-center justify-content-between text-muted mb-2">
+                <div class="d-flex align-items-center">
+                    <i class="fas fa-user-circle me-2"></i>
+                    <small>{% if user_role|default("owner") == "owner" %}Владелец{% else %}Исполнитель{% endif %}</small>
+                </div>
             </div>
-            <small class="text-success">
-                <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
-                Онлайн
-            </small>
+            <div class="d-flex align-items-center justify-content-between">
+                <small class="text-success">
+                    <i class="fas fa-circle" style="font-size: 0.5rem;"></i>
+                    Онлайн
+                </small>
+                <div class="d-flex gap-1">
+                    <button class="btn btn-outline-secondary btn-sm" onclick="switchUser()" title="Сменить пользователя">
+                        <i class="fas fa-user-cog" style="font-size: 0.75rem;"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm" onclick="logout()" title="Выйти">
+                        <i class="fas fa-sign-out-alt" style="font-size: 0.75rem;"></i>
+                    </button>
+                </div>
+            </div>
         </div>
     </nav>
 
@@ -788,6 +800,30 @@
                     link.classList.add('active');
                 }
             });
+        }
+
+        // Logout function
+        function logout() {
+            if (confirm('Вы уверены, что хотите выйти?')) {
+                // Clear any stored auth data
+                localStorage.removeItem('admin_auth');
+                sessionStorage.removeItem('admin_auth');
+                
+                // Clear HTTP Basic Auth by redirecting to logout URL
+                window.location.href = '/admin/logout-auth';
+            }
+        }
+        
+        // Switch user function
+        function switchUser() {
+            if (confirm('Вы хотите сменить пользователя? Текущая сессия будет завершена.')) {
+                // Clear any stored auth data
+                localStorage.removeItem('admin_auth');
+                sessionStorage.removeItem('admin_auth');
+                
+                // Clear HTTP Basic Auth and redirect to login
+                window.location.href = '/admin/logout-auth?switch=true';
+            }
         }
 
         // Initialize

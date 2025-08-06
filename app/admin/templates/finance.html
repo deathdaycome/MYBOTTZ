@@ -454,9 +454,13 @@
     const username = 'admin';
     const password = 'qwerty123';
     
+    // Force cache refresh - timestamp
+    console.log('Finance page loaded at:', new Date().toISOString());
+    
     // Глобальные переменные
     let financeCategories = [];
     let projects = [];
+    let allTransactions = [];
     let monthlyChart = null;
     let expenseChart = null;
     
@@ -586,8 +590,8 @@
                 minute: '2-digit'
             });
             
-            const category = financeCategories.find(cat => cat.id === transaction.category_id);
-            const categoryName = category ? category.name : 'Неизвестная категория';
+            const categoryName = transaction.category ? transaction.category.name : 'Неизвестная категория';
+            console.log('Transaction:', transaction.id, 'Category:', categoryName, 'Full category:', transaction.category);
             
             const amount = Math.abs(transaction.amount);
             const isIncome = transaction.type === 'income';
@@ -600,7 +604,7 @@
                                 <h6 class="mb-0">${transaction.description}</h6>
                                 <span class="badge badge-${isIncome ? 'success' : 'danger'}">${categoryName}</span>
                             </div>
-                            <p class="text-muted mb-1 small">${transaction.notes || ''}</p>
+                            ${transaction.notes && !transaction.notes.includes('OCR данные:') && !transaction.notes.includes('"success"') ? `<p class="text-muted mb-1 small">${transaction.notes}</p>` : ''}
                             <small class="text-muted">
                                 <i class="fas fa-calendar-alt"></i> ${formattedDate} в ${formattedTime}
                                 ${transaction.project_id ? `| <i class="fas fa-project-diagram"></i> Проект #${transaction.project_id}` : ''}
@@ -767,6 +771,9 @@
                 }
                 
                 console.log('Обработанные транзакции:', transactions);
+                
+                // Сохраняем в глобальную переменную для редактирования
+                allTransactions = transactions;
                 
                 // Обновляем список транзакций
                 updateTransactionsList(transactions);
@@ -937,8 +944,18 @@
         try {
             console.log('Отправка данных:', formData);
             
-            const response = await fetch('/admin/api/finance/transactions', {
-                method: 'POST',
+            // Проверяем режим редактирования
+            const saveBtn = document.getElementById('saveTransactionBtn');
+            const editingId = saveBtn.getAttribute('data-editing');
+            const isEditing = editingId && editingId !== 'null';
+            
+            const url = isEditing ? 
+                `/admin/api/finance/transactions/${editingId}` : 
+                '/admin/api/finance/transactions';
+            const method = isEditing ? 'PUT' : 'POST';
+            
+            const response = await fetch(url, {
+                method: method,
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': 'Basic ' + btoa('admin:qwerty123')
@@ -950,27 +967,33 @@
             console.log('Ответ сервера:', result);
             
             if (result.success) {
-                console.log('Транзакция успешно создана, обновляем данные...');
-                alert('Транзакция успешно создана!');
+                const action = isEditing ? 'обновлена' : 'создана';
+                console.log(`Транзакция успешно ${action}, обновляем данные...`);
+                alert(`Транзакция успешно ${action}!`);
                 
                 // Закрываем модальное окно
                 const modal = bootstrap.Modal.getInstance(document.getElementById('addTransactionModal'));
                 modal.hide();
                 
-                // Очищаем форму
+                // Очищаем форму и сбрасываем режим редактирования
                 form.reset();
+                saveBtn.removeAttribute('data-editing');
+                document.querySelector('#addTransactionModal .modal-title').textContent = 'Добавить транзакцию';
+                saveBtn.textContent = 'Сохранить транзакцию';
                 
                 // Обновляем данные без перезагрузки страницы
                 await loadFinanceData();
-                console.log('Данные обновлены после создания транзакции');
+                console.log(`Данные обновлены после ${action.slice(0, -1)}ия транзакции`);
                 
             } else {
                 console.error('Ошибка от сервера:', result);
-                alert('Ошибка создания транзакции: ' + (result.error || result.message || 'Неизвестная ошибка'));
+                const action = isEditing ? 'обновления' : 'создания';
+                alert(`Ошибка ${action} транзакции: ` + (result.error || result.message || 'Неизвестная ошибка'));
             }
         } catch (error) {
             console.error('Ошибка:', error);
-            alert('Ошибка при создании транзакции: ' + error.message);
+            const action = isEditing ? 'обновлении' : 'создании';
+            alert(`Ошибка при ${action} транзакции: ` + error.message);
         }
     }
     
@@ -1211,8 +1234,44 @@
         console.log('Редактирование транзакции:', transactionId);
         
         // Найдем транзакцию в списке
-        // Для простоты пока просто показываем alert
-        alert('Функция редактирования транзакций будет добавлена в следующей версии.\n\nПока что вы можете создать новую транзакцию и удалить старую.');
+        const transaction = allTransactions.find(t => t.id === transactionId);
+        if (!transaction) {
+            alert('Транзакция не найдена');
+            return;
+        }
+        
+        // Заполняем форму данными транзакции
+        document.getElementById('transactionAmount').value = Math.abs(transaction.amount);
+        document.getElementById('transactionType').value = transaction.type;
+        document.getElementById('transactionDescription').value = transaction.description;
+        
+        // Форматируем дату для input[type="date"]
+        const date = new Date(transaction.date);
+        const formattedDate = date.getFullYear() + '-' + 
+            String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+            String(date.getDate()).padStart(2, '0');
+        document.getElementById('transactionDate').value = formattedDate;
+        
+        document.getElementById('transactionProject').value = transaction.project_id || '';
+        document.getElementById('transactionContractor').value = transaction.contractor_name || '';
+        document.getElementById('transactionNotes').value = transaction.notes || '';
+        document.getElementById('transactionRecurring').checked = transaction.is_recurring || false;
+        
+        // Устанавливаем категорию
+        setTimeout(() => {
+            document.getElementById('transactionCategory').value = transaction.category ? transaction.category.id : '';
+        }, 100);
+        
+        // Обновляем категории для выбранного типа
+        filterCategoriesByType(transaction.type);
+        
+        // Меняем заголовок и кнопку модального окна
+        document.querySelector('#addTransactionModal .modal-title').textContent = 'Редактировать транзакцию';
+        document.getElementById('saveTransactionBtn').textContent = 'Обновить транзакцию';
+        document.getElementById('saveTransactionBtn').setAttribute('data-editing', transactionId);
+        
+        // Показываем модальное окно
+        $('#addTransactionModal').modal('show');
     }
 </script>
 {% endblock %}

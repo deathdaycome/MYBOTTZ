@@ -20,8 +20,7 @@ from ...database.models import (
     Project, User, AdminUser
 )
 from ...config.logging import get_logger
-from ..middleware.auth import get_current_admin_user
-from ...middleware.auth import authenticate
+from ...admin.middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 templates = Jinja2Templates(directory="app/admin/templates")
@@ -54,15 +53,15 @@ class RevisionMessageCreateModel(BaseModel):
     is_internal: bool = False
 
 @router.get("/revisions", response_class=HTMLResponse)
-async def revisions_page(request: Request, username: str = Depends(authenticate)):
+async def revisions_page(request: Request, admin_user: dict = Depends(get_current_admin_user)):
     """Страница управления правками"""
     # Получаем роль пользователя и элементы навигации
     from app.admin.app import get_user_role, get_navigation_items
-    user_role = get_user_role(username)
+    user_role = get_user_role(admin_user["username"])
     navigation_items = get_navigation_items(user_role)
     
     # Debug logging
-    print(f"[DEBUG] Username: {username}")
+    print(f"[DEBUG] Username: {admin_user['username']}")
     print(f"[DEBUG] User role: {user_role}")
     print(f"[DEBUG] Navigation items count: {len(navigation_items) if navigation_items else 0}")
     if navigation_items:
@@ -70,7 +69,7 @@ async def revisions_page(request: Request, username: str = Depends(authenticate)
     
     return templates.TemplateResponse("revisions.html", {
         "request": request,
-        "username": username,
+        "username": admin_user["username"],
         "user_role": user_role,
         "navigation_items": navigation_items
     })

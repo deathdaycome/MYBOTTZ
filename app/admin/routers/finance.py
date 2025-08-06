@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, desc, asc, func, extract
 from pydantic import BaseModel
 from decimal import Decimal
@@ -129,6 +129,14 @@ async def get_finance_transactions(
 ):
     """Получить финансовые транзакции с фильтрами"""
     try:
+        # Если даты не указаны, показываем последние 7 дней
+        if not date_from and not date_to:
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            week_ago = today - timedelta(days=7)
+            tomorrow = today + timedelta(days=1)
+            date_from = week_ago
+            date_to = tomorrow
+        
         query = db.query(FinanceTransaction)
         
         # Фильтрация по пользователю: исполнители видят только свои транзакции
@@ -155,7 +163,7 @@ async def get_finance_transactions(
             query = query.filter(FinanceTransaction.date <= date_to)
         
         total = query.count()
-        transactions = query.order_by(desc(FinanceTransaction.date)).offset(offset).limit(limit).all()
+        transactions = query.options(joinedload(FinanceTransaction.category)).order_by(desc(FinanceTransaction.date)).offset(offset).limit(limit).all()
         
         print(f"[DEBUG FINANCE] Returning {len(transactions)} transactions (total: {total}) for user {current_user['username']} (role: {current_user['role']})")
         
