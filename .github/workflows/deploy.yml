@@ -1,0 +1,48 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Позволяет запускать workflow вручную
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy to server via SSH
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        port: ${{ secrets.SERVER_PORT }}
+        script: |
+          # Переходим в директорию проекта
+          cd ~/bot_business_card
+          
+          # Сохраняем локальные изменения (если есть)
+          git stash
+          
+          # Получаем последние изменения
+          git pull origin main
+          
+          # Восстанавливаем локальные изменения
+          git stash pop || true
+          
+          # Активируем виртуальное окружение
+          source venv/bin/activate
+          
+          # Обновляем зависимости
+          pip install -r requirements.txt
+          
+          # Выполняем миграции базы данных (если нужно)
+          # python -m alembic upgrade head
+          
+          # Перезапускаем сервис
+          sudo systemctl restart botdev
+          
+          # Проверяем статус
+          sudo systemctl status botdev --no-pager
+          
+          echo "✅ Деплой завершен успешно!"
