@@ -39,10 +39,16 @@ jobs:
           # Выполняем миграции базы данных (если нужно)
           # python -m alembic upgrade head
           
-          # Перезапускаем сервис
-          sudo systemctl restart botdev
+          # Перезапускаем бота через PM2
+          pm2 restart bot || pm2 restart all
+          
+          # Сохраняем конфигурацию PM2
+          pm2 save
           
           # Проверяем статус
-          sudo systemctl status botdev --no-pager
+          pm2 status
           
-          echo "✅ Деплой завершен успешно!"
+          # Показываем последние логи
+          pm2 logs bot --lines 10 --nostream
+          
+          echo "✅ Деплой завершен успешно! Бот перезапущен через PM2"
