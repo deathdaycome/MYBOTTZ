@@ -43,8 +43,12 @@ jobs:
           # Выполняем миграции базы данных (если нужно)
           # python -m alembic upgrade head
           
-          # Перезапускаем бота через PM2
-          pm2 restart bot-business-card || pm2 start ecosystem.config.js
+          # Полностью останавливаем и удаляем процесс
+          pm2 stop bot-business-card || true
+          pm2 delete bot-business-card || true
+          
+          # Запускаем заново с конфигурацией
+          pm2 start ecosystem.config.js
           
           # Сохраняем конфигурацию PM2
           pm2 save
