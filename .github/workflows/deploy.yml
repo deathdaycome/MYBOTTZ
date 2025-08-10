@@ -18,21 +18,14 @@ jobs:
         password: ${{ secrets.SERVER_PASSWORD }}
         port: ${{ secrets.SERVER_PORT }}
         script: |
-          # Ищем директорию проекта
-          echo "Поиск директории проекта..."
-          find $HOME -name "bot_business_card" -type d 2>/dev/null || true
-          find /root -name "bot_business_card" -type d 2>/dev/null || true
-          find /home -name "bot_business_card" -type d 2>/dev/null || true
-          
-          # Если проекта нет, клонируем его
-          if [ ! -d "$HOME/bot_business_card" ]; then
-            echo "Проект не найден, клонируем репозиторий..."
-            cd $HOME
-            git clone https://github.com/deathdaycome/MYBOTTZ.git bot_business_card
+          # Удаляем старую директорию из /root если она есть
+          if [ -d "/root/bot_business_card" ]; then
+            echo "Удаляем старую директорию из /root..."
+            rm -rf /root/bot_business_card
           fi
           
-          # Переходим в директорию проекта
-          cd $HOME/bot_business_card
+          # Переходим в правильную директорию проекта
+          cd /var/www/bot_business_card
           
           # Проверяем что мы в правильной директории
           pwd
@@ -71,7 +64,7 @@ jobs:
           pm2 delete bot-business-card || true
           
           # Запускаем PM2 из текущей директории
-          pm2 start ./venv/bin/python --name bot-business-card --interpreter none -- -m app.main
+          pm2 start /var/www/bot_business_card/venv/bin/python --name bot-business-card --interpreter none --cwd /var/www/bot_business_card -- -m app.main
           
           # Сохраняем конфигурацию PM2
           pm2 save
