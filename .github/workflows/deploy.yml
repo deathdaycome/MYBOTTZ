@@ -48,7 +48,8 @@ jobs:
           pm2 delete bot-business-card || true
           
           # Запускаем PM2 напрямую без конфигурационного файла
-          pm2 start "venv/bin/python -m app.main" --name bot-business-card --cwd ~/bot_business_card --max-memory-restart 500M
+          cd ~/bot_business_card
+          pm2 start venv/bin/python --name bot-business-card --interpreter none -- -m app.main
           
           # Сохраняем конфигурацию PM2
           pm2 save
