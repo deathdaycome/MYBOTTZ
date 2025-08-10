@@ -43,15 +43,15 @@ jobs:
           # Выполняем миграции базы данных (если нужно)
           # python -m alembic upgrade head
           
-          # Создаем ecosystem.config.js если его нет
-          cat > ecosystem.config.js << 'EOF'
+          # Создаем ecosystem.config.js в правильной директории
+          cat > ~/bot_business_card/ecosystem.config.js << 'EOF'
           module.exports = {
             apps: [{
               name: 'bot-business-card',
               script: 'python',
               args: '-m app.main',
-              cwd: '/home/root/bot_business_card',
-              interpreter: '/home/root/bot_business_card/venv/bin/python',
+              cwd: process.cwd(),
+              interpreter: './venv/bin/python',
               instances: 1,
               autorestart: true,
               watch: false,
@@ -67,8 +67,8 @@ jobs:
           pm2 stop bot-business-card || true
           pm2 delete bot-business-card || true
           
-          # Запускаем заново с конфигурацией
-          pm2 start ecosystem.config.js
+          # Запускаем заново из правильной директории
+          pm2 start ~/bot_business_card/ecosystem.config.js
           
           # Сохраняем конфигурацию PM2
           pm2 save
