@@ -36,6 +36,10 @@ jobs:
           # Обновляем зависимости
           pip install -r requirements.txt
           
+          # Очищаем кэш Python для применения изменений
+          find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find . -type f -name "*.pyc" -delete 2>/dev/null || true
+          
           # Выполняем миграции базы данных (если нужно)
           # python -m alembic upgrade head
           
