@@ -7,21 +7,20 @@ def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton("🚀 Создать ТЗ", callback_data="create_tz"),
-            InlineKeyboardButton("💼 Портфолио", callback_data="portfolio")
+            InlineKeyboardButton("📊 Мои проекты", callback_data="my_projects")
         ],
         [
-            InlineKeyboardButton("📊 Мои проекты", callback_data="my_projects"),
-            InlineKeyboardButton("🧮 Калькулятор", callback_data="calculator")
+            InlineKeyboardButton("🧮 Калькулятор", callback_data="calculator"),
+            InlineKeyboardButton("🤖 AI Консультант", callback_data="consultant")
         ],
         [
-            InlineKeyboardButton("🤖 AI Консультант", callback_data="consultant"),
-            InlineKeyboardButton("❓ FAQ", callback_data="faq")
+            InlineKeyboardButton("❓ FAQ", callback_data="faq"),
+            InlineKeyboardButton("📞 Контакты", callback_data="contacts")
         ],
         [
-            InlineKeyboardButton("💬 Консультация", callback_data="consultation")
+            InlineKeyboardButton("💼 Наши проекты", url="https://t.me/your_portfolio_channel")
         ],
         [
-            InlineKeyboardButton("📞 Контакты", callback_data="contacts"),
             InlineKeyboardButton("⚙️ Настройки", callback_data="settings")
         ]
     ]
@@ -78,8 +77,7 @@ def get_project_actions_keyboard(project_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("💬 Чат", callback_data=f"project_chat_{project_id}")
         ],
         [
-            InlineKeyboardButton("✏️ Правки", callback_data=f"project_revisions_{project_id}"),
-            InlineKeyboardButton("📄 Скачать ТЗ", callback_data=f"project_download_{project_id}")
+            InlineKeyboardButton("✏️ Правки", callback_data=f"project_revisions_{project_id}")
         ],
         [
             InlineKeyboardButton("📊 Мои проекты", callback_data="my_projects"),

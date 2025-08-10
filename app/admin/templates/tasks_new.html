@@ -648,6 +648,14 @@
                 <h1>
                     <i class="fas fa-tasks"></i>
                     Планировщик задач
+                    {% if user_role == 'owner' %}
+                    <select class="form-select form-select-sm d-inline-block ms-3" id="employeeSelector" style="width: 200px; font-size: 0.9rem;">
+                        <option value="my" selected>Мои задачи</option>
+                        {% for executor in executors %}
+                        <option value="{{ executor.id }}">{{ executor.first_name }} {{ executor.last_name if executor.last_name else '' }}</option>
+                        {% endfor %}
+                    </select>
+                    {% endif %}
                 </h1>
                 <p class="text-muted">Канбан-доска для управления задачами команды</p>
             </div>
@@ -867,6 +875,10 @@ console.log('🚀 JavaScript загружается...');
 
 // Глобальные данные
 let allTasks = {{ tasks | tojson }};
+let currentUserId = {{ current_user_id | default(1) }};
+let currentUserRole = '{{ user_role }}';
+console.log('🔍 Текущий пользователь ID:', currentUserId, 'Role:', currentUserRole);
+console.log('📋 Загруженные задачи:', allTasks);
 let currentFilter = {
     status: '',
     priority: '',
@@ -886,9 +898,90 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`📦 Контейнер ${index + 1}: ID=${container.id}`);
     });
     
+    // Инициализация селектора сотрудников
+    initializeEmployeeSelector();
+    
+    // При загрузке страницы показываем задачи текущего пользователя
+    // (они уже загружены с сервера отфильтрованными)
     loadTasksToBoard();
     updateEmployeeStats();
 });
+
+// Инициализация селектора сотрудников
+function initializeEmployeeSelector() {
+    const selector = document.getElementById('employeeSelector');
+    if (selector) {
+        selector.addEventListener('change', async function() {
+            const value = this.value;
+            console.log('🔄 Выбран сотрудник:', value);
+            
+            if (value === 'my') {
+                // Загружаем мои задачи
+                await loadMyTasks();
+            } else {
+                // Загружаем задачи конкретного сотрудника
+                await loadEmployeeTasks(value);
+            }
+        });
+    }
+}
+
+// Загрузка всех задач
+async function loadAllTasks() {
+    try {
+        const response = await fetch('/admin/tasks/api/tasks', {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            allTasks = data.tasks || [];
+            loadTasksToBoard();
+            updateEmployeeStats();
+            showNotification('Загружены все задачи', 'success');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки задач:', error);
+        showNotification('Ошибка загрузки задач', 'error');
+    }
+}
+
+// Загрузка моих задач
+async function loadMyTasks() {
+    try {
+        const response = await fetch('/admin/tasks/api/tasks/my-tasks', {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            allTasks = data.tasks || [];
+            loadTasksToBoard();
+            updateEmployeeStats();
+            showNotification('Загружены мои задачи', 'success');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки задач:', error);
+        showNotification('Ошибка загрузки задач', 'error');
+    }
+}
+
+// Загрузка задач сотрудника
+async function loadEmployeeTasks(employeeId) {
+    try {
+        const response = await fetch(`/admin/tasks/api/tasks/employee/${employeeId}`, {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            allTasks = data.tasks || [];
+            loadTasksToBoard();
+            updateEmployeeStats();
+            showNotification('Загружены задачи сотрудника', 'success');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки задач:', error);
+        showNotification('Ошибка загрузки задач', 'error');
+    }
+}
 
 // Загрузка задач на доску
 function loadTasksToBoard() {

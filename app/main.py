@@ -226,9 +226,11 @@ class TelegramBot:
         
         # ПРИОРИТЕТ 1 (САМЫЙ ВЫСОКИЙ): Специфичные ID-based маршруты
         
-        # Проекты - детали (очень специфично)
+        # Проекты - детали и чат (очень специфично)
         router.register(r"^project_details_\d+$", projects_handler.show_project_details, 
                        priority=10, description="Детали проекта по ID")
+        router.register(r"^project_chat_\d+$", projects_handler.show_project_chat,
+                       priority=10, description="Чат с исполнителем проекта")
         
         # Правки - специфичные действия
         router.register(r"^project_revisions_\d+$", revisions_handler.show_project_revisions,
@@ -254,24 +256,24 @@ class TelegramBot:
         router.register(r"^list_projects$", projects_handler.show_user_projects,
                        priority=20, description="Показать проекты пользователя")
         
-        # ПРИОРИТЕТ 3: Портфолио специфичное
+        # ПРИОРИТЕТ 3: Портфолио - ОТКЛЮЧЕНО (заменено на канал)
         # Категории портфолио (старый формат callback'ов)
-        router.register(r"^portfolio_(telegram|whatsapp|web|integration|featured|all)$", portfolio_handler.select_category,
-                       priority=25, description="Выбор категории портфолио (старый формат)")
-        # Категории портфолио (новый формат callback'ов)
-        router.register(r"^portfolio_(telegram_bots|web_development|mobile_apps|ai_integration|automation|ecommerce|other|featured)$", portfolio_handler.show_category_portfolio,
-                       priority=30, description="Категории портфолио")
-        router.register(r"^project_\d+$", portfolio_handler.show_project_details,
-                       priority=30, description="Детали проекта в портфолио") 
-        router.register(r"^gallery_\d+$", portfolio_handler.show_project_gallery,
-                       priority=30, description="Галерея изображений проекта")
-        router.register(r"^like_\d+$", portfolio_handler.like_project,
-                       priority=30, description="Лайкнуть проект")
-        router.register(r"^portfolio_page_\d+$", portfolio_handler.show_portfolio_page,
-                       priority=30, description="Навигация по страницам портфолио")
-        # Навигация между проектами
-        router.register(r"^portfolio_nav_\d+$", portfolio_handler.navigate_project,
-                       priority=30, description="Навигация между проектами")
+        # router.register(r"^portfolio_(telegram|whatsapp|web|integration|featured|all)$", portfolio_handler.select_category,
+        #                priority=25, description="Выбор категории портфолио (старый формат)")
+        # # Категории портфолио (новый формат callback'ов)
+        # router.register(r"^portfolio_(telegram_bots|web_development|mobile_apps|ai_integration|automation|ecommerce|other|featured)$", portfolio_handler.show_category_portfolio,
+        #                priority=30, description="Категории портфолио")
+        # router.register(r"^project_\d+$", portfolio_handler.show_project_details,
+        #                priority=30, description="Детали проекта в портфолио") 
+        # router.register(r"^gallery_\d+$", portfolio_handler.show_project_gallery,
+        #                priority=30, description="Галерея изображений проекта")
+        # router.register(r"^like_\d+$", portfolio_handler.like_project,
+        #                priority=30, description="Лайкнуть проект")
+        # router.register(r"^portfolio_page_\d+$", portfolio_handler.show_portfolio_page,
+        #                priority=30, description="Навигация по страницам портфолио")
+        # # Навигация между проектами
+        # router.register(r"^portfolio_nav_\d+$", portfolio_handler.navigate_project,
+        #                priority=30, description="Навигация между проектами")
         
         # ПРИОРИТЕТ 4: ТЗ Creation (ConversationHandler маршруты)
         router.register(r"^create_tz$", tz_handler.show_tz_creation_menu,
@@ -284,12 +286,12 @@ class TelegramBot:
                        priority=40, description="Ответы на пошаговые вопросы ТЗ")
         
         # Действия с готовым ТЗ
-        router.register(r"^(review_|edit_own_tz)", tz_handler.handle_review_action,
+        router.register(r"^(review_|edit_own_tz|tz_save)", tz_handler.handle_review_action,
                        priority=40, description="Действия с готовым ТЗ")
         
-        # ПРИОРИТЕТ 5: Консультации
-        router.register(r"^consultation$", consultant_handler.start_consultation,
-                       priority=50, description="Начать консультацию")
+        # ПРИОРИТЕТ 5: Консультации - ОТКЛЮЧЕНО
+        # router.register(r"^consultation$", consultant_handler.start_consultation,
+        #                priority=50, description="Начать консультацию")
         router.register(r"^(ask_question|example_questions)$", common_handler.handle_callback,
                        priority=50, description="AI консультант - вопросы")
         
@@ -328,7 +330,7 @@ class TelegramBot:
         # ПРИОРИТЕТ 7 (САМЫЙ НИЗКИЙ): Основное меню и общие команды
         router.register(r"^main_menu$", start_handler.start,
                        priority=70, description="Главное меню")
-        router.register(r"^(calculator|faq|contacts|my_projects|consultant|portfolio|settings|create_bot_guide)$", 
+        router.register(r"^(calculator|faq|contacts|my_projects|consultant|settings|create_bot_guide)$", 
                        common_handler.handle_callback, priority=70, description="Основные разделы меню")
         
         # Логируем все зарегистрированные маршруты
@@ -424,3 +426,17 @@ async def admin_debug():
         "admin_port": settings.ADMIN_PORT,
         "database_status": "connected"
     }
+
+if __name__ == "__main__":
+    import uvicorn
+    settings = get_settings()
+    
+    logger.info(f"🚀 Запуск сервера на {settings.server_host}:{settings.server_port}")
+    
+    uvicorn.run(
+        "app.main:app",
+        host=settings.server_host,
+        port=settings.server_port,
+        reload=False,  # Отключаем reload для продакшена
+        log_level="info"
+    )

@@ -91,8 +91,88 @@ class ProjectsHandler:
             logger.error(f"Ошибка в show_user_projects: {e}")
     
     @standard_handler
+    async def show_project_chat(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Показать чат с исполнителем проекта"""
+        try:
+            query = update.callback_query
+            user_id = update.effective_user.id
+            
+            project_id = int(query.data.replace('project_chat_', ''))
+            
+            log_user_action(user_id, "show_project_chat", str(project_id))
+            
+            with get_db_context() as db:
+                from ...database.database import get_or_create_user
+                user = get_or_create_user(db, user_id)
+                
+                # Загружаем проект
+                project = db.query(Project).filter(
+                    Project.id == project_id,
+                    Project.user_id == user.id
+                ).first()
+                
+                if not project:
+                    await query.answer("Проект не найден")
+                    return
+                
+                # Проверяем, есть ли назначенный исполнитель
+                executor_id = project.executor_id if hasattr(project, 'executor_id') else None
+                executor_username = project.executor_username if hasattr(project, 'executor_username') else None
+            
+            if not executor_id and not executor_username:
+                text = """
+💬 <b>Чат с исполнителем</b>
+
+⚠️ На данный проект еще не назначен исполнитель.
+
+Как только исполнитель будет назначен, вы сможете общаться с ним через этот чат.
+
+А пока вы можете:
+• Посмотреть детали проекта
+• Добавить правки к проекту
+• Связаться с поддержкой
+                """
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("📝 Детали проекта", callback_data=f"project_details_{project_id}")],
+                    [InlineKeyboardButton("✏️ Правки", callback_data=f"project_revisions_{project_id}")],
+                    [InlineKeyboardButton("📞 Поддержка", callback_data="contacts")],
+                    [InlineKeyboardButton("◀️ Назад", callback_data="my_projects")]
+                ])
+            else:
+                # Если исполнитель назначен
+                executor_contact = f"@{executor_username}" if executor_username else f"ID: {executor_id}"
+                text = f"""
+💬 <b>Чат с исполнителем проекта</b>
+
+📋 Проект: <b>{project.title}</b>
+👤 Исполнитель: <b>{executor_contact}</b>
+
+Для связи с исполнителем используйте:
+{f'• Telegram: @{executor_username}' if executor_username else f'• Обратитесь в поддержку для связи с исполнителем (ID: {executor_id})'}
+
+<b>Важно:</b> Все обсуждения ведите в рамках проекта для сохранения истории переписки.
+                """
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton(f"💬 Написать @{executor_username}" if executor_username else "📞 Поддержка", 
+                                        url=f"https://t.me/{executor_username}" if executor_username else None,
+                                        callback_data="contacts" if not executor_username else None)],
+                    [InlineKeyboardButton("📝 Детали проекта", callback_data=f"project_details_{project_id}")],
+                    [InlineKeyboardButton("◀️ Назад", callback_data="my_projects")]
+                ])
+            
+            await query.edit_message_text(
+                text,
+                reply_markup=keyboard,
+                parse_mode='HTML'
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка в show_project_chat: {e}")
+            await query.answer("Произошла ошибка при открытии чата")
+    
+    @standard_handler
     async def show_project_details(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Показать детали проекта"""
+        """Показать расширенные детали проекта"""
         try:
             query = update.callback_query
             user_id = update.effective_user.id
@@ -134,19 +214,19 @@ class ProjectsHandler:
                     'user_preferences': user.preferences if user else None
                 }
             
-            # Формируем детальную информацию
+            # Формируем расширенную детальную информацию
             text = f"""
 📋 <b>Проект #{project_data['id']}</b>
 
 <b>📝 Название:</b> {project_data['title']}
 
-<b>📄 Описание:</b>
-{project_data['description'][:300]}{'...' if len(project_data['description']) > 300 else ''}
+<b>📄 Полное описание:</b>
+{project_data['description'] if project_data['description'] else 'Описание не указано'}
 
-<b>📊 Информация:</b>
+<b>📊 Подробная информация:</b>
 • Статус: {self._get_status_emoji(project_data['status'])} {self._get_status_name(project_data['status'])}
-• Сложность: {project_data['complexity']}
-• Тип: {self._get_type_name(project_data['project_type'])}
+• Сложность: {project_data['complexity'] if project_data['complexity'] else 'Не указана'}
+• Тип проекта: {self._get_type_name(project_data['project_type'])}
 
 <b>💰 Финансы:</b>
 • Оценочная стоимость: {format_currency(project_data['estimated_cost'])}
@@ -320,8 +400,7 @@ class ProjectsHandler:
             # Кнопки действий для каждого проекта
             keyboard.append([
                 InlineKeyboardButton("💬 Чат", callback_data=f"project_chat_{project_data['id']}"),
-                InlineKeyboardButton("✏️ Правки", callback_data=f"project_revisions_{project_data['id']}"),
-                InlineKeyboardButton("📄 Скачать ТЗ", callback_data=f"project_download_{project_data['id']}")
+                InlineKeyboardButton("✏️ Правки", callback_data=f"project_revisions_{project_data['id']}")
             ])
         
         # Если проектов больше 5, добавляем кнопку "Показать все"

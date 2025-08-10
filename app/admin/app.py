@@ -257,6 +257,42 @@ def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
     )
 
 
+@admin_router.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Страница входа в админ-панель"""
+    return templates.TemplateResponse("login.html", {
+        "request": request
+    })
+
+@admin_router.post("/login")
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    """Обработка входа"""
+    try:
+        # Проверяем простую аутентификацию
+        if username == settings.ADMIN_USERNAME and password == settings.ADMIN_PASSWORD:
+            response = RedirectResponse(url="/admin/", status_code=302)
+            # Можно добавить установку cookies для сессии
+            return response
+        
+        # Проверяем исполнителей в базе данных
+        admin_user = AuthService.authenticate_user(username, password)
+        if admin_user:
+            response = RedirectResponse(url="/admin/", status_code=302)
+            return response
+            
+        # Если аутентификация не прошла
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Неверные учетные данные"
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка при входе: {e}")
+        return templates.TemplateResponse("login.html", {
+            "request": request,
+            "error": "Ошибка сервера"
+        })
+
 @admin_router.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, username: str = Depends(authenticate)):
     """Главная страница админ-панели"""
@@ -530,61 +566,7 @@ async def project_detail_page(request: Request, project_id: int, username: str =
         logger.error(f"Ошибка в project_detail_page: {e}")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
-@admin_router.get("/users", response_class=HTMLResponse)
-@RoleMiddleware.require_role("owner")
-async def users_page(request: Request, username: str = Depends(authenticate), current_user: dict = None):
-    """Страница управления пользователями (только для владельца)"""
-    try:
-        user_role = get_user_role(username)
-        navigation_items = get_navigation_items(user_role)
-        
-        with get_db_context() as db:
-            users_raw = db.query(User).order_by(
-                User.registration_date.desc()
-            ).all()
-            
-            # Конвертируем в словари В РАМКАХ СЕССИИ
-            users = []
-            for u in users_raw:
-                try:
-                    # Считаем проекты и консультации в сессии
-                    projects_count = db.query(Project).filter(Project.user_id == u.id).count()
-                    sessions_count = 0  # Временно убираем подсчет сессий
-                    # sessions_count = db.query(ConsultantSession).filter(ConsultantSession.user_id == u.id).count()
-                    
-                    user_dict = {
-                        'id': u.id,
-                        'telegram_id': u.telegram_id,
-                        'username': u.username,
-                        'first_name': u.first_name,
-                        'last_name': u.last_name,
-                        'phone': u.phone,
-                        'email': u.email,
-                        'registration_date': u.registration_date.isoformat() if u.registration_date else None,
-                        'last_activity': u.last_activity.isoformat() if u.last_activity else None,
-                        'state': u.state,
-                        'is_active': u.is_active,
-                        'preferences': u.preferences or {},
-                        'notes': u.notes,
-                        'projects_count': projects_count,
-                        'sessions_count': sessions_count
-                    }
-                    users.append(user_dict)
-                except Exception as e:
-                    logger.error(f"Ошибка обработки пользователя {u.id}: {e}")
-                    continue
-        
-        return templates.TemplateResponse("users.html", {
-            "request": request,
-            "username": username,
-            "user_role": user_role,
-            "navigation_items": navigation_items,
-            "users": users
-        })
-        
-    except Exception as e:
-        logger.error(f"Ошибка в users_page: {e}")
-        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+# Удалено - дублирует другой обработчик /users ниже
 
 @admin_router.get("/contractors", response_class=HTMLResponse)
 async def contractors_page(request: Request, username: str = Depends(authenticate)):
@@ -667,18 +649,137 @@ async def settings_page(request: Request, username: str = Depends(authenticate),
         logger.error(f"Ошибка в settings_page: {e}")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
+@admin_router.get("/users", response_class=HTMLResponse)
+async def users_page(request: Request, username: str = Depends(authenticate)):
+    """Страница управления пользователями"""
+    try:
+        user_role = get_user_role(username)
+        
+        # Только владелец может управлять пользователями
+        if user_role != 'owner':
+            raise HTTPException(status_code=403, detail="Недостаточно прав")
+        
+        navigation_items = get_navigation_items(user_role)
+        
+        # Получаем список пользователей
+        with get_db_context() as db:
+            users_raw = db.query(AdminUser).order_by(AdminUser.created_at.desc()).all()
+            users = []
+            for user in users_raw:
+                user_dict = user.to_dict()
+                # Добавляем статистику по задачам
+                from app.database.models import Task
+                user_dict['tasks_count'] = db.query(Task).filter(Task.assigned_to_id == user.id).count()
+                user_dict['active_tasks'] = db.query(Task).filter(
+                    Task.assigned_to_id == user.id,
+                    Task.status.in_(['pending', 'in_progress'])
+                ).count()
+                users.append(user_dict)
+        
+        return templates.TemplateResponse("users.html", {
+            "request": request,
+            "username": username,
+            "user_role": user_role,
+            "navigation_items": navigation_items,
+            "users": users
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка в users_page: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
 @admin_router.get("/finance", response_class=HTMLResponse)
 async def finance_page(request: Request, username: str = Depends(authenticate)):
     """Страница управления финансами"""
     try:
         user_role = get_user_role(username)
         navigation_items = get_navigation_items(user_role)
+        current_user = get_current_user(username)
         
-        return templates.TemplateResponse("finance_improved.html", {
+        # Получаем статистику для текущего месяца
+        from datetime import datetime, timedelta
+        from sqlalchemy import func
+        from ..database.models import FinanceTransaction
+        from ..database.database import get_db_context
+        
+        now = datetime.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        with get_db_context() as db:
+            # Базовый запрос с фильтрацией по пользователю для исполнителей
+            base_query = db.query(FinanceTransaction)
+            if user_role == "executor":
+                base_query = base_query.filter(FinanceTransaction.created_by_id == current_user["id"])
+            
+            # Доходы за месяц
+            total_income = base_query.filter(
+            FinanceTransaction.type == "income",
+            FinanceTransaction.date >= month_start
+        ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+        
+            # Расходы за месяц
+            total_expenses = base_query.filter(
+            FinanceTransaction.type == "expense",
+            FinanceTransaction.date >= month_start
+        ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+        
+            # Общий баланс
+            balance = base_query.with_entities(
+            func.sum(func.case(
+                (FinanceTransaction.type == "income", FinanceTransaction.amount),
+                (FinanceTransaction.type == "expense", -FinanceTransaction.amount),
+                else_=0
+            ))
+        ).scalar() or 0
+        
+            # Прибыль
+            profit = total_income - total_expenses
+            
+            # Расчет изменений (пример)
+            income_change = 12.5
+            expense_change = 8.2
+            profit_change = 15.0 if profit > 0 else -5.0
+            savings_rate = round((profit / total_income * 100) if total_income > 0 else 0, 1)
+            
+            # Последние транзакции
+            recent_transactions_query = base_query.order_by(
+            FinanceTransaction.date.desc()
+        ).limit(10).all()
+        
+            recent_transactions = []
+            for t in recent_transactions_query:
+                icon = "shopping-cart" if t.type == "expense" else "dollar-sign"
+                recent_transactions.append({
+                    "id": t.id,
+                    "type": t.type,
+                    "icon": icon,
+                    "description": t.description,
+                    "category": t.category.name if t.category else "Без категории",
+                    "date": t.date.strftime("%d.%m.%Y"),
+                    "amount": t.amount
+                })
+        
+        stats = {
+            "total_income": total_income,
+            "total_expenses": total_expenses,
+            "balance": balance,
+            "profit": profit,
+            "income_change": income_change,
+            "expense_change": expense_change,
+            "profit_change": profit_change,
+            "savings_rate": savings_rate
+        }
+        
+        return templates.TemplateResponse("finance_simple.html", {
             "request": request,
             "username": username,
             "user_role": user_role,
-            "navigation_items": navigation_items
+            "navigation_items": navigation_items,
+            "stats": stats,
+            "recent_transactions": recent_transactions,
+            "today": now.strftime("%Y-%m-%d")
         })
         
     except Exception as e:
@@ -1677,7 +1778,6 @@ def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
             {"name": "Мои проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
             {"name": "Мои файлы", "url": "/project-files", "icon": "fas fa-folder"},
             {"name": "Правки", "url": "/revisions", "icon": "fas fa-edit"},
-            {"name": "Планировщик задач", "url": "/tasks/", "icon": "fas fa-tasks"},
             {"name": "Мои задачи", "url": "/tasks/user/my-tasks", "icon": "fas fa-clipboard-list"},
             {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"}
         ]

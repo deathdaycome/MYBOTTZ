@@ -265,11 +265,6 @@
                 </button>
             </form>
             
-            <div class="text-center mt-3">
-                <small class="text-muted">
-                    Владелец: admin/qwerty123 • Исполнитель: executor/executor123
-                </small>
-            </div>
             
             <div class="text-center mt-2">
                 <small class="text-info">
@@ -304,13 +299,9 @@
             const usernameField = document.getElementById('username');
             const passwordField = document.getElementById('password');
             
-            if (role === 'owner') {
-                usernameField.value = 'admin';
-                passwordField.value = 'qwerty123';
-            } else {
-                usernameField.value = 'executor';
-                passwordField.value = 'executor123';
-            }
+            // Очищаем поля при выборе роли
+            usernameField.value = '';
+            passwordField.value = '';
         }
 
         // Toggle password visibility

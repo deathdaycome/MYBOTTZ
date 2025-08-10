@@ -496,15 +496,19 @@ html, body {
 
 {% block header_actions %}
 <div class="btn-group">
+    {% if user_role == 'owner' %}
     <button class="btn btn-primary btn-custom" onclick="showCreateProjectModal();">
         <i class="fas fa-plus me-1"></i> Создать проект
     </button>
+    {% endif %}
     <button class="btn btn-secondary btn-custom" onclick="refreshProjects()">
         <i class="fas fa-sync-alt me-1"></i> Обновить
     </button>
+    {% if user_role == 'owner' %}
     <button class="btn btn-success btn-custom" onclick="exportProjects()">
         <i class="fas fa-download me-1"></i> Экспорт
     </button>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -767,9 +771,14 @@ html, body {
                                 </span>
                                                     </td>
                         <td>
-                            <div class="fw-bold">{{ (project.estimated_cost or 0)|round|int }}₽</div>
-                            {% if project.final_cost and project.final_cost != project.estimated_cost %}
-                            <small class="text-success">Финал: {{ (project.final_cost)|round|int }}₽</small>
+                            {% if user_role == 'owner' %}
+                                <div class="fw-bold">{{ (project.estimated_cost or 0)|round|int }}₽</div>
+                                {% if project.final_cost and project.final_cost != project.estimated_cost %}
+                                <small class="text-success">Финал: {{ (project.final_cost)|round|int }}₽</small>
+                                {% endif %}
+                            {% else %}
+                                <div class="fw-bold">{{ (project.executor_cost or 0)|round|int }}₽</div>
+                                <small class="text-success">Выплачено: {{ (project.executor_paid_total or 0)|round|int }}₽</small>
                             {% endif %}
                         </td>
                         <td>

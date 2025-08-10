@@ -908,6 +908,10 @@ AI проанализирует ваше описание и создаст ст
     async def _show_own_tz_preview(self, update: Update, context: ContextTypes.DEFAULT_TYPE, tz_data: Dict):
         """Показать предварительный просмотр собственного ТЗ"""
         try:
+            # Сохраняем данные в context для последующего использования при сохранении
+            context.user_data['tz_creation'] = tz_data
+            logger.info(f"Данные сохранены в context.user_data при показе превью: {list(tz_data.keys())}")
+            
             tz_text = tz_data.get('tz_text', '')
             title = tz_data.get('title', 'Проект пользователя')
             estimated_cost = tz_data.get('estimated_cost', 0)
@@ -957,7 +961,7 @@ AI проанализирует ваше описание и создаст ст
             user_id = update.effective_user.id
             logger.info(f"handle_review_action: пользователь {user_id}, callback_data: {callback_data}")
             
-            if callback_data == "review_save":
+            if callback_data == "review_save" or callback_data == "tz_save":
                 logger.info(f"Пользователь {user_id} нажал кнопку сохранения")
                 await self._save_tz(update, context)
                 return ConversationHandler.END

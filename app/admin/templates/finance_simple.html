@@ -1,0 +1,793 @@
+{% extends "base.html" %}
+
+{% block title %}Финансы - Админ-панель{% endblock %}
+
+{% block page_title %}💰 Финансы{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Основные карточки статистики */
+.stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+
+.stat-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.stat-value {
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 8px;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.stat-change {
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 12px;
+}
+
+.stat-change.positive {
+    color: #10b981;
+}
+
+.stat-change.negative {
+    color: #ef4444;
+}
+
+/* Цветовые схемы для карточек */
+.income-card {
+    background: linear-gradient(135deg, #d4f4dd 0%, #bbf0d1 100%);
+}
+
+.income-card .stat-icon {
+    background: #10b981;
+    color: white;
+}
+
+.income-card .stat-value {
+    color: #059669;
+}
+
+.expense-card {
+    background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+}
+
+.expense-card .stat-icon {
+    background: #ef4444;
+    color: white;
+}
+
+.expense-card .stat-value {
+    color: #dc2626;
+}
+
+.balance-card {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+}
+
+.balance-card .stat-icon {
+    background: #3b82f6;
+    color: white;
+}
+
+.balance-card .stat-value {
+    color: #2563eb;
+}
+
+.profit-card {
+    background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);
+}
+
+.profit-card .stat-icon {
+    background: #a855f7;
+    color: white;
+}
+
+.profit-card .stat-value {
+    color: #9333ea;
+}
+
+/* Секция быстрых действий */
+.quick-actions {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.quick-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.quick-action-btn {
+    padding: 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    background: white;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    color: #374151;
+}
+
+.quick-action-btn:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    transform: translateY(-2px);
+    text-decoration: none;
+    color: #2563eb;
+}
+
+.quick-action-btn i {
+    font-size: 24px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.quick-action-btn span {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* Таблица транзакций */
+.transactions-section {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.transaction-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.filter-btn:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.filter-btn.active {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.transaction-item {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.2s;
+}
+
+.transaction-item:hover {
+    background: #f9fafb;
+}
+
+.transaction-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 16px;
+    font-size: 18px;
+}
+
+.transaction-icon.income {
+    background: #d4f4dd;
+    color: #10b981;
+}
+
+.transaction-icon.expense {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.transaction-details {
+    flex: 1;
+}
+
+.transaction-title {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.transaction-meta {
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.transaction-amount {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.transaction-amount.income {
+    color: #10b981;
+}
+
+.transaction-amount.expense {
+    color: #ef4444;
+}
+
+/* График */
+.chart-section {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+
+.chart-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.chart-tab {
+    padding: 8px 16px;
+    border: none;
+    background: #f3f4f6;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.chart-tab:hover {
+    background: #e5e7eb;
+}
+
+.chart-tab.active {
+    background: #3b82f6;
+    color: white;
+}
+
+.chart-container {
+    height: 300px;
+    position: relative;
+}
+
+/* Модальное окно добавления транзакции */
+.modal-quick-add {
+    max-width: 500px;
+}
+
+.amount-input {
+    font-size: 24px;
+    font-weight: 600;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px 16px;
+    text-align: center;
+}
+
+.amount-input:focus {
+    border-color: #3b82f6;
+    outline: none;
+}
+
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.category-btn {
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    background: white;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.category-btn:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+}
+
+.category-btn.selected {
+    background: #3b82f6;
+    color: white;
+    border-color: #3b82f6;
+}
+
+.category-btn i {
+    display: block;
+    font-size: 20px;
+    margin-bottom: 4px;
+}
+
+.category-btn span {
+    font-size: 12px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Основная статистика -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card income-card">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">{{ "{:,.0f}".format(stats.total_income).replace(",", " ") }}₽</div>
+                    <div class="stat-label">Доходы</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-arrow-up"></i>
+                </div>
+            </div>
+            <div class="stat-change positive">
+                <i class="fas fa-trending-up"></i>
+                +{{ stats.income_change }}% за месяц
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card expense-card">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">{{ "{:,.0f}".format(stats.total_expenses).replace(",", " ") }}₽</div>
+                    <div class="stat-label">Расходы</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-arrow-down"></i>
+                </div>
+            </div>
+            <div class="stat-change negative">
+                <i class="fas fa-trending-down"></i>
+                +{{ stats.expense_change }}% за месяц
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card profit-card">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">{{ "{:,.0f}".format(stats.profit).replace(",", " ") }}₽</div>
+                    <div class="stat-label">Прибыль</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+            </div>
+            <div class="stat-change {% if stats.profit_change > 0 %}positive{% else %}negative{% endif %}">
+                <i class="fas fa-{% if stats.profit_change > 0 %}trending-up{% else %}trending-down{% endif %}"></i>
+                {{ stats.profit_change }}% за месяц
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="stat-card balance-card">
+            <div class="stat-card-header">
+                <div>
+                    <div class="stat-value">{{ "{:,.0f}".format(stats.balance).replace(",", " ") }}₽</div>
+                    <div class="stat-label">Баланс</div>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-wallet"></i>
+                </div>
+            </div>
+            <div class="stat-change">
+                <i class="fas fa-percent"></i>
+                Экономия {{ stats.savings_rate }}%
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Быстрые действия -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="quick-actions">
+            <h5 class="mb-3">Быстрые действия</h5>
+            <div class="quick-actions-grid">
+                <button class="quick-action-btn" onclick="openQuickAdd('income')">
+                    <i class="fas fa-plus-circle text-success"></i>
+                    <span>Добавить доход</span>
+                </button>
+                <button class="quick-action-btn" onclick="openQuickAdd('expense')">
+                    <i class="fas fa-minus-circle text-danger"></i>
+                    <span>Добавить расход</span>
+                </button>
+                <button class="quick-action-btn" onclick="exportReport()">
+                    <i class="fas fa-file-download text-primary"></i>
+                    <span>Скачать отчет</span>
+                </button>
+                <button class="quick-action-btn" onclick="showAnalytics()">
+                    <i class="fas fa-chart-pie text-warning"></i>
+                    <span>Аналитика</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- График и последние транзакции -->
+<div class="row">
+    <!-- График -->
+    <div class="col-lg-8 mb-4">
+        <div class="chart-section">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Динамика финансов</h5>
+                <div class="chart-tabs">
+                    <button class="chart-tab active" onclick="switchChart('week')">Неделя</button>
+                    <button class="chart-tab" onclick="switchChart('month')">Месяц</button>
+                    <button class="chart-tab" onclick="switchChart('year')">Год</button>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="financeChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Последние транзакции -->
+    <div class="col-lg-4 mb-4">
+        <div class="transactions-section">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Последние операции</h5>
+                <a href="/admin/finance/transactions" class="btn btn-sm btn-outline-primary">Все</a>
+            </div>
+            
+            <div class="transaction-filters">
+                <button class="filter-btn active" onclick="filterTransactions('all')">Все</button>
+                <button class="filter-btn" onclick="filterTransactions('income')">Доходы</button>
+                <button class="filter-btn" onclick="filterTransactions('expense')">Расходы</button>
+            </div>
+            
+            <div id="transactionsList">
+                {% for transaction in recent_transactions %}
+                <div class="transaction-item" data-type="{{ transaction.type }}">
+                    <div class="transaction-icon {{ transaction.type }}">
+                        <i class="fas fa-{{ transaction.icon }}"></i>
+                    </div>
+                    <div class="transaction-details">
+                        <div class="transaction-title">{{ transaction.description }}</div>
+                        <div class="transaction-meta">{{ transaction.category }} • {{ transaction.date }}</div>
+                    </div>
+                    <div class="transaction-amount {{ transaction.type }}">
+                        {{ "+" if transaction.type == 'income' else "-" }}{{ "{:,.0f}".format(transaction.amount).replace(",", " ") }}₽
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно быстрого добавления -->
+<div class="modal fade" id="quickAddModal" tabindex="-1">
+    <div class="modal-dialog modal-quick-add">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickAddTitle">Добавить транзакцию</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="quickAddForm">
+                    <input type="hidden" id="transactionType" value="">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Сумма</label>
+                        <input type="number" class="form-control amount-input" id="amount" placeholder="0" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Категория</label>
+                        <div class="category-grid" id="categoryGrid">
+                            <!-- Заполняется динамически -->
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <input type="text" class="form-control" id="description" placeholder="Введите описание">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Дата</label>
+                        <input type="date" class="form-control" id="date" value="{{ today }}">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuickTransaction()">
+                    <i class="fas fa-save me-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Инициализация графика
+let financeChart;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initFinanceChart();
+});
+
+function initFinanceChart() {
+    const ctx = document.getElementById('financeChart').getContext('2d');
+    financeChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+            datasets: [{
+                label: 'Доходы',
+                data: [15000, 22000, 18000, 25000, 20000, 12000, 8000],
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Расходы',
+                data: [5000, 8000, 6000, 7000, 9000, 4000, 3000],
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                tension: 0.4,
+                fill: true
+            }, {
+                label: 'Прибыль',
+                data: [10000, 14000, 12000, 18000, 11000, 8000, 5000],
+                borderColor: '#a855f7',
+                backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'bottom'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            label += new Intl.NumberFormat('ru-RU', { 
+                                style: 'currency', 
+                                currency: 'RUB',
+                                maximumFractionDigits: 0
+                            }).format(context.parsed.y);
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return new Intl.NumberFormat('ru-RU', { 
+                                style: 'currency', 
+                                currency: 'RUB',
+                                maximumFractionDigits: 0,
+                                minimumFractionDigits: 0
+                            }).format(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Переключение периода графика
+function switchChart(period) {
+    document.querySelectorAll('.chart-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    // Загрузка данных для выбранного периода
+    loadChartData(period);
+}
+
+// Фильтрация транзакций
+function filterTransactions(type) {
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.classList.add('active');
+    
+    const transactions = document.querySelectorAll('.transaction-item');
+    transactions.forEach(item => {
+        if (type === 'all' || item.dataset.type === type) {
+            item.style.display = 'flex';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Открытие модального окна быстрого добавления
+function openQuickAdd(type) {
+    document.getElementById('transactionType').value = type;
+    document.getElementById('quickAddTitle').textContent = 
+        type === 'income' ? 'Добавить доход' : 'Добавить расход';
+    
+    // Загрузка категорий
+    loadCategories(type);
+    
+    const modal = new bootstrap.Modal(document.getElementById('quickAddModal'));
+    modal.show();
+}
+
+// Загрузка категорий
+function loadCategories(type) {
+    const categories = type === 'income' ? [
+        { id: 1, name: 'Проекты', icon: 'briefcase' },
+        { id: 2, name: 'Консультации', icon: 'comments' },
+        { id: 3, name: 'Поддержка', icon: 'life-ring' },
+        { id: 4, name: 'Другое', icon: 'ellipsis-h' }
+    ] : [
+        { id: 5, name: 'Зарплата', icon: 'user-tie' },
+        { id: 6, name: 'Хостинг', icon: 'server' },
+        { id: 7, name: 'Реклама', icon: 'ad' },
+        { id: 8, name: 'Офис', icon: 'building' },
+        { id: 9, name: 'Другое', icon: 'ellipsis-h' }
+    ];
+    
+    const grid = document.getElementById('categoryGrid');
+    grid.innerHTML = categories.map(cat => `
+        <button type="button" class="category-btn" onclick="selectCategory(${cat.id}, this)">
+            <i class="fas fa-${cat.icon}"></i>
+            <span>${cat.name}</span>
+        </button>
+    `).join('');
+}
+
+// Выбор категории
+function selectCategory(categoryId, button) {
+    document.querySelectorAll('.category-btn').forEach(btn => {
+        btn.classList.remove('selected');
+    });
+    button.classList.add('selected');
+    button.dataset.categoryId = categoryId;
+}
+
+// Сохранение транзакции
+async function saveQuickTransaction() {
+    const form = document.getElementById('quickAddForm');
+    const selectedCategory = document.querySelector('.category-btn.selected');
+    
+    if (!selectedCategory) {
+        showNotification('Выберите категорию', 'warning');
+        return;
+    }
+    
+    const data = {
+        type: document.getElementById('transactionType').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        category_id: selectedCategory.dataset.categoryId,
+        description: document.getElementById('description').value,
+        date: document.getElementById('date').value
+    };
+    
+    try {
+        const response = await fetch('/admin/api/finance/transactions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            showNotification('Транзакция добавлена', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('quickAddModal')).hide();
+            location.reload();
+        } else {
+            showNotification('Ошибка при добавлении транзакции', 'danger');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Ошибка при добавлении транзакции', 'danger');
+    }
+}
+
+// Экспорт отчета
+function exportReport() {
+    window.location.href = '/admin/api/finance/export?format=xlsx';
+}
+
+// Показать аналитику
+function showAnalytics() {
+    window.location.href = '/admin/finance/analytics';
+}
+
+// Загрузка данных графика
+async function loadChartData(period) {
+    try {
+        const response = await fetch(`/admin/api/finance/chart-data?period=${period}`);
+        const data = await response.json();
+        
+        financeChart.data.labels = data.labels;
+        financeChart.data.datasets[0].data = data.income;
+        financeChart.data.datasets[1].data = data.expenses;
+        financeChart.data.datasets[2].data = data.profit;
+        financeChart.update();
+    } catch (error) {
+        console.error('Error loading chart data:', error);
+    }
+}
+</script>
+{% endblock %}
