@@ -43,6 +43,26 @@ jobs:
           # Выполняем миграции базы данных (если нужно)
           # python -m alembic upgrade head
           
+          # Создаем ecosystem.config.js если его нет
+          cat > ecosystem.config.js << 'EOF'
+          module.exports = {
+            apps: [{
+              name: 'bot-business-card',
+              script: 'python',
+              args: '-m app.main',
+              cwd: '/home/root/bot_business_card',
+              interpreter: '/home/root/bot_business_card/venv/bin/python',
+              instances: 1,
+              autorestart: true,
+              watch: false,
+              max_memory_restart: '500M',
+              env: {
+                NODE_ENV: 'production'
+              }
+            }]
+          };
+          EOF
+          
           # Полностью останавливаем и удаляем процесс
           pm2 stop bot-business-card || true
           pm2 delete bot-business-card || true
