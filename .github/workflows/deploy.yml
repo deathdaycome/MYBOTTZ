@@ -55,10 +55,15 @@ jobs:
           # Обновляем зависимости
           pip install -r requirements.txt
           
-          # Создаем .env файл если его нет
+          # Дополнительно устанавливаем python-telegram-bot на случай если не установился
+          pip install python-telegram-bot
+          
+          # Проверяем наличие .env файла
           if [ ! -f ".env" ]; then
-            echo "Создаем файл .env..."
-            cp .env.example .env 2>/dev/null || echo "BOT_TOKEN=your_bot_token_here" > .env
+            echo "⚠️ Внимание: .env файл не найден! Бот не запустится без токенов."
+            echo "Скопируйте .env файл с локальной машины на сервер"
+          else
+            echo "✅ .env файл найден"
           fi
           
           # Очищаем кэш Python для применения изменений
