@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: 'bot',
+    name: 'bot-business-card',
     script: 'python',
     args: '-m app.main',
     cwd: '/home/root/bot_business_card',

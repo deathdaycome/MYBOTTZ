@@ -40,7 +40,7 @@ jobs:
           # python -m alembic upgrade head
           
           # Перезапускаем бота через PM2
-          pm2 restart bot || pm2 restart all
+          pm2 restart bot-business-card || pm2 start ecosystem.config.js
           
           # Сохраняем конфигурацию PM2
           pm2 save
@@ -49,6 +49,6 @@ jobs:
           pm2 status
           
           # Показываем последние логи
-          pm2 logs bot --lines 10 --nostream
+          pm2 logs bot-business-card --lines 10 --nostream
           
           echo "✅ Деплой завершен успешно! Бот перезапущен через PM2"
