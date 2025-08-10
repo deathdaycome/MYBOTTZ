@@ -19,7 +19,11 @@ jobs:
         port: ${{ secrets.SERVER_PORT }}
         script: |
           # Переходим в директорию проекта
-          cd ~/bot_business_card
+          cd $HOME/bot_business_card
+          
+          # Проверяем что мы в правильной директории
+          pwd
+          ls -la
           
           # Сохраняем локальные изменения (если есть)
           git stash
@@ -47,9 +51,8 @@ jobs:
           pm2 stop bot-business-card || true
           pm2 delete bot-business-card || true
           
-          # Запускаем PM2 напрямую без конфигурационного файла
-          cd ~/bot_business_card
-          pm2 start venv/bin/python --name bot-business-card --interpreter none -- -m app.main
+          # Запускаем PM2 из текущей директории
+          pm2 start ./venv/bin/python --name bot-business-card --interpreter none -- -m app.main
           
           # Сохраняем конфигурацию PM2
           pm2 save
