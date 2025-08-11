@@ -487,9 +487,7 @@ async function viewContractor(contractorId) {
     try {
         console.log('Просмотр исполнителя:', contractorId);
         const response = await fetch(`/admin/api/contractors/${contractorId}`, {
-            headers: {
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
-            }
+            credentials: 'include'
         });
         
         const data = await response.json();
@@ -554,9 +552,9 @@ function createPayment(contractorId) {
         fetch(`/admin/api/contractors/${contractorId}/payments`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+                'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify({
                 amount: parseFloat(amount),
                 description: description
@@ -585,9 +583,7 @@ async function editContractor(contractorId) {
         
         // Загружаем данные исполнителя
         const response = await fetch(`/admin/api/contractors/${contractorId}`, {
-            headers: {
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
-            }
+            credentials: 'include'
         });
         
         const data = await response.json();
@@ -676,9 +672,9 @@ async function saveEditedContractor(contractorId) {
         const response = await fetch(`/admin/api/contractors/${contractorId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
+                'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(contractorData)
         });
         
@@ -713,9 +709,7 @@ async function deleteContractor(contractorId) {
         
         const response = await fetch(`/admin/api/contractors/${contractorId}`, {
             method: 'DELETE',
-            headers: {
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
-            }
+            credentials: 'include'
         });
         
         const data = await response.json();
@@ -1476,9 +1470,7 @@ async function loadContractors(page = 1) {
         
         console.log('Отправляем запрос...');
         const response = await fetch(url, {
-            headers: {
-                'Authorization': 'Basic ' + btoa(`${adminUsername}:${adminPassword}`)
-            }
+            credentials: 'include'
         });
         
         console.log('Response получен:');

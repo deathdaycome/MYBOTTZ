@@ -76,6 +76,7 @@ class Project(Base):
     priority = Column(String(20), default="normal")  # low, normal, high, urgent
     project_type = Column(String(50), nullable=True)  # telegram_bot, whatsapp_bot, web_bot, integration
     complexity = Column(String(20), default="medium")  # simple, medium, complex, premium
+    color = Column(String(20), default="default")  # default, green, yellow, red
     estimated_cost = Column(Float, default=0.0)  # Полная стоимость проекта (видит только владелец)
     executor_cost = Column(Float, nullable=True)  # Стоимость для исполнителя (видит исполнитель)
     final_cost = Column(Float, nullable=True)
@@ -116,6 +117,7 @@ class Project(Base):
             "priority": self.priority,
             "project_type": self.project_type,
             "complexity": self.complexity,
+            "color": self.color if hasattr(self, 'color') else 'default',
             "estimated_cost": self.estimated_cost,
             "executor_cost": self.executor_cost,
             "final_cost": self.final_cost,

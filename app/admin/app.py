@@ -454,6 +454,9 @@ async def projects_page(request: Request, username: str = Depends(authenticate))
             query = db.query(Project).join(User, Project.user_id == User.id, isouter=True)
 
             # Получаем проекты в зависимости от роли
+            # Не показываем завершенные проекты на главной странице
+            query = query.filter(Project.status != 'completed')
+            
             if user_role == "owner":
                 # Владелец видит все проекты
                 projects_raw = query.order_by(Project.created_at.desc()).all()

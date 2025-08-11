@@ -29,31 +29,55 @@ html, body {
     flex-direction: column;
 }
 
-#projectModal .modal-dialog {
-    max-height: 90vh;
+.modal {
+    z-index: 1050 !important;
+}
+
+.modal-backdrop {
+    z-index: 1040 !important;
+}
+
+.modal-dialog {
+    margin: 1.75rem auto;
+    max-height: calc(100vh - 3.5rem);
+}
+
+.modal-content {
+    max-height: calc(100vh - 3.5rem);
     display: flex;
     flex-direction: column;
 }
 
-#projectModal .modal-content {
-    display: flex;
-    flex-direction: column;
-    max-height: 90vh;
+.modal-body {
+    overflow-y: auto;
+    flex: 1 1 auto;
 }
 
 #projectModal .modal-body {
+    max-height: calc(80vh - 120px);
     overflow-y: auto;
-    flex: 1 1 auto;
-    max-height: calc(90vh - 120px);
     padding: 1.5rem;
 }
 
-#projectModal .modal-header {
-    flex-shrink: 0;
+#editProjectModal .modal-body {
+    max-height: calc(80vh - 120px);
+    overflow-y: auto;
 }
 
-#projectModal .modal-footer {
+.modal-header {
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    background: white;
+    z-index: 10;
+}
+
+.modal-footer {
+    flex-shrink: 0;
+    position: sticky;
+    bottom: 0;
+    background: white;
+    z-index: 10;
 }
 
 /* Полноэкранные контейнеры */
@@ -420,6 +444,7 @@ html, body {
 .project-card {
     min-height: 350px;
     max-height: 400px;
+    position: relative;
 }
 
 .project-card-item {
@@ -427,6 +452,38 @@ html, body {
     max-height: 380px;
     display: flex;
     flex-direction: column;
+}
+
+.project-color-indicator {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    transition: transform 0.2s;
+}
+
+.project-color-indicator:hover {
+    transform: scale(1.2);
+}
+
+.color-green { background-color: #28a745; }
+.color-yellow { background-color: #ffc107; }
+.color-red { background-color: #dc3545; }
+.color-default { background-color: #6c757d; }
+
+tr .project-color-indicator {
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 8px;
+    top: auto;
+    right: auto;
 }
 
 .project-card-item .card-body {
@@ -757,6 +814,9 @@ html, body {
                         {% for project in projects %}
                         <tr data-project-id="{{ project.id }}" data-status="{{ project.status }}" data-complexity="{{ project.complexity }}">
                             <td>
+                                <span class="project-color-indicator color-{{ project.color|default('default') }}" 
+                                      onclick="changeProjectColor({{ project.id }}, '{{ project.color|default('default') }}')"
+                                      title="Изменить цветовую метку"></span>
                                 <span class="badge bg-secondary">#{{ project.id }}</span>
                             </td>
                             <td>
@@ -864,7 +924,10 @@ html, body {
         <div class="row p-3" id="projectsCards">
             {% for project in projects %}
             <div class="col-md-6 col-lg-4 mb-4 project-card" data-project-id="{{ project.id }}" data-status="{{ project.status }}" data-complexity="{{ project.complexity }}" data-priority="{{ project.priority }}" data-title="{{ project.title.lower() }}" data-client="{{ (project.user.first_name or '').lower() }}">
-                <div class="card h-100 shadow-sm project-card-item">
+                <div class="card h-100 shadow-sm project-card-item" style="position: relative;">
+                    <span class="project-color-indicator color-{{ project.color|default('default') }}" 
+                          onclick="changeProjectColor({{ project.id }}, '{{ project.color|default('default') }}')"
+                          title="Изменить цветовую метку"></span>
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="mb-0 text-truncate" title="{{ project.title }}">{{ project.title }}</h6>
                         <span class="badge bg-secondary">#{{ project.id }}</span>
@@ -1531,6 +1594,53 @@ html, body {
         });
     }
 
+    async function changeProjectColor(projectId, currentColor) {
+        const colors = ['default', 'green', 'yellow', 'red'];
+        const colorNames = {
+            'default': 'Серый',
+            'green': 'Зеленый', 
+            'yellow': 'Желтый',
+            'red': 'Красный'
+        };
+        
+        // Находим следующий цвет
+        const currentIndex = colors.indexOf(currentColor);
+        const nextColor = colors[(currentIndex + 1) % colors.length];
+        
+        try {
+            const response = await fetch(`/admin/api/projects/${projectId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({ color: nextColor })
+            });
+            
+            if (response.ok) {
+                // Обновляем все индикаторы цвета
+                document.querySelectorAll(`[data-project-id="${projectId}"] .project-color-indicator`).forEach(indicator => {
+                    indicator.className = `project-color-indicator color-${nextColor}`;
+                    indicator.setAttribute('onclick', `changeProjectColor(${projectId}, '${nextColor}')`);
+                });
+                
+                // Обновляем в таблице
+                const tableIndicator = document.querySelector(`tr[data-project-id="${projectId}"] .project-color-indicator`);
+                if (tableIndicator) {
+                    tableIndicator.className = `project-color-indicator color-${nextColor}`;
+                    tableIndicator.setAttribute('onclick', `changeProjectColor(${projectId}, '${nextColor}')`);
+                }
+                
+                showNotification(`Цвет изменен на ${colorNames[nextColor]}`, 'success');
+            } else {
+                showNotification('Ошибка изменения цвета', 'danger');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            showNotification('Ошибка изменения цвета', 'danger');
+        }
+    }
+    
     function showNotification(message, type = 'info') {
         // Создаем контейнер для уведомлений, если его нет
         let notificationContainer = document.getElementById('notification-container');
@@ -2636,6 +2746,18 @@ html, body {
                 });
                 
                 modal.show();
+                
+                // Фиксируем проблему с прокруткой и позиционированием
+                setTimeout(() => {
+                    const modalDialog = document.querySelector('#projectModal .modal-dialog');
+                    if (modalDialog) {
+                        modalDialog.scrollTop = 0;
+                        modalDialog.style.marginTop = '1.75rem';
+                    }
+                    if (modalBody) {
+                        modalBody.scrollTop = 0;
+                    }
+                }, 100);
             } else {
                 console.error('Ошибка API:', data);
                 showNotification(data.message || 'Ошибка загрузки проекта', 'danger');
