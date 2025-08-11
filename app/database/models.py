@@ -117,7 +117,7 @@ class Project(Base):
             "priority": self.priority,
             "project_type": self.project_type,
             "complexity": self.complexity,
-            "color": self.color if hasattr(self, 'color') else 'default',
+            "color": getattr(self, 'color', 'default'),
             "estimated_cost": self.estimated_cost,
             "executor_cost": self.executor_cost,
             "final_cost": self.final_cost,

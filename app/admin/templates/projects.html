@@ -814,8 +814,8 @@ tr .project-color-indicator {
                         {% for project in projects %}
                         <tr data-project-id="{{ project.id }}" data-status="{{ project.status }}" data-complexity="{{ project.complexity }}">
                             <td>
-                                <span class="project-color-indicator color-{{ project.color|default('default') }}" 
-                                      onclick="changeProjectColor({{ project.id }}, '{{ project.color|default('default') }}')"
+                                <span class="project-color-indicator color-{{ project.get('color', 'default') }}" 
+                                      onclick="changeProjectColor({{ project.id }}, '{{ project.get('color', 'default') }}')"
                                       title="Изменить цветовую метку"></span>
                                 <span class="badge bg-secondary">#{{ project.id }}</span>
                             </td>
@@ -925,8 +925,8 @@ tr .project-color-indicator {
             {% for project in projects %}
             <div class="col-md-6 col-lg-4 mb-4 project-card" data-project-id="{{ project.id }}" data-status="{{ project.status }}" data-complexity="{{ project.complexity }}" data-priority="{{ project.priority }}" data-title="{{ project.title.lower() }}" data-client="{{ (project.user.first_name or '').lower() }}">
                 <div class="card h-100 shadow-sm project-card-item" style="position: relative;">
-                    <span class="project-color-indicator color-{{ project.color|default('default') }}" 
-                          onclick="changeProjectColor({{ project.id }}, '{{ project.color|default('default') }}')"
+                    <span class="project-color-indicator color-{{ project.get('color', 'default') }}" 
+                          onclick="changeProjectColor({{ project.id }}, '{{ project.get('color', 'default') }}')"
                           title="Изменить цветовую метку"></span>
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="mb-0 text-truncate" title="{{ project.title }}">{{ project.title }}</h6>
