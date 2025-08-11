@@ -654,34 +654,39 @@ async def users_page(request: Request, username: str = Depends(authenticate)):
     """Страница управления пользователями"""
     try:
         user_role = get_user_role(username)
-        
-        # Только владелец может управлять пользователями
-        if user_role != 'owner':
-            raise HTTPException(status_code=403, detail="Недостаточно прав")
-        
+        current_user = get_current_user(username)
         navigation_items = get_navigation_items(user_role)
         
         # Получаем список пользователей
         with get_db_context() as db:
-            users_raw = db.query(AdminUser).order_by(AdminUser.created_at.desc()).all()
+            # Владелец видит всех, исполнитель только себя
+            if user_role == 'executor':
+                # Исполнитель видит только свою учетную запись
+                users_raw = db.query(AdminUser).filter(AdminUser.id == current_user['id']).all()
+            else:
+                # Владелец видит всех пользователей
+                users_raw = db.query(AdminUser).order_by(AdminUser.created_at.desc()).all()
+            
             users = []
             for user in users_raw:
-                user_dict = user.to_dict()
-                # Добавляем статистику по задачам
-                from app.database.models import Task
-                user_dict['tasks_count'] = db.query(Task).filter(Task.assigned_to_id == user.id).count()
-                user_dict['active_tasks'] = db.query(Task).filter(
-                    Task.assigned_to_id == user.id,
-                    Task.status.in_(['pending', 'in_progress'])
-                ).count()
-                users.append(user_dict)
+                if user:  # Проверяем, что пользователь существует
+                    user_dict = user.to_dict()
+                    # Добавляем статистику по задачам
+                    from app.database.models import Task
+                    user_dict['tasks_count'] = db.query(Task).filter(Task.assigned_to_id == user.id).count()
+                    user_dict['active_tasks'] = db.query(Task).filter(
+                        Task.assigned_to_id == user.id,
+                        Task.status.in_(['pending', 'in_progress'])
+                    ).count()
+                    users.append(user_dict)
         
         return templates.TemplateResponse("users.html", {
             "request": request,
             "username": username,
             "user_role": user_role,
             "navigation_items": navigation_items,
-            "users": users
+            "users": users,
+            "current_user": current_user
         })
         
     except HTTPException:

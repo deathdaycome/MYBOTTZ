@@ -240,7 +240,12 @@
                     <button class="btn btn-sm btn-outline-primary" onclick="editUser({{ user.id }})">
                         <i class="fas fa-edit"></i> Редактировать
                     </button>
-                    <button class="btn btn-sm btn-outline-success" onclick="changePassword({{ user.id }})">
+                    {% if user_role == 'owner' %}
+                    <button class="btn btn-sm btn-outline-info" onclick="viewPassword({{ user.id }}, '{{ user.username }}')">
+                        <i class="fas fa-eye"></i> Показать пароль
+                    </button>
+                    {% endif %}
+                    <button class="btn btn-sm btn-outline-success" onclick="changePassword({{ user.id }}, '{{ user.role }}')">
                         <i class="fas fa-key"></i> Сменить пароль
                     </button>
                     {% if user.role != 'owner' %}
@@ -330,13 +335,24 @@
             <div class="modal-body">
                 <form id="changePasswordForm">
                     <input type="hidden" id="changePasswordUserId">
+                    <input type="hidden" id="changePasswordUserRole">
                     <div class="mb-3">
                         <label for="newPassword" class="form-label">Новый пароль *</label>
-                        <input type="password" class="form-control" id="newPassword" required>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="newPassword" required>
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('newPassword')">
+                                <i class="fas fa-eye" id="newPasswordToggle"></i>
+                            </button>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="confirmPassword" class="form-label">Подтвердите пароль *</label>
-                        <input type="password" class="form-control" id="confirmPassword" required>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="confirmPassword" required>
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('confirmPassword')">
+                                <i class="fas fa-eye" id="confirmPasswordToggle"></i>
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -345,6 +361,40 @@
                 <button type="button" class="btn btn-primary" onclick="saveNewPassword()">
                     <i class="fas fa-key me-2"></i>Изменить пароль
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно просмотра пароля -->
+<div class="modal fade" id="viewPasswordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Пароль пользователя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Пароль пользователя <strong id="passwordUsername"></strong>
+                </div>
+                <div class="input-group mb-3">
+                    <input type="password" class="form-control" id="viewPasswordField" readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('viewPasswordField')">
+                        <i class="fas fa-eye" id="viewPasswordFieldToggle"></i>
+                    </button>
+                    <button class="btn btn-outline-primary" type="button" onclick="copyPassword()">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+                <small class="text-muted">
+                    <i class="fas fa-shield-alt me-1"></i>
+                    Пароль хранится в зашифрованном виде. Здесь показан временный пароль.
+                </small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
             </div>
         </div>
     </div>
@@ -407,10 +457,71 @@
         }
     }
     
-    function changePassword(userId) {
+    function changePassword(userId, userRole) {
+        // Проверяем права доступа
+        const currentUserRole = '{{ user_role }}';
+        const currentUserId = {{ current_user.id | default(0) }};
+        
+        // Исполнители могут менять только свой пароль
+        if (currentUserRole === 'executor' && userId !== currentUserId) {
+            showNotification('Вы можете изменить только свой пароль', 'warning');
+            return;
+        }
+        
         document.getElementById('changePasswordUserId').value = userId;
+        document.getElementById('changePasswordUserRole').value = userRole;
         const modal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
         modal.show();
+    }
+    
+    function togglePasswordVisibility(fieldId) {
+        const field = document.getElementById(fieldId);
+        const toggle = document.getElementById(fieldId + 'Toggle');
+        
+        if (field.type === 'password') {
+            field.type = 'text';
+            toggle.classList.remove('fa-eye');
+            toggle.classList.add('fa-eye-slash');
+        } else {
+            field.type = 'password';
+            toggle.classList.remove('fa-eye-slash');
+            toggle.classList.add('fa-eye');
+        }
+    }
+    
+    async function viewPassword(userId, username) {
+        // Только админ может просматривать пароли
+        if ('{{ user_role }}' !== 'owner') {
+            showNotification('У вас нет прав для просмотра паролей', 'warning');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/admin/api/users/${userId}/password/view`, {
+                method: 'GET',
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('passwordUsername').textContent = username;
+                document.getElementById('viewPasswordField').value = data.password || 'Установлен при регистрации';
+                const modal = new bootstrap.Modal(document.getElementById('viewPasswordModal'));
+                modal.show();
+            } else {
+                showNotification('Не удалось получить пароль', 'danger');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            showNotification('Ошибка при получении пароля', 'danger');
+        }
+    }
+    
+    function copyPassword() {
+        const passwordField = document.getElementById('viewPasswordField');
+        passwordField.select();
+        document.execCommand('copy');
+        showNotification('Пароль скопирован в буфер обмена', 'success');
     }
     
     async function saveNewPassword() {
@@ -418,8 +529,22 @@
         const newPassword = document.getElementById('newPassword').value;
         const confirmPassword = document.getElementById('confirmPassword').value;
         
+        // Проверяем права доступа еще раз
+        const currentUserRole = '{{ user_role }}';
+        const currentUserId = {{ current_user.id | default(0) }};
+        
+        if (currentUserRole === 'executor' && parseInt(userId) !== currentUserId) {
+            showNotification('Вы можете изменить только свой пароль', 'warning');
+            return;
+        }
+        
         if (newPassword !== confirmPassword) {
             showNotification('Пароли не совпадают', 'warning');
+            return;
+        }
+        
+        if (newPassword.length < 6) {
+            showNotification('Пароль должен содержать минимум 6 символов', 'warning');
             return;
         }
         

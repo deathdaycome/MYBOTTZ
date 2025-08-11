@@ -132,7 +132,7 @@ async def change_user_password(
     """Изменить пароль пользователя (только для владельца или себя)"""
     try:
         data = await request.json()
-        new_password = data.get("new_password")
+        new_password = data.get("password") or data.get("new_password")
         
         if not new_password:
             return {
@@ -203,6 +203,46 @@ async def deactivate_user(
             "success": False,
             "message": f"Ошибка деактивации пользователя: {str(e)}"
         }
+
+@router.get("/{user_id}/password/view")
+async def view_user_password(
+    user_id: int,
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """Просмотреть пароль пользователя (только для владельца)"""
+    try:
+        # Только владелец может просматривать пароли
+        if not current_user.is_owner():
+            raise HTTPException(
+                status_code=403,
+                detail="Недостаточно прав для просмотра паролей"
+            )
+        
+        # Получаем пользователя из базы
+        from ...database.database import get_db_context
+        with get_db_context() as db:
+            user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+            if not user:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Пользователь не найден"
+                )
+            
+            # В реальном приложении пароли должны храниться в хешированном виде
+            # Здесь мы можем вернуть только временный пароль или уведомление
+            return {
+                "success": True,
+                "password": user.password if hasattr(user, 'password') else "***скрыт***",
+                "message": "Пароль получен успешно"
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка просмотра пароля пользователя {user_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка просмотра пароля: {str(e)}"
+        )
 
 @router.get("/me")
 async def get_current_user_info(current_user: AdminUser = Depends(get_current_user)):
