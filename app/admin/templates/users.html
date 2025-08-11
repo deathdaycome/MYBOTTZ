@@ -399,6 +399,64 @@
         </div>
     </div>
 </div>
+
+<!-- Модальное окно редактирования пользователя -->
+<div class="modal fade" id="editUserModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать исполнителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="mb-3">
+                        <label for="editUsername" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="editUsername" readonly>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editFirstName" class="form-label">Имя *</label>
+                            <input type="text" class="form-control" id="editFirstName" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editLastName" class="form-label">Фамилия</label>
+                            <input type="text" class="form-control" id="editLastName">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editEmail" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="editEmail">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editPassword" class="form-label">Новый пароль (оставьте пустым для сохранения текущего)</label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" id="editPassword" placeholder="Введите новый пароль">
+                            <button class="btn btn-outline-secondary" type="button" onclick="togglePasswordVisibility('editPassword')">
+                                <i class="fas fa-eye" id="editPasswordToggle"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% if user_role == 'owner' %}
+                    <div class="mb-3">
+                        <label class="form-check-label">
+                            <input type="checkbox" class="form-check-input" id="editIsActive">
+                            Активен
+                        </label>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="updateUser()">
+                    <i class="fas fa-save me-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -622,9 +680,81 @@
         }
     }
     
-    function editUser(userId) {
-        // TODO: Implement edit user functionality
-        showNotification('Функция редактирования в разработке', 'info');
+    async function editUser(userId) {
+        try {
+            const response = await fetch(`/admin/api/users/${userId}`, {
+                method: 'GET',
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                const user = data.user;
+                
+                // Заполняем форму данными
+                document.getElementById('editUserId').value = user.id;
+                document.getElementById('editUsername').value = user.username;
+                document.getElementById('editFirstName').value = user.first_name || '';
+                document.getElementById('editLastName').value = user.last_name || '';
+                document.getElementById('editEmail').value = user.email || '';
+                document.getElementById('editPassword').value = '';
+                
+                const activeCheckbox = document.getElementById('editIsActive');
+                if (activeCheckbox) {
+                    activeCheckbox.checked = user.is_active;
+                }
+                
+                const modal = new bootstrap.Modal(document.getElementById('editUserModal'));
+                modal.show();
+            } else {
+                showNotification('Не удалось получить данные пользователя', 'danger');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            showNotification('Ошибка при получении данных', 'danger');
+        }
+    }
+    
+    async function updateUser() {
+        const userId = document.getElementById('editUserId').value;
+        const userData = {
+            first_name: document.getElementById('editFirstName').value,
+            last_name: document.getElementById('editLastName').value,
+            email: document.getElementById('editEmail').value
+        };
+        
+        const password = document.getElementById('editPassword').value;
+        if (password) {
+            userData.password = password;
+        }
+        
+        const activeCheckbox = document.getElementById('editIsActive');
+        if (activeCheckbox) {
+            userData.is_active = activeCheckbox.checked;
+        }
+        
+        try {
+            const response = await fetch(`/admin/api/users/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData),
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                showNotification('Данные пользователя обновлены', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('editUserModal')).hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                const error = await response.json();
+                showNotification(error.detail || 'Ошибка обновления данных', 'danger');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            showNotification('Ошибка обновления данных', 'danger');
+        }
     }
 </script>
 {% endblock %}

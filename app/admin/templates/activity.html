@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Активность пользователей{% endblock %}
+
+{% block page_title %}Активность пользователей{% endblock %}
+
+{% block extra_css %}
+<style>
+    .activity-item {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        border-left: 3px solid #6366f1;
+        transition: all 0.3s ease;
+    }
+    
+    .activity-item:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transform: translateX(5px);
+    }
+    
+    .activity-time {
+        color: #6c757d;
+        font-size: 0.85rem;
+    }
+    
+    .activity-user {
+        font-weight: 600;
+        color: #2d3748;
+    }
+    
+    .activity-action {
+        margin: 0.5rem 0;
+    }
+    
+    .action-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .action-view {
+        background: #e0f2fe;
+        color: #0369a1;
+    }
+    
+    .action-create {
+        background: #d1fae5;
+        color: #065f46;
+    }
+    
+    .action-update {
+        background: #fed7aa;
+        color: #92400e;
+    }
+    
+    .action-delete {
+        background: #fecaca;
+        color: #991b1b;
+    }
+    
+    .activity-details {
+        font-size: 0.9rem;
+        color: #4a5568;
+        margin-top: 0.5rem;
+    }
+    
+    .filter-section {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .timeline-line {
+        position: absolute;
+        left: 20px;
+        top: 40px;
+        bottom: 20px;
+        width: 2px;
+        background: #e2e8f0;
+    }
+    
+    .timeline-dot {
+        position: absolute;
+        left: 16px;
+        top: 1.5rem;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #6366f1;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .activity-container {
+        position: relative;
+        padding-left: 40px;
+    }
+</style>
+{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-outline-primary" onclick="loadActivity()">
+    <i class="fas fa-sync-alt me-1"></i> Обновить
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Фильтры -->
+    <div class="filter-section">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="userFilter" class="form-label">Пользователь</label>
+                <select class="form-select" id="userFilter" onchange="filterActivity()">
+                    <option value="">Все пользователи</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}">{{ user.first_name }} {{ user.last_name }} (@{{ user.username }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="actionFilter" class="form-label">Действие</label>
+                <select class="form-select" id="actionFilter" onchange="filterActivity()">
+                    <option value="">Все действия</option>
+                    <option value="login">Вход в систему</option>
+                    <option value="logout">Выход из системы</option>
+                    <option value="view">Просмотр</option>
+                    <option value="create">Создание</option>
+                    <option value="update">Изменение</option>
+                    <option value="delete">Удаление</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="dateFrom" class="form-label">От даты</label>
+                <input type="date" class="form-control" id="dateFrom" onchange="filterActivity()">
+            </div>
+            <div class="col-md-3">
+                <label for="dateTo" class="form-label">До даты</label>
+                <input type="date" class="form-control" id="dateTo" onchange="filterActivity()">
+            </div>
+        </div>
+    </div>
+    
+    <!-- Список активности -->
+    <div class="activity-container">
+        <div class="timeline-line"></div>
+        <div id="activityList">
+            <!-- Активность будет загружена через JavaScript -->
+        </div>
+    </div>
+    
+    <!-- Кнопка загрузить больше -->
+    <div class="text-center mt-4">
+        <button class="btn btn-outline-primary" id="loadMoreBtn" onclick="loadMore()" style="display: none;">
+            <i class="fas fa-arrow-down me-2"></i>Загрузить больше
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    let hasMore = true;
+    let allActivities = [];
+    
+    async function loadActivity() {
+        try {
+            const response = await fetch('/admin/api/activity', {
+                credentials: 'include'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    allActivities = data.activities || [];
+                    displayActivity(allActivities);
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки активности:', error);
+            showNotification('Ошибка загрузки активности', 'danger');
+        }
+    }
+    
+    function displayActivity(activities) {
+        const container = document.getElementById('activityList');
+        container.innerHTML = '';
+        
+        if (activities.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-5">
+                    <i class="fas fa-history fa-3x text-muted mb-3"></i>
+                    <p class="text-muted">Нет данных об активности</p>
+                </div>
+            `;
+            return;
+        }
+        
+        activities.forEach(activity => {
+            const item = createActivityItem(activity);
+            container.appendChild(item);
+        });
+    }
+    
+    function createActivityItem(activity) {
+        const div = document.createElement('div');
+        div.className = 'activity-item';
+        div.style.position = 'relative';
+        
+        const actionBadge = getActionBadge(activity.action_type);
+        const actionText = getActionText(activity);
+        const timeAgo = getTimeAgo(activity.created_at);
+        
+        div.innerHTML = `
+            <div class="timeline-dot"></div>
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <div class="activity-user">
+                        ${activity.user_name || 'Неизвестный пользователь'}
+                        <span class="action-badge action-${activity.action_type}">${actionBadge}</span>
+                    </div>
+                    <div class="activity-action">${actionText}</div>
+                    ${activity.details ? `<div class="activity-details">${formatDetails(activity.details)}</div>` : ''}
+                </div>
+                <div class="activity-time">${timeAgo}</div>
+            </div>
+        `;
+        
+        return div;
+    }
+    
+    function getActionBadge(actionType) {
+        const badges = {
+            'view': 'Просмотр',
+            'create': 'Создание',
+            'update': 'Изменение',
+            'delete': 'Удаление',
+            'login': 'Вход',
+            'logout': 'Выход'
+        };
+        return badges[actionType] || actionType;
+    }
+    
+    function getActionText(activity) {
+        const actions = {
+            'login': 'вошел в систему',
+            'logout': 'вышел из системы',
+            'view_project': `просмотрел проект #${activity.entity_id}`,
+            'update_project': `изменил проект #${activity.entity_id}`,
+            'create_project': 'создал новый проект',
+            'delete_project': `удалил проект #${activity.entity_id}`,
+            'update_user': `изменил данные пользователя #${activity.entity_id}`,
+            'create_task': 'создал новую задачу',
+            'update_task': `изменил задачу #${activity.entity_id}`,
+            'complete_task': `завершил задачу #${activity.entity_id}`
+        };
+        return actions[activity.action] || activity.action;
+    }
+    
+    function formatDetails(details) {
+        if (typeof details === 'object') {
+            return Object.entries(details).map(([key, value]) => 
+                `<small>${key}: ${value}</small>`
+            ).join(', ');
+        }
+        return details;
+    }
+    
+    function getTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diff = Math.floor((now - date) / 1000);
+        
+        if (diff < 60) return 'только что';
+        if (diff < 3600) return `${Math.floor(diff / 60)} мин. назад`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)} ч. назад`;
+        if (diff < 604800) return `${Math.floor(diff / 86400)} дн. назад`;
+        
+        return date.toLocaleDateString('ru-RU');
+    }
+    
+    function filterActivity() {
+        const userFilter = document.getElementById('userFilter').value;
+        const actionFilter = document.getElementById('actionFilter').value;
+        const dateFrom = document.getElementById('dateFrom').value;
+        const dateTo = document.getElementById('dateTo').value;
+        
+        let filtered = [...allActivities];
+        
+        if (userFilter) {
+            filtered = filtered.filter(a => a.user_id == userFilter);
+        }
+        
+        if (actionFilter) {
+            filtered = filtered.filter(a => 
+                a.action_type === actionFilter || a.action.includes(actionFilter)
+            );
+        }
+        
+        if (dateFrom) {
+            const fromDate = new Date(dateFrom);
+            filtered = filtered.filter(a => new Date(a.created_at) >= fromDate);
+        }
+        
+        if (dateTo) {
+            const toDate = new Date(dateTo);
+            toDate.setHours(23, 59, 59);
+            filtered = filtered.filter(a => new Date(a.created_at) <= toDate);
+        }
+        
+        displayActivity(filtered);
+    }
+    
+    // Загружаем активность при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function() {
+        loadActivity();
+    });
+</script>
+{% endblock %}

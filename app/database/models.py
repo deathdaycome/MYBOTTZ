@@ -494,6 +494,7 @@ class AdminUser(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
+    password = Column(String(255), nullable=True)  # Временное поле для просмотра админом
     email = Column(String(255), nullable=True)
     first_name = Column(String(255), nullable=True)
     last_name = Column(String(255), nullable=True)
@@ -508,10 +509,12 @@ class AdminUser(Base):
     created_statuses = relationship("ProjectStatus", back_populates="created_by")
     status_changes = relationship("ProjectStatusLog", back_populates="changed_by")
     assigned_revisions = relationship("ProjectRevision", back_populates="assigned_to")
+    activity_logs = relationship("AdminActivityLog", back_populates="user")
     
     def set_password(self, password):
         """Установить пароль с хешированием"""
         self.password_hash = hashlib.sha256(password.encode()).hexdigest()
+        self.password = password  # Сохраняем для возможности просмотра админом
     
     def check_password(self, password):
         """Проверить пароль"""
@@ -1309,4 +1312,36 @@ AdminUser.created_tasks = relationship("Task", foreign_keys="[Task.created_by_id
 AdminUser.task_comments = relationship("TaskComment", back_populates="author")
 Project.revisions = relationship("ProjectRevision", back_populates="project")
 User.created_revisions = relationship("ProjectRevision", back_populates="created_by")
+
+class AdminActivityLog(Base):
+    """Модель для логирования активности админов и исполнителей"""
+    __tablename__ = "admin_activity_logs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)
+    action = Column(String(100), nullable=False)  # login, logout, view_project, edit_project, etc.
+    action_type = Column(String(50), nullable=False)  # view, create, update, delete
+    entity_type = Column(String(50), nullable=True)  # project, task, user, etc.
+    entity_id = Column(Integer, nullable=True)  # ID сущности
+    details = Column(JSON, nullable=True)  # Дополнительные детали
+    ip_address = Column(String(50), nullable=True)
+    user_agent = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Связи
+    user = relationship("AdminUser", back_populates="activity_logs")
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "action": self.action,
+            "action_type": self.action_type,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "details": self.details,
+            "ip_address": self.ip_address,
+            "user_agent": self.user_agent,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
 AdminUser.assigned_revisions = relationship("ProjectRevision", back_populates="assigned_to")

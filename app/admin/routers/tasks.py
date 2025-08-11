@@ -137,8 +137,9 @@ async def tasks_page(request: Request, current_user: dict = Depends(get_current_
             # Получаем все задачи
             query = db.query(Task).outerjoin(AdminUser, Task.assigned_to_id == AdminUser.id)
             
-            # По умолчанию все пользователи (включая владельца) видят только свои задачи
-            query = query.filter(Task.assigned_to_id == current_user["id"])
+            # Владелец видит все задачи, исполнители только свои
+            if current_user["role"] != "owner":
+                query = query.filter(Task.assigned_to_id == current_user["id"])
             
             tasks = query.order_by(Task.created_at.desc()).all()
             

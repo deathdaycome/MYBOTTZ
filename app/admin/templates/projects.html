@@ -29,9 +29,22 @@ html, body {
     flex-direction: column;
 }
 
+#projectModal .modal-dialog {
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#projectModal .modal-content {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
 #projectModal .modal-body {
     overflow-y: auto;
-    max-height: calc(85vh - 120px);
+    flex: 1 1 auto;
+    max-height: calc(90vh - 120px);
     padding: 1.5rem;
 }
 
@@ -1954,6 +1967,28 @@ html, body {
 
     async function openEditModal(projectId) {
         try {
+            // Загружаем список исполнителей
+            const executorsResponse = await fetch('/admin/api/users/executors', {
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                }
+            });
+            
+            if (executorsResponse.ok) {
+                const executorsData = await executorsResponse.json();
+                if (executorsData.success && executorsData.executors) {
+                    const executorSelect = document.getElementById('editProjectAssignedExecutor');
+                    executorSelect.innerHTML = '<option value="">Выберите исполнителя</option>';
+                    executorsData.executors.forEach(executor => {
+                        const option = document.createElement('option');
+                        option.value = executor.id;
+                        option.textContent = `${executor.first_name || ''} ${executor.last_name || ''} (@${executor.username})`;
+                        executorSelect.appendChild(option);
+                    });
+                }
+            }
+            
+            // Загружаем данные проекта
             const response = await fetch(`/admin/api/projects/${projectId}`, {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
@@ -1979,6 +2014,11 @@ html, body {
                 document.getElementById('editProjectPrepaymentAmount').value = project.prepayment_amount || '';
                 document.getElementById('editProjectClientPaidTotal').value = project.client_paid_total || '';
                 document.getElementById('editProjectExecutorPaidTotal').value = project.executor_paid_total || '';
+                
+                // Устанавливаем текущего исполнителя
+                if (project.assigned_executor_id) {
+                    document.getElementById('editProjectAssignedExecutor').value = project.assigned_executor_id;
+                }
                 
                 // Форматируем дату для datetime-local input
                 if (project.deadline) {

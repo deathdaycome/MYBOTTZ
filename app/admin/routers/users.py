@@ -244,6 +244,105 @@ async def view_user_password(
             detail=f"Ошибка просмотра пароля: {str(e)}"
         )
 
+@router.get("/{user_id}")
+async def get_user(
+    user_id: int,
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """Получить информацию о пользователе"""
+    try:
+        # Пользователь может просматривать только свои данные или владелец все
+        if not current_user.is_owner() and current_user.id != user_id:
+            return {
+                "success": False,
+                "message": "Недостаточно прав доступа"
+            }
+        
+        from ...database.database import get_db_context
+        with get_db_context() as db:
+            user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+            if not user:
+                return {
+                    "success": False,
+                    "message": "Пользователь не найден"
+                }
+            
+            return {
+                "success": True,
+                "user": user.to_dict()
+            }
+    except Exception as e:
+        logger.error(f"Ошибка получения пользователя {user_id}: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка получения пользователя: {str(e)}"
+        }
+
+@router.put("/{user_id}")
+async def update_user(
+    user_id: int,
+    request: Request,
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """Обновить данные пользователя"""
+    try:
+        # Пользователь может редактировать только свои данные или владелец все
+        if not current_user.is_owner() and current_user.id != user_id:
+            return {
+                "success": False,
+                "message": "Недостаточно прав доступа"
+            }
+        
+        data = await request.json()
+        
+        from ...database.database import get_db_context
+        with get_db_context() as db:
+            user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+            if not user:
+                return {
+                    "success": False,
+                    "message": "Пользователь не найден"
+                }
+            
+            # Обновляем данные
+            if "first_name" in data:
+                user.first_name = data["first_name"]
+            if "last_name" in data:
+                user.last_name = data["last_name"]
+            if "email" in data:
+                user.email = data["email"]
+            if "password" in data and data["password"]:
+                user.set_password(data["password"])
+            if "is_active" in data and current_user.is_owner():
+                user.is_active = data["is_active"]
+            
+            db.commit()
+            
+            # Логируем активность
+            from ...database.models import AdminActivityLog
+            log = AdminActivityLog(
+                user_id=current_user.id,
+                action="update_user",
+                action_type="update",
+                entity_type="user",
+                entity_id=user_id,
+                details={"updated_fields": list(data.keys())}
+            )
+            db.add(log)
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": "Данные пользователя обновлены",
+                "user": user.to_dict()
+            }
+    except Exception as e:
+        logger.error(f"Ошибка обновления пользователя {user_id}: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка обновления данных: {str(e)}"
+        }
+
 @router.get("/me")
 async def get_current_user_info(current_user: AdminUser = Depends(get_current_user)):
     """Получить информацию о текущем пользователе"""

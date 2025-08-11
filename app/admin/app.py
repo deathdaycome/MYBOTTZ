@@ -695,6 +695,37 @@ async def users_page(request: Request, username: str = Depends(authenticate)):
         logger.error(f"Ошибка в users_page: {e}")
         raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
 
+@admin_router.get("/activity", response_class=HTMLResponse)
+async def activity_page(request: Request, username: str = Depends(authenticate)):
+    """Страница активности пользователей"""
+    try:
+        user_role = get_user_role(username)
+        
+        # Только владелец может просматривать активность всех
+        if user_role != 'owner':
+            raise HTTPException(status_code=403, detail="Недостаточно прав")
+        
+        navigation_items = get_navigation_items(user_role)
+        
+        # Получаем список пользователей для фильтра
+        with get_db_context() as db:
+            users = db.query(AdminUser).all()
+            users_list = [u.to_dict() for u in users]
+        
+        return templates.TemplateResponse("activity.html", {
+            "request": request,
+            "username": username,
+            "user_role": user_role,
+            "navigation_items": navigation_items,
+            "users": users_list
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка в activity_page: {e}")
+        raise HTTPException(status_code=500, detail="Внутренняя ошибка сервера")
+
 @admin_router.get("/finance", response_class=HTMLResponse)
 async def finance_page(request: Request, username: str = Depends(authenticate)):
     """Страница управления финансами"""
@@ -1634,6 +1665,45 @@ async def notifications_page(request: Request):
 
 
 
+@admin_router.get("/api/activity")
+async def get_activity_logs(username: str = Depends(authenticate)):
+    """Получить логи активности"""
+    try:
+        user_role = get_user_role(username)
+        current_user = get_current_user(username)
+        
+        with get_db_context() as db:
+            from app.database.models import AdminActivityLog
+            
+            # Если не владелец, показываем только его активность
+            if user_role == 'owner':
+                logs = db.query(AdminActivityLog).order_by(
+                    AdminActivityLog.created_at.desc()
+                ).limit(100).all()
+            else:
+                logs = db.query(AdminActivityLog).filter(
+                    AdminActivityLog.user_id == current_user['id']
+                ).order_by(
+                    AdminActivityLog.created_at.desc()
+                ).limit(50).all()
+            
+            # Добавляем имена пользователей
+            activities = []
+            for log in logs:
+                log_dict = log.to_dict()
+                user = db.query(AdminUser).filter(AdminUser.id == log.user_id).first()
+                if user:
+                    log_dict['user_name'] = f"{user.first_name or ''} {user.last_name or ''} (@{user.username})".strip()
+                activities.append(log_dict)
+            
+            return {
+                "success": True,
+                "activities": activities
+            }
+    except Exception as e:
+        logger.error(f"Ошибка получения логов активности: {e}")
+        return {"success": False, "error": str(e)}
+
 @admin_router.get("/api/notifications/bot-status")
 async def check_bot_status(request: Request):
     """Проверка статуса бота"""
@@ -1773,6 +1843,7 @@ def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
             {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"},
             {"name": "Пользователи", "url": "/users", "icon": "fas fa-users"},
             {"name": "Исполнители", "url": "/contractors", "icon": "fas fa-user-tie"},
+            {"name": "Активность", "url": "/activity", "icon": "fas fa-history"},
             {"name": "Сервисы", "url": "/services", "icon": "fas fa-server"},
             {"name": "Аналитика", "url": "/analytics", "icon": "fas fa-chart-line"},
             {"name": "Уведомления", "url": "/notifications", "icon": "fas fa-bell"},
