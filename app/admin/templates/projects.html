@@ -2084,6 +2084,12 @@ tr .project-color-indicator {
 
     async function openEditModal(projectId) {
         try {
+            // Скрываем старое модальное окно Bootstrap если оно есть  
+            const oldModal = bootstrap.Modal.getInstance(document.getElementById('editProjectModal'));
+            if (oldModal) {
+                oldModal.hide();
+            }
+            
             // Загружаем список исполнителей
             const executorsResponse = await fetch('/admin/api/users/executors', {
                 headers: {
@@ -2091,16 +2097,12 @@ tr .project-color-indicator {
                 }
             });
             
+            let executorsOptions = '<option value="">Выберите исполнителя</option>';
             if (executorsResponse.ok) {
                 const executorsData = await executorsResponse.json();
                 if (executorsData.success && executorsData.executors) {
-                    const executorSelect = document.getElementById('editProjectAssignedExecutor');
-                    executorSelect.innerHTML = '<option value="">Выберите исполнителя</option>';
                     executorsData.executors.forEach(executor => {
-                        const option = document.createElement('option');
-                        option.value = executor.id;
-                        option.textContent = `${executor.first_name || ''} ${executor.last_name || ''} (@${executor.username})`;
-                        executorSelect.appendChild(option);
+                        executorsOptions += `<option value="${executor.id}">${executor.first_name || ''} ${executor.last_name || ''} (@${executor.username})</option>`;
                     });
                 }
             }
@@ -2116,50 +2118,216 @@ tr .project-color-indicator {
             if (data.success && data.project) {
                 const project = data.project;
                 
-                // Заполняем форму редактирования
-                document.getElementById('editProjectId').value = project.id;
-                document.getElementById('editProjectTitle').value = project.title || '';
-                document.getElementById('editProjectDescription').value = project.description || '';
-                document.getElementById('editProjectType').value = project.project_type || 'web';
-                document.getElementById('editProjectStatus').value = project.status || 'new';
-                document.getElementById('editProjectComplexity').value = project.complexity || 'medium';
-                document.getElementById('editProjectPriority').value = project.priority || 'normal';
-                document.getElementById('editProjectEstimatedCost').value = project.estimated_cost || '';
-                document.getElementById('editProjectExecutorCost').value = project.executor_cost || '';
-                document.getElementById('editProjectFinalCost').value = project.final_cost || '';
-                document.getElementById('editProjectEstimatedHours').value = project.estimated_hours || '';
-                document.getElementById('editProjectPrepaymentAmount').value = project.prepayment_amount || '';
-                document.getElementById('editProjectClientPaidTotal').value = project.client_paid_total || '';
-                document.getElementById('editProjectExecutorPaidTotal').value = project.executor_paid_total || '';
+                // Форматируем дату для datetime-local input
+                let formattedDeadline = '';
+                if (project.deadline) {
+                    const deadline = new Date(project.deadline);
+                    formattedDeadline = deadline.toISOString().slice(0, 16);
+                }
                 
-                // Устанавливаем текущего исполнителя
+                // Удаляем старое кастомное модальное окно если есть
+                const existingModal = document.getElementById('customEditModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
+                
+                // Создаем КАСТОМНОЕ модальное окно для редактирования с АБСОЛЮТНЫМ центрированием
+                const modalHTML = `
+                    <div id="customEditModal" style="
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        background: rgba(0, 0, 0, 0.6) !important;
+                        z-index: 999999 !important;
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                    " onclick="if(event.target.id === 'customEditModal') hideEditModal()">
+                        <div style="
+                            background: white !important;
+                            border-radius: 8px !important;
+                            width: 90% !important;
+                            max-width: 800px !important;
+                            max-height: 90vh !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                            position: relative !important;
+                            box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
+                        " onclick="event.stopPropagation()">
+                            <div style="
+                                padding: 20px !important;
+                                border-bottom: 1px solid #dee2e6 !important;
+                                display: flex !important;
+                                justify-content: space-between !important;
+                                align-items: center !important;
+                                flex-shrink: 0 !important;
+                            ">
+                                <h4 style="margin: 0 !important; color: #333 !important;">
+                                    <i class="fas fa-edit me-2"></i>Редактирование проекта
+                                </h4>
+                                <button onclick="hideEditModal()" style="
+                                    background: none !important;
+                                    border: none !important;
+                                    font-size: 28px !important;
+                                    line-height: 1 !important;
+                                    cursor: pointer !important;
+                                    color: #6c757d !important;
+                                    padding: 0 !important;
+                                    width: 30px !important;
+                                    height: 30px !important;
+                                ">&times;</button>
+                            </div>
+                            <div style="
+                                padding: 20px !important;
+                                overflow-y: auto !important;
+                                flex-grow: 1 !important;
+                            ">
+                                <form id="editProjectForm">
+                                    <input type="hidden" id="editProjectId" value="${project.id}">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Название проекта <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="editProjectTitle" value="${(project.title || '').replace(/"/g, '&quot;')}" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Тип проекта</label>
+                                            <select class="form-select" id="editProjectType">
+                                                <option value="website" ${project.project_type === 'website' ? 'selected' : ''}>Веб-сайт</option>
+                                                <option value="bot" ${project.project_type === 'bot' ? 'selected' : ''}>Telegram-бот</option>
+                                                <option value="app" ${project.project_type === 'app' ? 'selected' : ''}>Мобильное приложение</option>
+                                                <option value="other" ${project.project_type === 'other' ? 'selected' : ''}>Другое</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Описание</label>
+                                        <textarea class="form-control" id="editProjectDescription" rows="3">${project.description || ''}</textarea>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Статус</label>
+                                            <select class="form-select" id="editProjectStatus">
+                                                <option value="new" ${project.status === 'new' ? 'selected' : ''}>Новый</option>
+                                                <option value="review" ${project.status === 'review' ? 'selected' : ''}>На рассмотрении</option>
+                                                <option value="accepted" ${project.status === 'accepted' ? 'selected' : ''}>Принят</option>
+                                                <option value="in_progress" ${project.status === 'in_progress' ? 'selected' : ''}>В работе</option>
+                                                <option value="testing" ${project.status === 'testing' ? 'selected' : ''}>Тестирование</option>
+                                                <option value="completed" ${project.status === 'completed' ? 'selected' : ''}>Завершен</option>
+                                                <option value="cancelled" ${project.status === 'cancelled' ? 'selected' : ''}>Отменен</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Сложность</label>
+                                            <select class="form-select" id="editProjectComplexity">
+                                                <option value="simple" ${project.complexity === 'simple' ? 'selected' : ''}>Простой</option>
+                                                <option value="medium" ${project.complexity === 'medium' ? 'selected' : ''}>Средний</option>
+                                                <option value="complex" ${project.complexity === 'complex' ? 'selected' : ''}>Сложный</option>
+                                                <option value="premium" ${project.complexity === 'premium' ? 'selected' : ''}>Премиум</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Приоритет</label>
+                                            <select class="form-select" id="editProjectPriority">
+                                                <option value="low" ${project.priority === 'low' ? 'selected' : ''}>Низкий</option>
+                                                <option value="normal" ${project.priority === 'normal' ? 'selected' : ''}>Обычный</option>
+                                                <option value="high" ${project.priority === 'high' ? 'selected' : ''}>Высокий</option>
+                                                <option value="urgent" ${project.priority === 'urgent' ? 'selected' : ''}>Срочный</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Ориентировочная стоимость (₽)</label>
+                                            <input type="number" class="form-control" id="editProjectEstimatedCost" value="${project.estimated_cost || ''}" step="100">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Стоимость для исполнителя (₽)</label>
+                                            <input type="number" class="form-control" id="editProjectExecutorCost" value="${project.executor_cost || ''}" step="100">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Назначить исполнителя</label>
+                                            <select class="form-select" id="editProjectAssignedExecutor">
+                                                ${executorsOptions}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Дедлайн</label>
+                                            <input type="datetime-local" class="form-control" id="editProjectDeadline" value="${formattedDeadline}">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Предоплата (₽)</label>
+                                            <input type="number" class="form-control" id="editProjectPrepaymentAmount" value="${project.prepayment_amount || ''}" step="100">
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Оплачено клиентом (₽)</label>
+                                            <input type="number" class="form-control" id="editProjectClientPaidTotal" value="${project.client_paid_total || ''}" step="100">
+                                        </div>
+                                        <div class="col-md-4 mb-3">
+                                            <label class="form-label">Выплачено исполнителю (₽)</label>
+                                            <input type="number" class="form-control" id="editProjectExecutorPaidTotal" value="${project.executor_paid_total || ''}" step="100">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Финальная стоимость (₽)</label>
+                                            <input type="number" class="form-control" id="editProjectFinalCost" value="${project.final_cost || ''}" step="100">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Оценочное время (часы)</label>
+                                            <input type="number" class="form-control" id="editProjectEstimatedHours" value="${project.estimated_hours || ''}" min="1">
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                            <div style="
+                                padding: 20px !important;
+                                border-top: 1px solid #dee2e6 !important;
+                                display: flex !important;
+                                justify-content: flex-end !important;
+                                gap: 10px !important;
+                                flex-shrink: 0 !important;
+                            ">
+                                <button onclick="hideEditModal()" class="btn btn-secondary">Отмена</button>
+                                <button onclick="submitProjectEdit()" class="btn btn-primary">
+                                    <i class="fas fa-save me-1"></i>Сохранить изменения
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
+                
+                // Устанавливаем выбранного исполнителя
                 if (project.assigned_executor_id) {
                     document.getElementById('editProjectAssignedExecutor').value = project.assigned_executor_id;
                 }
                 
-                // Форматируем дату для datetime-local input
-                if (project.deadline) {
-                    const deadline = new Date(project.deadline);
-                    const formattedDeadline = deadline.toISOString().slice(0, 16);
-                    document.getElementById('editProjectDeadline').value = formattedDeadline;
-                } else {
-                    document.getElementById('editProjectDeadline').value = '';
-                }
-                
-                // Загружаем список исполнителей для формы редактирования
-                await loadExecutorsForEdit();
-                
-                // Устанавливаем выбранного исполнителя после загрузки списка
-                document.getElementById('editProjectAssignedExecutor').value = project.assigned_executor_id || '';
-                
-                const modal = new bootstrap.Modal(document.getElementById('editProjectModal'));
-                modal.show();
             } else {
                 showNotification(data.message || 'Ошибка загрузки проекта', 'danger');
             }
         } catch (error) {
             console.error('Ошибка при загрузке проекта:', error);
             showNotification('Ошибка загрузки проекта: ' + error.message, 'danger');
+        }
+    }
+    
+    function hideEditModal() {
+        const modal = document.getElementById('customEditModal');
+        if (modal) {
+            modal.remove();
         }
     }
 
@@ -2216,8 +2384,8 @@ tr .project-color-indicator {
             if (data.success) {
                 showNotification('Проект успешно обновлен!', 'success');
                 
-                const modal = bootstrap.Modal.getInstance(document.getElementById('editProjectModal'));
-                modal.hide();
+                // Закрываем кастомное модальное окно
+                hideEditModal();
                 
                 // Обновляем страницу
                 setTimeout(() => {
@@ -3211,18 +3379,120 @@ tr .project-color-indicator {
     // Функции для работы с файлами проектов
     async function showFilesModal(projectId) {
         try {
-            // Устанавливаем ID проекта для загрузки файлов
-            document.getElementById('uploadProjectId').value = projectId;
+            // Удаляем старое кастомное модальное окно если есть
+            const existingModal = document.getElementById('customFilesModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
             
-            // Показываем модальное окно
-            const modal = new bootstrap.Modal(document.getElementById('projectFilesModal'));
-            modal.show();
+            // Создаем КАСТОМНОЕ модальное окно для файлов с АБСОЛЮТНЫМ центрированием
+            const modalHTML = `
+                <div id="customFilesModal" style="
+                    position: fixed !important;
+                    top: 0 !important;
+                    left: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    background: rgba(0, 0, 0, 0.6) !important;
+                    z-index: 999999 !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                " onclick="if(event.target.id === 'customFilesModal') hideFilesModal()">
+                    <div style="
+                        background: white !important;
+                        border-radius: 8px !important;
+                        width: 90% !important;
+                        max-width: 800px !important;
+                        max-height: 90vh !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        position: relative !important;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
+                    " onclick="event.stopPropagation()">
+                        <div style="
+                            padding: 20px !important;
+                            border-bottom: 1px solid #dee2e6 !important;
+                            display: flex !important;
+                            justify-content: space-between !important;
+                            align-items: center !important;
+                            flex-shrink: 0 !important;
+                        ">
+                            <h4 style="margin: 0 !important; color: #333 !important;">
+                                <i class="fas fa-folder-open me-2"></i>Файлы проекта
+                            </h4>
+                            <button onclick="hideFilesModal()" style="
+                                background: none !important;
+                                border: none !important;
+                                font-size: 28px !important;
+                                line-height: 1 !important;
+                                cursor: pointer !important;
+                                color: #6c757d !important;
+                                padding: 0 !important;
+                                width: 30px !important;
+                                height: 30px !important;
+                            ">&times;</button>
+                        </div>
+                        <div style="
+                            padding: 20px !important;
+                            overflow-y: auto !important;
+                            flex-grow: 1 !important;
+                        ">
+                            <div id="projectFilesContent">
+                                <div class="text-center p-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Загрузка...</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <hr class="my-4">
+                            
+                            <h6 class="mb-3">
+                                <i class="fas fa-upload me-2"></i>Загрузить новый файл
+                            </h6>
+                            <form id="uploadFileForm" onsubmit="uploadProjectFile(event, ${projectId})">
+                                <input type="hidden" id="uploadProjectId" value="${projectId}">
+                                <div class="mb-3">
+                                    <label class="form-label">Выберите файл</label>
+                                    <input type="file" class="form-control" id="projectFile" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Описание файла</label>
+                                    <textarea class="form-control" id="fileDescription" rows="2" placeholder="Опишите содержимое файла..."></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-upload me-1"></i>Загрузить файл
+                                </button>
+                            </form>
+                        </div>
+                        <div style="
+                            padding: 20px !important;
+                            border-top: 1px solid #dee2e6 !important;
+                            display: flex !important;
+                            justify-content: flex-end !important;
+                            flex-shrink: 0 !important;
+                        ">
+                            <button onclick="hideFilesModal()" class="btn btn-secondary">Закрыть</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
             
             // Загружаем файлы проекта
             await loadProjectFiles(projectId);
         } catch (error) {
             console.error('Ошибка показа модального окна файлов:', error);
             showNotification('Ошибка открытия файлов проекта: ' + error.message, 'danger');
+        }
+    }
+    
+    function hideFilesModal() {
+        const modal = document.getElementById('customFilesModal');
+        if (modal) {
+            modal.remove();
         }
     }
 
@@ -3592,11 +3862,91 @@ tr .project-color-indicator {
 
     // Функции для удаления проекта
     function confirmDeleteProject(projectId, projectTitle) {
-        document.getElementById('deleteProjectId').value = projectId;
-        document.getElementById('deleteProjectTitle').textContent = projectTitle;
+        // Удаляем старое кастомное модальное окно если есть
+        const existingModal = document.getElementById('customDeleteModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
         
-        const modal = new bootstrap.Modal(document.getElementById('deleteProjectModal'));
-        modal.show();
+        // Создаем КАСТОМНОЕ модальное окно для подтверждения удаления с АБСОЛЮТНЫМ центрированием
+        const modalHTML = `
+            <div id="customDeleteModal" style="
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background: rgba(0, 0, 0, 0.6) !important;
+                z-index: 999999 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            " onclick="if(event.target.id === 'customDeleteModal') hideDeleteModal()">
+                <div style="
+                    background: white !important;
+                    border-radius: 8px !important;
+                    width: 90% !important;
+                    max-width: 500px !important;
+                    position: relative !important;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
+                " onclick="event.stopPropagation()">
+                    <div style="
+                        padding: 20px !important;
+                        border-bottom: 1px solid #dee2e6 !important;
+                        display: flex !important;
+                        justify-content: space-between !important;
+                        align-items: center !important;
+                    ">
+                        <h4 style="margin: 0 !important; color: #dc3545 !important;">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Подтверждение удаления
+                        </h4>
+                        <button onclick="hideDeleteModal()" style="
+                            background: none !important;
+                            border: none !important;
+                            font-size: 28px !important;
+                            line-height: 1 !important;
+                            cursor: pointer !important;
+                            color: #6c757d !important;
+                            padding: 0 !important;
+                            width: 30px !important;
+                            height: 30px !important;
+                        ">&times;</button>
+                    </div>
+                    <div style="padding: 20px !important;">
+                        <div class="alert alert-danger d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <div>
+                                <strong>Внимание!</strong> Это действие необратимо.
+                            </div>
+                        </div>
+                        <p>Вы уверены, что хотите удалить проект <strong>"${projectTitle}"</strong>?</p>
+                        <p class="text-muted">При удалении проекта будут удалены все связанные файлы и данные. Заказчик получит уведомление об удалении.</p>
+                        <input type="hidden" id="deleteProjectId" value="${projectId}">
+                    </div>
+                    <div style="
+                        padding: 20px !important;
+                        border-top: 1px solid #dee2e6 !important;
+                        display: flex !important;
+                        justify-content: flex-end !important;
+                        gap: 10px !important;
+                    ">
+                        <button onclick="hideDeleteModal()" class="btn btn-secondary">Отмена</button>
+                        <button onclick="deleteProject()" class="btn btn-danger">
+                            <i class="fas fa-trash me-1"></i>Удалить проект
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+    }
+    
+    function hideDeleteModal() {
+        const modal = document.getElementById('customDeleteModal');
+        if (modal) {
+            modal.remove();
+        }
     }
 
     async function deleteProject() {
@@ -3615,9 +3965,8 @@ tr .project-color-indicator {
             if (data.success) {
                 showNotification('Проект успешно удален!', 'success');
                 
-                // Закрываем модальное окно
-                const modal = bootstrap.Modal.getInstance(document.getElementById('deleteProjectModal'));
-                modal.hide();
+                // Закрываем кастомное модальное окно
+                hideDeleteModal();
                 
                 // Обновляем список проектов
                 setTimeout(() => {
