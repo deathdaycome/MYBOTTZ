@@ -2328,18 +2328,9 @@ tr .project-color-indicator {
         // Очищаем форму
         document.getElementById('createProjectForm').reset();
         
-        // Простое открытие модального окна
-        const modalElement = document.getElementById('createProjectModal');
-        modalElement.style.display = 'block';
-        modalElement.classList.add('show');
-        modalElement.style.background = 'rgba(0, 0, 0, 0.5)';
-        console.log('Модальное окно открыто');
-        
-        // Убираем backdrop-filter с content-wrapper при показе модального окна
-        const contentWrapper = document.querySelector('.content-wrapper');
-        if (contentWrapper) {
-            contentWrapper.classList.add('modal-open');
-        }
+        // Используем Bootstrap модальное окно
+        const modal = new bootstrap.Modal(document.getElementById('createProjectModal'));
+        modal.show();
         
         // Фокус на первое поле
         setTimeout(() => {
@@ -2352,14 +2343,9 @@ tr .project-color-indicator {
     
     function hideCreateProjectModal() {
         console.log('Закрываем модальное окно');
-        const modalElement = document.getElementById('createProjectModal');
-        modalElement.style.display = 'none';
-        modalElement.classList.remove('show');
-        
-        // Возвращаем backdrop-filter
-        const contentWrapper = document.querySelector('.content-wrapper');
-        if (contentWrapper) {
-            contentWrapper.classList.remove('modal-open');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
+        if (modal) {
+            modal.hide();
         }
     }
 
