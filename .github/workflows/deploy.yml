@@ -109,7 +109,8 @@ jobs:
           else
             echo "⚠️ Скрипт миграции не найден, пытаемся добавить колонку вручную..."
             # Создаем временный файл для миграции
-            cat > /tmp/migrate_temp.py << 'MIGRATE_EOF'
+            echo "Создаем временный скрипт миграции..."
+            cat > /tmp/migrate_temp.py << 'ENDOFPYTHON'
 import sqlite3
 import os
 
@@ -126,7 +127,8 @@ if os.path.exists('business_card_bot.db'):
         conn.close()
 else:
     print('⚠️ База данных не найдена')
-MIGRATE_EOF
+ENDOFPYTHON
+            echo "Запускаем миграцию..."
             python3 /tmp/migrate_temp.py
             rm -f /tmp/migrate_temp.py
           fi
