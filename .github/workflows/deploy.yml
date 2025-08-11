@@ -108,29 +108,8 @@ jobs:
             echo "✅ Миграции выполнены"
           else
             echo "⚠️ Скрипт миграции не найден, пытаемся добавить колонку вручную..."
-            # Создаем временный файл для миграции
-            echo "Создаем временный скрипт миграции..."
-            cat > /tmp/migrate_temp.py << 'ENDOFPYTHON'
-import sqlite3
-import os
-
-if os.path.exists('business_card_bot.db'):
-    conn = sqlite3.connect('business_card_bot.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute("ALTER TABLE projects ADD COLUMN color VARCHAR(20) DEFAULT 'default'")
-        conn.commit()
-        print('✅ Колонка color добавлена')
-    except Exception as e:
-        print('ℹ️ Колонка color уже существует или ошибка:', str(e))
-    finally:
-        conn.close()
-else:
-    print('⚠️ База данных не найдена')
-ENDOFPYTHON
-            echo "Запускаем миграцию..."
-            python3 /tmp/migrate_temp.py
-            rm -f /tmp/migrate_temp.py
+            # Используем однострочный Python для избежания проблем с YAML
+            python3 -c "import sqlite3, os; conn = sqlite3.connect('business_card_bot.db') if os.path.exists('business_card_bot.db') else None; cursor = conn.cursor() if conn else None; cursor.execute('ALTER TABLE projects ADD COLUMN color VARCHAR(20) DEFAULT \"default\"') if cursor else None; conn.commit() if conn else None; print('✅ Миграция выполнена') if conn else print('⚠️ БД не найдена')" 2>/dev/null || echo "ℹ️ Колонка color уже существует или БД не найдена"
           fi
           
           # Полностью останавливаем и удаляем процесс
