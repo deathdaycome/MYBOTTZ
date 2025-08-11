@@ -2790,28 +2790,57 @@ tr .project-color-indicator {
         const username = window.username;
         const password = window.password;
         
-        const title = document.getElementById('createProjectTitle').value;
-        const description = document.getElementById('createProjectDescription').value;
+        // Проверяем существование элементов
+        const titleElement = document.getElementById('createProjectTitle');
+        const descriptionElement = document.getElementById('createProjectDescription');
         
-        console.log('Title:', title);
-        console.log('Description:', description);
-        const projectType = document.getElementById('createProjectType').value;
-        const clientName = document.getElementById('createClientName').value;
-        const clientTelegramId = document.getElementById('createClientTelegramId').value;
-        const clientPhone = document.getElementById('createClientPhone').value;
-        const complexity = document.getElementById('createProjectComplexity').value;
-        const priority = document.getElementById('createProjectPriority').value;
-        const status = document.getElementById('createProjectStatus').value;
-        const estimatedCost = document.getElementById('createEstimatedCost').value;
-        const executorCost = document.getElementById('createExecutorCost').value;
-        const estimatedHours = document.getElementById('createEstimatedHours').value;
-        const deadline = document.getElementById('createProjectDeadline').value;
+        console.log('Title element:', titleElement);
+        console.log('Description element:', descriptionElement);
+        
+        if (!titleElement || !descriptionElement) {
+            console.error('Элементы формы не найдены!');
+            showNotification('Ошибка: элементы формы не найдены', 'danger');
+            return;
+        }
+        
+        const title = titleElement.value;
+        const description = descriptionElement.value;
+        
+        console.log('Title value:', title);
+        console.log('Description value:', description);
+        // Безопасное получение значений с проверкой существования элементов
+        const getElementValue = (id) => {
+            const element = document.getElementById(id);
+            if (!element) {
+                console.warn(`Элемент с ID '${id}' не найден`);
+                return '';
+            }
+            return element.value;
+        };
+        
+        const projectType = getElementValue('createProjectType');
+        const clientName = getElementValue('createClientName');
+        const clientTelegramId = getElementValue('createClientTelegramId');
+        const clientPhone = getElementValue('createClientPhone');
+        const complexity = getElementValue('createProjectComplexity');
+        const priority = getElementValue('createProjectPriority');
+        const status = getElementValue('createProjectStatus');
+        const estimatedCost = getElementValue('createEstimatedCost');
+        const executorCost = getElementValue('createExecutorCost');
+        const estimatedHours = getElementValue('createEstimatedHours');
+        const deadline = getElementValue('createDeadline'); // Исправлен ID
         
         // Новые поля
-        const prepaymentAmount = document.getElementById('createPrepaymentAmount').value;
-        const clientPaidTotal = document.getElementById('createClientPaidTotal').value;
-        const executorPaidTotal = document.getElementById('createExecutorPaidTotal').value;
-        const assignedExecutor = document.getElementById('createAssignedExecutor').value;
+        const prepaymentAmount = getElementValue('createPrepaymentAmount');
+        const clientPaidTotal = getElementValue('createClientPaidTotal');
+        const executorPaidTotal = getElementValue('createExecutorPaidTotal');
+        const assignedExecutor = getElementValue('createAssignedExecutor');
+        
+        // Дополнительные поля
+        const botToken = getElementValue('createBotToken');
+        const chatId = getElementValue('createChatId');
+        const technicalRequirements = getElementValue('createTechnicalRequirements');
+        const additionalRequirements = getElementValue('createAdditionalRequirements');
         
         if (!title.trim()) {
             showNotification('Название проекта обязательно', 'warning');
@@ -2825,6 +2854,15 @@ tr .project-color-indicator {
         
         try {
             console.log('Отправляем запрос на создание проекта');
+            console.log('Данные для отправки:', {
+                title: title.trim(),
+                description: description.trim(),
+                project_type: projectType || 'bot',
+                complexity: complexity || 'medium',
+                priority: priority || 'medium',
+                status: status || 'new'
+            });
+            
             const response = await fetch('/admin/api/projects/', {
                 method: 'POST',
                 headers: {
@@ -2834,13 +2872,13 @@ tr .project-color-indicator {
                 body: JSON.stringify({
                     title: title.trim(),
                     description: description.trim(),
-                    project_type: projectType,
+                    project_type: projectType || 'bot',
                     client_name: clientName.trim(),
                     client_telegram_id: clientTelegramId.trim(),
                     client_phone: clientPhone.trim(),
-                    complexity: complexity,
-                    priority: priority,
-                    status: status,
+                    complexity: complexity || 'medium',
+                    priority: priority || 'medium',
+                    status: status || 'new',
                     estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
                     executor_cost: executorCost ? parseFloat(executorCost) : null,
                     estimated_hours: estimatedHours ? parseInt(estimatedHours) : null,
@@ -2848,7 +2886,11 @@ tr .project-color-indicator {
                     prepayment_amount: prepaymentAmount ? parseFloat(prepaymentAmount) : 0,
                     client_paid_total: clientPaidTotal ? parseFloat(clientPaidTotal) : 0,
                     executor_paid_total: executorPaidTotal ? parseFloat(executorPaidTotal) : 0,
-                    assigned_executor_id: assignedExecutor || null
+                    assigned_executor_id: assignedExecutor ? parseInt(assignedExecutor) : null,
+                    bot_token: botToken || '',
+                    chat_id: chatId || '',
+                    technical_requirements: technicalRequirements || '',
+                    additional_requirements: additionalRequirements || ''
                 })
             });
             
