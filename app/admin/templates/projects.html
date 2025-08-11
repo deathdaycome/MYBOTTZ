@@ -1043,7 +1043,7 @@ tr .project-color-indicator {
                                     <i class="fas fa-comment"></i>
                                 </button>
                                 {% endif %}
-                                <button class="btn btn-outline-danger" onclick="confirmDeleteProject({{ project.id }}, '{{ project.title }}')" title="Удалить проект">
+                                <button class="btn btn-outline-danger" onclick="confirmDeleteProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="Удалить проект">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -3862,11 +3862,23 @@ tr .project-color-indicator {
 
     // Функции для удаления проекта
     window.confirmDeleteProject = function(projectId, projectTitle) {
+        console.log('confirmDeleteProject вызван с ID:', projectId, 'и названием:', projectTitle);
+        
+        // Проверяем, что projectId передан
+        if (!projectId) {
+            console.error('Project ID не передан в confirmDeleteProject!');
+            showNotification('Ошибка: ID проекта не указан', 'danger');
+            return;
+        }
+        
         // Удаляем старое кастомное модальное окно если есть
         const existingModal = document.getElementById('customDeleteModal');
         if (existingModal) {
             existingModal.remove();
         }
+        
+        // Экранируем HTML в названии проекта
+        const safeTitle = (projectTitle || 'Без названия').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         
         // Создаем КАСТОМНОЕ модальное окно для подтверждения удаления с АБСОЛЮТНЫМ центрированием
         const modalHTML = `
@@ -3919,7 +3931,7 @@ tr .project-color-indicator {
                                 <strong>Внимание!</strong> Это действие необратимо.
                             </div>
                         </div>
-                        <p>Вы уверены, что хотите удалить проект <strong>"${projectTitle}"</strong>?</p>
+                        <p>Вы уверены, что хотите удалить проект <strong>"${safeTitle}"</strong>?</p>
                         <p class="text-muted">При удалении проекта будут удалены все связанные файлы и данные. Заказчик получит уведомление об удалении.</p>
                         <input type="hidden" id="deleteProjectId" value="${projectId}">
                     </div>
@@ -3940,6 +3952,14 @@ tr .project-color-indicator {
         `;
         
         document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // Проверяем, что элемент создан и значение установлено
+        const checkElement = document.getElementById('deleteProjectId');
+        if (checkElement) {
+            console.log('Элемент deleteProjectId создан со значением:', checkElement.value);
+        } else {
+            console.error('Элемент deleteProjectId НЕ создан!');
+        }
     }
     
     window.hideDeleteModal = function() {
