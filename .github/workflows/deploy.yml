@@ -88,8 +88,18 @@ jobs:
           pm2 stop bot-business-card || true
           pm2 delete bot-business-card || true
           
-          # Запускаем PM2 из текущей директории
-          pm2 start /var/www/bot_business_card/venv/bin/python --name bot-business-card --interpreter none --cwd /var/www/bot_business_card -- -m app.main
+          # Загружаем переменные из .env и запускаем PM2
+          set -a
+          source .env
+          set +a
+          
+          # Запускаем PM2 с передачей переменных окружения
+          pm2 start /var/www/bot_business_card/venv/bin/python \
+            --name bot-business-card \
+            --interpreter none \
+            --cwd /var/www/bot_business_card \
+            --update-env \
+            -- -m app.main
           
           # Сохраняем конфигурацию PM2
           pm2 save
