@@ -725,14 +725,16 @@ async def finance_page(request: Request, username: str = Depends(authenticate)):
             FinanceTransaction.date >= month_start
         ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
         
-            # Общий баланс
-            balance = base_query.with_entities(
-            func.sum(func.case(
-                [(FinanceTransaction.type == "income", FinanceTransaction.amount),
-                 (FinanceTransaction.type == "expense", -FinanceTransaction.amount)],
-                else_=0
-            ))
-        ).scalar() or 0
+            # Общий баланс - считаем отдельно для избежания проблем с SQLAlchemy case
+            total_income_all = base_query.filter(
+                FinanceTransaction.type == "income"
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+            
+            total_expenses_all = base_query.filter(
+                FinanceTransaction.type == "expense"
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+            
+            balance = total_income_all - total_expenses_all
         
             # Прибыль
             profit = total_income - total_expenses
