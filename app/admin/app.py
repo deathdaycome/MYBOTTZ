@@ -728,8 +728,8 @@ async def finance_page(request: Request, username: str = Depends(authenticate)):
             # Общий баланс
             balance = base_query.with_entities(
             func.sum(func.case(
-                (FinanceTransaction.type == "income", FinanceTransaction.amount),
-                (FinanceTransaction.type == "expense", -FinanceTransaction.amount),
+                [(FinanceTransaction.type == "income", FinanceTransaction.amount),
+                 (FinanceTransaction.type == "expense", -FinanceTransaction.amount)],
                 else_=0
             ))
         ).scalar() or 0
