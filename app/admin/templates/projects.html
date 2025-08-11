@@ -3943,7 +3943,7 @@ tr .project-color-indicator {
                         gap: 10px !important;
                     ">
                         <button onclick="hideDeleteModal()" class="btn btn-secondary">Отмена</button>
-                        <button onclick="deleteProject()" class="btn btn-danger">
+                        <button onclick="window.deleteProject()" class="btn btn-danger">
                             <i class="fas fa-trash me-1"></i>Удалить проект
                         </button>
                     </div>
@@ -3970,10 +3970,12 @@ tr .project-color-indicator {
     }
 
     window.deleteProject = async function() {
-        console.log('=== НАЧАЛО УДАЛЕНИЯ ПРОЕКТА ===');
-        
-        const projectIdElement = document.getElementById('deleteProjectId');
-        console.log('Элемент deleteProjectId:', projectIdElement);
+        try {
+            console.log('=== НАЧАЛО УДАЛЕНИЯ ПРОЕКТА ===');
+            console.log('Функция deleteProject вызвана!');
+            
+            const projectIdElement = document.getElementById('deleteProjectId');
+            console.log('Элемент deleteProjectId:', projectIdElement);
         
         if (!projectIdElement) {
             console.error('КРИТИЧЕСКАЯ ОШИБКА: Элемент deleteProjectId не найден в DOM!');
@@ -4048,6 +4050,11 @@ tr .project-color-indicator {
         }
         
         console.log('=== КОНЕЦ УДАЛЕНИЯ ПРОЕКТА ===');
+        } catch (globalError) {
+            console.error('ГЛОБАЛЬНАЯ ОШИБКА В deleteProject:', globalError);
+            console.error('Stack:', globalError.stack);
+            showNotification('Критическая ошибка: ' + globalError.message, 'danger');
+        }
     }
     
     // Глобальная функция для теста
