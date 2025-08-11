@@ -4,6 +4,7 @@ from typing import List, Optional
 import os
 import uuid
 import secrets
+import traceback
 from fastapi import APIRouter, HTTPException, Depends, Request, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -1081,11 +1082,16 @@ async def delete_project(
 ):
     """Удалить проект (только для владельца)"""
     try:
+        logger.info(f"=== НАЧАЛО УДАЛЕНИЯ ПРОЕКТА {project_id} ===")
+        logger.info(f"Текущий пользователь: {current_user}")
+        logger.info(f"Роль пользователя: {current_user.get('role')}")
+        
         # Проверяем права доступа (только владелец может удалять проекты)
         if current_user["role"] != "owner":
+            logger.warning(f"Отказ в удалении: пользователь {current_user.get('username')} не владелец, роль: {current_user.get('role')}")
             return {
                 "success": False,
-                "message": "У вас нет прав для удаления проектов"
+                "message": f"У вас нет прав для удаления проектов. Ваша роль: {current_user.get('role')}"
             }
         
         # Получаем проект
@@ -1198,6 +1204,7 @@ async def delete_project(
                 logger.error(f"Ошибка отправки уведомления об удалении: {e}")
         
         logger.info(f"Проект '{project_title}' (ID: {project_id}) удален пользователем {current_user['username']}")
+        logger.info(f"=== УДАЛЕНИЕ ПРОЕКТА {project_id} ЗАВЕРШЕНО УСПЕШНО ===")
         
         return {
             "success": True,
@@ -1206,6 +1213,9 @@ async def delete_project(
         }
         
     except Exception as e:
+        logger.error(f"=== КРИТИЧЕСКАЯ ОШИБКА ПРИ УДАЛЕНИИ ПРОЕКТА {project_id} ===")
+        logger.error(f"Ошибка: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         logger.error(f"Ошибка удаления проекта {project_id}: {e}")
         db.rollback()
         return {
