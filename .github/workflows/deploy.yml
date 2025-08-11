@@ -108,21 +108,27 @@ jobs:
             echo "✅ Миграции выполнены"
           else
             echo "⚠️ Скрипт миграции не найден, пытаемся добавить колонку вручную..."
-            # Добавляем колонку color если её нет
-            python3 -c "
+            # Создаем временный файл для миграции
+            cat > /tmp/migrate_temp.py << 'MIGRATE_EOF'
 import sqlite3
 import os
+
 if os.path.exists('business_card_bot.db'):
     conn = sqlite3.connect('business_card_bot.db')
     cursor = conn.cursor()
     try:
-        cursor.execute('ALTER TABLE projects ADD COLUMN color VARCHAR(20) DEFAULT \\"default\\"')
+        cursor.execute("ALTER TABLE projects ADD COLUMN color VARCHAR(20) DEFAULT 'default'")
         conn.commit()
         print('✅ Колонка color добавлена')
-    except:
-        print('ℹ️ Колонка color уже существует')
-    conn.close()
-"
+    except Exception as e:
+        print('ℹ️ Колонка color уже существует или ошибка:', str(e))
+    finally:
+        conn.close()
+else:
+    print('⚠️ База данных не найдена')
+MIGRATE_EOF
+            python3 /tmp/migrate_temp.py
+            rm -f /tmp/migrate_temp.py
           fi
           
           # Полностью останавливаем и удаляем процесс
