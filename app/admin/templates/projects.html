@@ -1371,174 +1371,7 @@ tr .project-color-indicator {
     </div>
 </div>
 
-<!-- Create Project Modal -->
-<div class="modal fade" id="createProjectModal" tabindex="-1" aria-labelledby="createProjectModalLabel">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="createProjectModalLabel">
-                    <i class="fas fa-plus me-2"></i>Создать новый проект
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="createProjectForm">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createProjectTitle" class="form-label">Название проекта *</label>
-                                <input type="text" class="form-control" id="createProjectTitle">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createProjectType" class="form-label">Тип проекта</label>
-                                <select class="form-select" id="createProjectType">
-                                    <option value="website">Веб-сайт</option>
-                                    <option value="bot">Telegram-бот</option>
-                                    <option value="app">Мобильное приложение</option>
-                                    <option value="other">Другое</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="createProjectDescription" class="form-label">Описание проекта *</label>
-                        <textarea class="form-control" id="createProjectDescription" rows="3"></textarea>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createClientName" class="form-label">Имя клиента</label>
-                                <input type="text" class="form-control" id="createClientName">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createClientTelegramId" class="form-label">Telegram ID клиента</label>
-                                <input type="text" class="form-control" id="createClientTelegramId" placeholder="Например: 123456789">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createClientPhone" class="form-label">Телефон клиента</label>
-                                <input type="text" class="form-control" id="createClientPhone" placeholder="+7 (999) 123-45-67">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createProjectComplexity" class="form-label">Сложность</label>
-                                <select class="form-select" id="createProjectComplexity">
-                                    <option value="simple">Простой</option>
-                                    <option value="medium" selected>Средний</option>
-                                    <option value="complex">Сложный</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createProjectPriority" class="form-label">Приоритет</label>
-                                <select class="form-select" id="createProjectPriority">
-                                    <option value="low">Низкий</option>
-                                    <option value="medium" selected>Средний</option>
-                                    <option value="high">Высокий</option>
-                                    <option value="urgent">Срочный</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createProjectStatus" class="form-label">Статус</label>
-                                <select class="form-select" id="createProjectStatus">
-                                    <option value="new" selected>Новый</option>
-                                    <option value="review">На рассмотрении</option>
-                                    <option value="accepted">Принят</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="createEstimatedCost" class="form-label">Стоимость (руб.)</label>
-                                <input type="number" class="form-control" id="createEstimatedCost" min="0" step="1000">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="createExecutorCost" class="form-label">Стоимость для исполнителя (руб.)</label>
-                                <input type="number" class="form-control" id="createExecutorCost" min="0" step="500">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="createEstimatedHours" class="form-label">Часы (прогноз)</label>
-                                <input type="number" class="form-control" id="createEstimatedHours" min="1" step="1">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Финансовые поля -->
-                    <div class="row">
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="createPrepaymentAmount" class="form-label">Предоплата (руб.)</label>
-                                <input type="number" class="form-control" id="createPrepaymentAmount" min="0" step="1000" placeholder="0">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="createClientPaidTotal" class="form-label">Уже заплачено клиентом (руб.)</label>
-                                <input type="number" class="form-control" id="createClientPaidTotal" min="0" step="1000" placeholder="0">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label for="createExecutorPaidTotal" class="form-label">Выплачено исполнителю (руб.)</label>
-                                <input type="number" class="form-control" id="createExecutorPaidTotal" min="0" step="500" placeholder="0">
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Назначение исполнителя -->
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createAssignedExecutor" class="form-label">Назначить исполнителя</label>
-                                <select class="form-select" id="createAssignedExecutor">
-                                    <option value="">Выберите исполнителя</option>
-                                    <!-- Опции будут загружены динамически -->
-                                </select>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="createProjectDeadline" class="form-label">Дедлайн</label>
-                                <input type="datetime-local" class="form-control" id="createProjectDeadline">
-                            </div>
-                        </div>
-                    </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="hideCreateProjectModal()">Отмена</button>
-                <button type="button" id="createProjectBtn" class="btn btn-primary" onclick="createProject()">
-                    <i class="fas fa-plus me-1"></i>Создать проект
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Create Project Modal - УДАЛЕНО, используется кастомное модальное окно -->
 
 <!-- Project Files Modal -->
 <div class="modal fade" id="projectFilesModal" tabindex="-1" aria-labelledby="projectFilesModalLabel" aria-hidden="true">
@@ -2838,9 +2671,6 @@ tr .project-color-indicator {
         
         // Дополнительные поля
         const botToken = getElementValue('createBotToken');
-        const chatId = getElementValue('createChatId');
-        const technicalRequirements = getElementValue('createTechnicalRequirements');
-        const additionalRequirements = getElementValue('createAdditionalRequirements');
         
         if (!title.trim()) {
             showNotification('Название проекта обязательно', 'warning');
@@ -2863,7 +2693,7 @@ tr .project-color-indicator {
                 status: status || 'new'
             });
             
-            const response = await fetch('/admin/api/projects/', {
+            const response = await fetch('/admin/api/projects/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2887,10 +2717,9 @@ tr .project-color-indicator {
                     client_paid_total: clientPaidTotal ? parseFloat(clientPaidTotal) : 0,
                     executor_paid_total: executorPaidTotal ? parseFloat(executorPaidTotal) : 0,
                     assigned_executor_id: assignedExecutor ? parseInt(assignedExecutor) : null,
-                    bot_token: botToken || '',
-                    chat_id: chatId || '',
-                    technical_requirements: technicalRequirements || '',
-                    additional_requirements: additionalRequirements || ''
+                    bot_token: botToken || null,
+                    timeweb_login: null,
+                    timeweb_password: null
                 })
             });
             
