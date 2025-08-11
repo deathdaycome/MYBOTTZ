@@ -2632,6 +2632,15 @@ tr .project-color-indicator {
                                         <label class="form-label">Назначить исполнителя</label>
                                         <select class="form-select" id="createAssignedExecutor">
                                             <option value="">Выберите исполнителя</option>
+                                            <option value="1">admin (owner)</option>
+                                            <option value="2">Николаев Николай (executor)</option>
+                                            <option value="3">Миша Ключка (executor)</option>
+                                            <option value="4">Даниил Михайлов (executor)</option>
+                                            <option value="5">Павел (executor)</option>
+                                            <option value="6">Тестовый Исполнитель (executor)</option>
+                                            <option value="7">Геннадий Николаев (executor)</option>
+                                            <option value="8">Иван Исполнитель (executor)</option>
+                                            <option value="9">Петр Разработчик (executor)</option>
                                         </select>
                                     </div>
                                 </div>
@@ -2715,26 +2724,28 @@ tr .project-color-indicator {
                     const executorSelect = document.getElementById('createAssignedExecutor');
                     
                     if (executorSelect) {
-                        // Очищаем и заполняем select
-                        executorSelect.innerHTML = '<option value="">Выберите исполнителя</option>';
+                        // НЕ очищаем существующие опции, если они уже есть
+                        if (executorSelect.children.length <= 1) {
+                            executorSelect.innerHTML = '<option value="">Выберите исполнителя</option>';
+                        }
                         
-                        if (data.executors && data.executors.length > 0) {
-                            data.executors.forEach(executor => {
-                                const option = document.createElement('option');
-                                option.value = executor.id;
-                                const name = executor.first_name || executor.username || 'Без имени';
-                                const role = executor.role || 'executor';
-                                option.textContent = `${name} (${role})`;
-                                executorSelect.appendChild(option);
-                            });
-                            console.log(`Добавлено ${data.executors.length} исполнителей в список`);
+                        // Пытаемся загрузить с API, только если список пустой
+                        if (executorSelect.children.length <= 1) {
+                            if (data.executors && data.executors.length > 0) {
+                                data.executors.forEach(executor => {
+                                    const option = document.createElement('option');
+                                    option.value = executor.id;
+                                    const name = executor.first_name || executor.username || 'Без имени';
+                                    const role = executor.role || 'executor';
+                                    option.textContent = `${name} (${role})`;
+                                    executorSelect.appendChild(option);
+                                });
+                                console.log(`Добавлено ${data.executors.length} исполнителей в список`);
+                            } else {
+                                console.warn('Список исполнителей пуст');
+                            }
                         } else {
-                            console.warn('Список исполнителей пуст');
-                            // Добавляем тестового исполнителя для отладки
-                            const option = document.createElement('option');
-                            option.value = "1";
-                            option.textContent = "admin (owner)";
-                            executorSelect.appendChild(option);
+                            console.log('Исполнители уже загружены в HTML');
                         }
                     } else {
                         console.error('Элемент select для исполнителей не найден!');
