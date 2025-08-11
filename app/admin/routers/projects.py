@@ -790,12 +790,17 @@ async def create_project(
             user = db.query(User).filter(User.telegram_id == project_data.client_telegram_id).first()
         
         if not user:
+            # Генерируем уникальный username на основе имени клиента или используем временную метку
+            import time
+            base_username = (project_data.client_name or "client").replace(' ', '_').lower()
+            username = f"{base_username}_{int(time.time())}"
+            
             # Создаем нового пользователя
             user = User(
-                telegram_id=project_data.client_telegram_id or "",  # Обеспечиваем не None значение
+                telegram_id=project_data.client_telegram_id if project_data.client_telegram_id else None,  # Используем None вместо пустой строки
                 first_name=project_data.client_name or "Клиент",
                 last_name="",
-                username="",
+                username=username,  # Используем уникальный username
                 phone=project_data.client_phone,
                 is_active=True
             )
