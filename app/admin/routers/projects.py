@@ -51,6 +51,7 @@ class ProjectUpdateModel(BaseModel):
     bot_token: Optional[str] = None  # API токен Telegram бота
     timeweb_login: Optional[str] = None  # Логин Timeweb
     timeweb_password: Optional[str] = None  # Пароль Timeweb
+    color: Optional[str] = None  # Цветовая метка проекта (default, green, yellow, red)
     telegram_id: Optional[str] = None  # Telegram ID пользователя
 
     class Config:
@@ -521,7 +522,7 @@ async def update_project(
                     "message": "У вас нет доступа к этому проекту"
                 }
             # Исполнители могут менять только определенные поля
-            allowed_fields = {"status", "actual_hours", "comment"}
+            allowed_fields = {"status", "actual_hours", "comment", "color"}
             for field_name, field_value in project_data.dict(exclude_unset=True).items():
                 if field_name not in allowed_fields and field_value is not None:
                     return {
@@ -574,6 +575,11 @@ async def update_project(
                         return {
                             "success": False,
                             "message": "Недопустимый статус"
+                        }
+                    elif field_name == "color" and new_value not in ["default", "green", "yellow", "red"]:
+                        return {
+                            "success": False,
+                            "message": "Недопустимый цвет. Допустимые значения: default, green, yellow, red"
                         }
                     elif old_value != new_value:
                         original_values[field_name] = old_value
