@@ -120,7 +120,7 @@
                     <i class="fas fa-clock me-2"></i>
                     Последние проекты
                 </h5>
-                <a href="/projects" class="btn btn-outline-primary btn-sm">Все проекты</a>
+                <a href="/admin/projects" class="btn btn-outline-primary btn-sm">Все проекты</a>
             </div>
             <div class="card-body">
                 {% if recent_projects %}
@@ -456,7 +456,7 @@
 
     // Project Management
     function viewProject(projectId) {
-        window.location.href = `/projects/${projectId}`;
+        window.location.href = `/admin/projects/${projectId}/detail`;
     }
 
     function updateProjectStatus(projectId) {
