@@ -3943,7 +3943,7 @@ tr .project-color-indicator {
                         gap: 10px !important;
                     ">
                         <button onclick="hideDeleteModal()" class="btn btn-secondary">Отмена</button>
-                        <button onclick="window.deleteProject()" class="btn btn-danger">
+                        <button id="confirmDeleteBtn" class="btn btn-danger">
                             <i class="fas fa-trash me-1"></i>Удалить проект
                         </button>
                     </div>
@@ -3959,6 +3959,18 @@ tr .project-color-indicator {
             console.log('Элемент deleteProjectId создан со значением:', checkElement.value);
         } else {
             console.error('Элемент deleteProjectId НЕ создан!');
+        }
+        
+        // Добавляем обработчик на кнопку удаления
+        const deleteBtn = document.getElementById('confirmDeleteBtn');
+        if (deleteBtn) {
+            console.log('Добавляем обработчик на кнопку удаления');
+            deleteBtn.addEventListener('click', function() {
+                console.log('Кнопка удаления нажата!');
+                window.deleteProject();
+            });
+        } else {
+            console.error('Кнопка confirmDeleteBtn не найдена!');
         }
     }
     
