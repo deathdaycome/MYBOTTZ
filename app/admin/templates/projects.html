@@ -3861,7 +3861,7 @@ tr .project-color-indicator {
     }
 
     // Функции для удаления проекта
-    function confirmDeleteProject(projectId, projectTitle) {
+    window.confirmDeleteProject = function(projectId, projectTitle) {
         // Удаляем старое кастомное модальное окно если есть
         const existingModal = document.getElementById('customDeleteModal');
         if (existingModal) {
@@ -3942,15 +3942,28 @@ tr .project-color-indicator {
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     }
     
-    function hideDeleteModal() {
+    window.hideDeleteModal = function() {
         const modal = document.getElementById('customDeleteModal');
         if (modal) {
             modal.remove();
         }
     }
 
-    async function deleteProject() {
-        const projectId = document.getElementById('deleteProjectId').value;
+    window.deleteProject = async function() {
+        const projectIdElement = document.getElementById('deleteProjectId');
+        if (!projectIdElement) {
+            console.error('Элемент deleteProjectId не найден!');
+            showNotification('Ошибка: не найден ID проекта для удаления', 'danger');
+            return;
+        }
+        
+        const projectId = projectIdElement.value;
+        console.log('Удаляем проект с ID:', projectId);
+        
+        if (!projectId) {
+            showNotification('Ошибка: ID проекта не указан', 'danger');
+            return;
+        }
         
         try {
             const response = await fetch(`/admin/api/projects/${projectId}`, {
@@ -3961,6 +3974,7 @@ tr .project-color-indicator {
             });
             
             const data = await response.json();
+            console.log('Ответ сервера:', data);
             
             if (data.success) {
                 showNotification('Проект успешно удален!', 'success');
@@ -3976,6 +3990,7 @@ tr .project-color-indicator {
                 throw new Error(data.message || 'Ошибка удаления проекта');
             }
         } catch (error) {
+            console.error('Ошибка при удалении проекта:', error);
             showNotification('Ошибка удаления проекта: ' + error.message, 'danger');
         }
     }
