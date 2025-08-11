@@ -228,12 +228,12 @@ async def view_user_password(
                     detail="Пользователь не найден"
                 )
             
-            # В реальном приложении пароли должны храниться в хешированном виде
-            # Здесь мы можем вернуть только временный пароль или уведомление
+            # Пароли хранятся в хешированном виде и не могут быть показаны
+            # Можно только сбросить пароль через изменение
             return {
                 "success": True,
-                "password": user.password if hasattr(user, 'password') else "***скрыт***",
-                "message": "Пароль получен успешно"
+                "password": "Пароль зашифрован. Используйте 'Сменить пароль' для установки нового.",
+                "message": "Пароли хранятся в зашифрованном виде"
             }
     except HTTPException:
         raise
@@ -318,18 +318,19 @@ async def update_user(
             
             db.commit()
             
-            # Логируем активность
-            from ...database.models import AdminActivityLog
-            log = AdminActivityLog(
-                user_id=current_user.id,
-                action="update_user",
-                action_type="update",
-                entity_type="user",
-                entity_id=user_id,
-                details={"updated_fields": list(data.keys())}
-            )
-            db.add(log)
-            db.commit()
+            # Логирование активности временно отключено
+            # TODO: Добавить миграцию для таблицы admin_activity_logs
+            # from ...database.models import AdminActivityLog
+            # log = AdminActivityLog(
+            #     user_id=current_user.id,
+            #     action="update_user",
+            #     action_type="update",
+            #     entity_type="user",
+            #     entity_id=user_id,
+            #     details={"updated_fields": list(data.keys())}
+            # )
+            # db.add(log)
+            # db.commit()
             
             return {
                 "success": True,
