@@ -58,12 +58,23 @@ jobs:
           # Дополнительно устанавливаем python-telegram-bot на случай если не установился
           pip install python-telegram-bot
           
-          # Проверяем наличие .env файла
+          # Проверяем наличие .env файла и токена
           if [ ! -f ".env" ]; then
             echo "⚠️ Внимание: .env файл не найден! Бот не запустится без токенов."
             echo "Скопируйте .env файл с локальной машины на сервер"
           else
             echo "✅ .env файл найден"
+            # Проверяем наличие BOT_TOKEN в файле
+            if grep -q "BOT_TOKEN=" .env; then
+              echo "✅ BOT_TOKEN найден в .env"
+              # Показываем первые символы токена для проверки (безопасно)
+              grep "BOT_TOKEN=" .env | head -c 30
+              echo "..."
+            else
+              echo "❌ BOT_TOKEN НЕ найден в .env файле!"
+            fi
+            # Проверяем права доступа к файлу
+            ls -la .env
           fi
           
           # Очищаем кэш Python для применения изменений
@@ -86,7 +97,17 @@ jobs:
           # Проверяем статус
           pm2 status
           
+          # Ждем немного для запуска
+          sleep 3
+          
           # Показываем последние логи
-          pm2 logs bot-business-card --lines 10 --nostream
+          pm2 logs bot-business-card --lines 20 --nostream
+          
+          # Показываем информацию о процессе
+          pm2 info bot-business-card || true
+          
+          # Проверяем переменные окружения процесса
+          echo "Проверка переменных окружения PM2 процесса:"
+          pm2 env 0 | grep -E "(BOT_TOKEN|DATABASE_URL|ADMIN)" | head -5 || true
           
           echo "✅ Деплой завершен успешно! Бот перезапущен через PM2"
