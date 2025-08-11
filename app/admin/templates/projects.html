@@ -2695,16 +2695,72 @@ tr .project-color-indicator {
         // Блокируем скролл основной страницы
         document.body.style.overflow = 'hidden';
         
-        // Загружаем список исполнителей
-        loadExecutors();
-        
-        // Фокус на первое поле
-        setTimeout(() => {
-            const firstInput = document.getElementById('createTitle');
+        // Загружаем список исполнителей ПОСЛЕ создания модального окна
+        setTimeout(async () => {
+            console.log('Начинаем загрузку исполнителей...');
+            try {
+                const response = await fetch('/admin/api/users/executors', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                    }
+                });
+                
+                console.log('Ответ от API исполнителей:', response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Полученные исполнители:', data);
+                    
+                    const executorSelect = document.getElementById('createAssignedExecutor');
+                    
+                    if (executorSelect) {
+                        // Очищаем и заполняем select
+                        executorSelect.innerHTML = '<option value="">Выберите исполнителя</option>';
+                        
+                        if (data.executors && data.executors.length > 0) {
+                            data.executors.forEach(executor => {
+                                const option = document.createElement('option');
+                                option.value = executor.id;
+                                const name = executor.first_name || executor.username || 'Без имени';
+                                const role = executor.role || 'executor';
+                                option.textContent = `${name} (${role})`;
+                                executorSelect.appendChild(option);
+                            });
+                            console.log(`Добавлено ${data.executors.length} исполнителей в список`);
+                        } else {
+                            console.warn('Список исполнителей пуст');
+                            // Добавляем тестового исполнителя для отладки
+                            const option = document.createElement('option');
+                            option.value = "1";
+                            option.textContent = "admin (owner)";
+                            executorSelect.appendChild(option);
+                        }
+                    } else {
+                        console.error('Элемент select для исполнителей не найден!');
+                    }
+                } else {
+                    console.error('Ошибка загрузки исполнителей:', response.status);
+                }
+            } catch (error) {
+                console.error('Критическая ошибка при загрузке исполнителей:', error);
+                // Добавляем дефолтного исполнителя при ошибке
+                const executorSelect = document.getElementById('createAssignedExecutor');
+                if (executorSelect) {
+                    executorSelect.innerHTML = '<option value="">Выберите исполнителя</option>';
+                    const option = document.createElement('option');
+                    option.value = "1";
+                    option.textContent = "admin (по умолчанию)";
+                    executorSelect.appendChild(option);
+                }
+            }
+            
+            // Фокус на первое поле
+            const firstInput = document.getElementById('createProjectTitle');
             if (firstInput) {
                 firstInput.focus();
             }
-        }, 100);
+        }, 200);
     }
     
     function hideCreateProjectModal() {
