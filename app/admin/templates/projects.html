@@ -17,6 +17,32 @@ html, body {
     min-height: 100vh;
 }
 
+/* Исправление прокрутки модального окна */
+#projectModal .modal-dialog {
+    max-height: 90vh;
+    margin: 1.75rem auto;
+}
+
+#projectModal .modal-content {
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#projectModal .modal-body {
+    overflow-y: auto;
+    max-height: calc(85vh - 120px);
+    padding: 1.5rem;
+}
+
+#projectModal .modal-header {
+    flex-shrink: 0;
+}
+
+#projectModal .modal-footer {
+    flex-shrink: 0;
+}
+
 /* Полноэкранные контейнеры */
 .container-fluid {
     max-width: 100% !important;
@@ -2353,6 +2379,9 @@ html, body {
                 
                 // Заполняем модальное окно данными проекта
                 const modalBody = document.getElementById('projectModalBody');
+                
+                // Прокручиваем модальное окно вверх
+                modalBody.scrollTop = 0;
                 modalBody.innerHTML = `
                     <div class="row">
                         <div class="col-md-8">
@@ -2557,7 +2586,15 @@ html, body {
                 `;
                 
                 // Показываем модальное окно
-                const modal = new bootstrap.Modal(document.getElementById('projectModal'));
+                const modalElement = document.getElementById('projectModal');
+                const modal = new bootstrap.Modal(modalElement);
+                
+                // Добавляем обработчик для прокрутки вверх при открытии
+                modalElement.addEventListener('shown.bs.modal', function () {
+                    const modalBody = document.getElementById('projectModalBody');
+                    modalBody.scrollTop = 0;
+                });
+                
                 modal.show();
             } else {
                 console.error('Ошибка API:', data);
