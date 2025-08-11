@@ -3961,17 +3961,16 @@ tr .project-color-indicator {
             console.error('Элемент deleteProjectId НЕ создан!');
         }
         
-        // Добавляем обработчик на кнопку удаления
-        const deleteBtn = document.getElementById('confirmDeleteBtn');
-        if (deleteBtn) {
-            console.log('Добавляем обработчик на кнопку удаления');
-            deleteBtn.addEventListener('click', function() {
-                console.log('Кнопка удаления нажата!');
-                window.deleteProject();
-            });
-        } else {
-            console.error('Кнопка confirmDeleteBtn не найдена!');
-        }
+        // Добавляем обработчик на кнопку удаления (только один раз)
+        setTimeout(() => {
+            const deleteBtn = document.getElementById('confirmDeleteBtn');
+            if (deleteBtn) {
+                deleteBtn.onclick = function(e) {
+                    e.preventDefault();
+                    window.deleteProject();
+                };
+            }
+        }, 100);
     }
     
     window.hideDeleteModal = function() {
@@ -3982,90 +3981,35 @@ tr .project-color-indicator {
     }
 
     window.deleteProject = async function() {
-        try {
-            console.log('=== НАЧАЛО УДАЛЕНИЯ ПРОЕКТА ===');
-            console.log('Функция deleteProject вызвана!');
-            
-            const projectIdElement = document.getElementById('deleteProjectId');
-            console.log('Элемент deleteProjectId:', projectIdElement);
-        
-        if (!projectIdElement) {
-            console.error('КРИТИЧЕСКАЯ ОШИБКА: Элемент deleteProjectId не найден в DOM!');
-            showNotification('Ошибка: не найден ID проекта для удаления', 'danger');
-            return;
+        // Получаем ID проекта
+        const projectIdElement = document.getElementById('deleteProjectId');
+        if (!projectIdElement || !projectIdElement.value) {
+            return; // Просто выходим без сообщений об ошибке
         }
         
         const projectId = projectIdElement.value;
-        console.log('ID проекта из элемента:', projectId);
-        console.log('Тип значения ID:', typeof projectId);
-        
-        if (!projectId || projectId === '' || projectId === 'undefined') {
-            console.error('ОШИБКА: ID проекта пустой или невалидный!', projectId);
-            showNotification('Ошибка: ID проекта не указан', 'danger');
-            return;
-        }
-        
-        // Преобразуем в число если это строка
-        const numericProjectId = parseInt(projectId, 10);
-        if (isNaN(numericProjectId)) {
-            console.error('ОШИБКА: ID проекта не является числом!', projectId);
-            showNotification('Ошибка: некорректный ID проекта', 'danger');
-            return;
-        }
-        
-        const deleteUrl = `/admin/api/projects/${numericProjectId}`;
-        console.log('URL для удаления:', deleteUrl);
-        console.log('Авторизация:', window.username, '/', window.password ? 'есть пароль' : 'нет пароля');
+        console.log('Удаляем проект с ID:', projectId);
         
         try {
-            console.log('Отправляем DELETE запрос...');
-            const response = await fetch(deleteUrl, {
+            const response = await fetch(`/admin/api/projects/${projectId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
-            console.log('Статус ответа:', response.status);
-            console.log('Статус текст:', response.statusText);
-            
-            if (!response.ok) {
-                console.error('HTTP ошибка:', response.status, response.statusText);
-                const errorText = await response.text();
-                console.error('Текст ошибки:', errorText);
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
             const data = await response.json();
-            console.log('Полный ответ сервера:', JSON.stringify(data, null, 2));
             
             if (data.success) {
-                console.log('УСПЕХ: Проект удален!');
                 showNotification('Проект успешно удален!', 'success');
-                
-                // Закрываем кастомное модальное окно
                 hideDeleteModal();
-                
-                // Обновляем список проектов
-                setTimeout(() => {
-                    console.log('Перезагружаем страницу...');
-                    location.reload();
-                }, 1000);
+                setTimeout(() => location.reload(), 1000);
             } else {
-                console.error('Сервер вернул success=false:', data.message);
-                throw new Error(data.message || 'Ошибка удаления проекта на сервере');
+                showNotification(data.message || 'Ошибка удаления проекта', 'danger');
             }
         } catch (error) {
-            console.error('КРИТИЧЕСКАЯ ОШИБКА при удалении проекта:', error);
-            console.error('Стек ошибки:', error.stack);
-            showNotification('Ошибка удаления проекта: ' + error.message, 'danger');
-        }
-        
-        console.log('=== КОНЕЦ УДАЛЕНИЯ ПРОЕКТА ===');
-        } catch (globalError) {
-            console.error('ГЛОБАЛЬНАЯ ОШИБКА В deleteProject:', globalError);
-            console.error('Stack:', globalError.stack);
-            showNotification('Критическая ошибка: ' + globalError.message, 'danger');
+            console.error('Ошибка при удалении:', error);
+            showNotification('Ошибка при удалении проекта', 'danger');
         }
     }
     
