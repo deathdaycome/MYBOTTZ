@@ -191,7 +191,7 @@ async def get_projects(
         for project in projects:
             project_dict = project.to_dict()
             
-            # Добавляем информацию о пользователе
+            # Добавляем информацию о пользователе (клиенте)
             user = db.query(User).filter(User.id == project.user_id).first()
             if user:
                 user_dict = user.to_dict()
@@ -205,6 +205,22 @@ async def get_projects(
                     
                 user_dict["telegram_id"] = telegram_id
                 project_dict["user"] = user_dict
+            
+            # Добавляем информацию об исполнителе
+            if project.assigned_executor_id:
+                executor = db.query(AdminUser).filter(AdminUser.id == project.assigned_executor_id).first()
+                if executor:
+                    project_dict["assigned_executor"] = {
+                        "id": executor.id,
+                        "username": executor.username,
+                        "first_name": executor.first_name,
+                        "last_name": executor.last_name,
+                        "role": executor.role
+                    }
+                else:
+                    project_dict["assigned_executor"] = None
+            else:
+                project_dict["assigned_executor"] = None
             
             # Добавляем читаемые названия статуса и приоритета
             project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)
@@ -295,7 +311,7 @@ async def get_project(
         
         project_dict = project.to_dict()
         
-        # Добавляем информацию о пользователе
+        # Добавляем информацию о пользователе (клиенте)
         user = db.query(User).filter(User.id == project.user_id).first()
         if user:
             user_dict = user.to_dict()
@@ -309,6 +325,23 @@ async def get_project(
                 
             user_dict["telegram_id"] = telegram_id
             project_dict["user"] = user_dict
+        
+        # Добавляем информацию об исполнителе
+        if project.assigned_executor_id:
+            executor = db.query(AdminUser).filter(AdminUser.id == project.assigned_executor_id).first()
+            if executor:
+                project_dict["assigned_executor"] = {
+                    "id": executor.id,
+                    "username": executor.username,
+                    "first_name": executor.first_name,
+                    "last_name": executor.last_name,
+                    "role": executor.role,
+                    "email": executor.email
+                }
+            else:
+                project_dict["assigned_executor"] = None
+        else:
+            project_dict["assigned_executor"] = None
         
         # Добавляем читаемые названия
         project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)

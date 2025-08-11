@@ -3087,6 +3087,19 @@ tr .project-color-indicator {
                             </div>
                             ` : ''}
                             
+                            <!-- Информация об исполнителе -->
+                            <div class="row mt-3">
+                                <div class="col-md-12">
+                                    <strong>Исполнитель:</strong> 
+                                    ${project.assigned_executor ? `
+                                        <span class="badge bg-primary ms-2">
+                                            ${project.assigned_executor.first_name || project.assigned_executor.username} 
+                                            (${project.assigned_executor.role})
+                                        </span>
+                                    ` : '<span class="badge bg-secondary ms-2">Не назначен</span>'}
+                                </div>
+                            </div>
+                            
                             ${project.user ? `
                             <div class="mt-4">
                                 <h5><i class="fas fa-user me-2"></i>Информация о заказчике</h5>
