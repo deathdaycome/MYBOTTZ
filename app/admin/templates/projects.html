@@ -2475,30 +2475,17 @@ tr .project-color-indicator {
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Название проекта <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" id="createTitle" required placeholder="Например: Бот для автоматизации">
+                                        <input type="text" class="form-control" id="createProjectTitle" required placeholder="Например: Бот для автоматизации">
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Тип проекта <span class="text-danger">*</span></label>
-                                        <select class="form-select" id="createProjectType" required>
-                                            <option value="">Выберите тип</option>
-                                            <option value="telegram_bot">Telegram-бот</option>
-                                            <option value="web_app">Веб-приложение</option>
-                                            <option value="mobile_app">Мобильное приложение</option>
-                                            <option value="integration">Интеграция</option>
+                                        <label class="form-label">Тип проекта</label>
+                                        <select class="form-select" id="createProjectType">
+                                            <option value="website">Веб-сайт</option>
+                                            <option value="bot">Telegram-бот</option>
+                                            <option value="app">Мобильное приложение</option>
                                             <option value="other">Другое</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-md-3">
-                                    <div class="mb-3">
-                                        <label class="form-label">Сложность</label>
-                                        <select class="form-select" id="createComplexity">
-                                            <option value="simple">Простой</option>
-                                            <option value="medium" selected>Средний</option>
-                                            <option value="complex">Сложный</option>
-                                            <option value="premium">Премиум</option>
                                         </select>
                                     </div>
                                 </div>
@@ -2506,35 +2493,152 @@ tr .project-color-indicator {
                             
                             <div class="mb-3">
                                 <label class="form-label">Описание проекта <span class="text-danger">*</span></label>
-                                <textarea class="form-control" id="createDescription" rows="4" required placeholder="Опишите, что должен делать проект..."></textarea>
+                                <textarea class="form-control" id="createProjectDescription" rows="3" required placeholder="Опишите, что должен делать проект..."></textarea>
                             </div>
                             
                             <div class="row">
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Оценочная стоимость (₽)</label>
-                                        <input type="number" class="form-control" id="createEstimatedCost" placeholder="50000">
+                                        <label class="form-label">Имя клиента</label>
+                                        <input type="text" class="form-control" id="createClientName" placeholder="Имя клиента">
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Срок выполнения (дней)</label>
-                                        <input type="number" class="form-control" id="createDeadlineDays" placeholder="30">
+                                        <label class="form-label">Telegram ID клиента</label>
+                                        <input type="text" class="form-control" id="createClientTelegramId" placeholder="Например: 123456789">
                                     </div>
                                 </div>
-                                <div class="col-md-4">
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
                                     <div class="mb-3">
-                                        <label class="form-label">Назначить исполнителя</label>
-                                        <select class="form-select" id="createAssignedExecutor">
-                                            <option value="">Не назначен</option>
+                                        <label class="form-label">Телефон клиента</label>
+                                        <input type="text" class="form-control" id="createClientPhone" placeholder="+7 (999) 123-45-67">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Сложность</label>
+                                        <select class="form-select" id="createProjectComplexity">
+                                            <option value="simple">Простой</option>
+                                            <option value="medium" selected>Средний</option>
+                                            <option value="complex">Сложный</option>
                                         </select>
                                     </div>
                                 </div>
                             </div>
                             
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Приоритет</label>
+                                        <select class="form-select" id="createProjectPriority">
+                                            <option value="low">Низкий</option>
+                                            <option value="medium" selected>Средний</option>
+                                            <option value="high">Высокий</option>
+                                            <option value="urgent">Срочный</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Статус</label>
+                                        <select class="form-select" id="createProjectStatus">
+                                            <option value="new" selected>Новый</option>
+                                            <option value="review">На рассмотрении</option>
+                                            <option value="accepted">Принят</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Стоимость (₽)</label>
+                                        <input type="number" class="form-control" id="createEstimatedCost" min="0" step="1000" placeholder="50000">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Стоимость для исполнителя (₽)</label>
+                                        <input type="number" class="form-control" id="createExecutorCost" min="0" step="500" placeholder="30000">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Часы (прогноз)</label>
+                                        <input type="number" class="form-control" id="createEstimatedHours" min="1" step="1" placeholder="40">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Финансовые поля -->
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Предоплата (₽)</label>
+                                        <input type="number" class="form-control" id="createPrepaymentAmount" min="0" step="1000" placeholder="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Уже заплачено клиентом (₽)</label>
+                                        <input type="number" class="form-control" id="createClientPaidTotal" min="0" step="1000" placeholder="0">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Выплачено исполнителю (₽)</label>
+                                        <input type="number" class="form-control" id="createExecutorPaidTotal" min="0" step="500" placeholder="0">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Назначение исполнителя и даты -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Назначить исполнителя</label>
+                                        <select class="form-select" id="createAssignedExecutor">
+                                            <option value="">Выберите исполнителя</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Дедлайн</label>
+                                        <input type="date" class="form-control" id="createDeadline">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Технические данные -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Токен бота (если есть)</label>
+                                        <input type="text" class="form-control" id="createBotToken" placeholder="Токен Telegram бота">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">ID чата для уведомлений</label>
+                                        <input type="text" class="form-control" id="createChatId" placeholder="ID чата или канала">
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Техническое задание</label>
+                                <textarea class="form-control" id="createTechnicalRequirements" rows="3" placeholder="Детальное техническое задание..."></textarea>
+                            </div>
+                            
                             <div class="mb-3">
                                 <label class="form-label">Дополнительные требования</label>
-                                <textarea class="form-control" id="createRequirements" rows="3" placeholder="Особые требования или пожелания..."></textarea>
+                                <textarea class="form-control" id="createAdditionalRequirements" rows="2" placeholder="Особые требования или пожелания..."></textarea>
                             </div>
                         </form>
                     </div>
