@@ -2640,7 +2640,7 @@ tr .project-color-indicator {
         }
     }
 
-    // Функция для просмотра деталей проекта
+    // ПОЛНОСТЬЮ ПЕРЕПИСАННАЯ функция просмотра проекта БЕЗ Bootstrap
     async function viewProject(projectId) {
         try {
             const response = await fetch(`/admin/api/projects/${projectId}`, {
@@ -2659,15 +2659,14 @@ tr .project-color-indicator {
                 const project = data.project;
                 currentProjectId = projectId;
                 
-                // Сохраняем позицию скролла страницы
-                const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+                // Удаляем старое модальное окно если оно есть
+                const existingModal = document.getElementById('customCenterModal');
+                if (existingModal) {
+                    existingModal.remove();
+                }
                 
-                // Заполняем модальное окно данными проекта
-                const modalBody = document.getElementById('projectModalBody');
-                
-                // Прокручиваем модальное окно вверх
-                modalBody.scrollTop = 0;
-                modalBody.innerHTML = `
+                // Создаем контент для модального окна
+                const modalContent = `
                     <div class="row">
                         <div class="col-md-8">
                             <h4>${project.title}</h4>
@@ -2870,39 +2869,86 @@ tr .project-color-indicator {
                     </div>
                 `;
                 
-                // Показываем модальное окно с правильным центрированием
-                const modalElement = document.getElementById('projectModal');
+                // Создаем ПОЛНОСТЬЮ КАСТОМНОЕ модальное окно без Bootstrap
+                const modalHTML = `
+                    <div id="customCenterModal" style="
+                        position: fixed !important;
+                        top: 0 !important;
+                        left: 0 !important;
+                        right: 0 !important;
+                        bottom: 0 !important;
+                        width: 100vw !important;
+                        height: 100vh !important;
+                        background: rgba(0, 0, 0, 0.6) !important;
+                        z-index: 999999 !important;
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        overflow: hidden !important;
+                    " onclick="if(event.target.id === 'customCenterModal') closeCustomModal()">
+                        <div style="
+                            background: white !important;
+                            border-radius: 8px !important;
+                            width: 90% !important;
+                            max-width: 800px !important;
+                            max-height: 90vh !important;
+                            display: flex !important;
+                            flex-direction: column !important;
+                            position: relative !important;
+                            box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
+                        " onclick="event.stopPropagation()">
+                            <div style="
+                                padding: 20px !important;
+                                border-bottom: 1px solid #dee2e6 !important;
+                                display: flex !important;
+                                justify-content: space-between !important;
+                                align-items: center !important;
+                                flex-shrink: 0 !important;
+                            ">
+                                <h4 style="margin: 0 !important; color: #333 !important;">Детали проекта #${project.id}</h4>
+                                <button onclick="closeCustomModal()" style="
+                                    background: none !important;
+                                    border: none !important;
+                                    font-size: 28px !important;
+                                    line-height: 1 !important;
+                                    cursor: pointer !important;
+                                    color: #6c757d !important;
+                                    padding: 0 !important;
+                                    width: 30px !important;
+                                    height: 30px !important;
+                                ">&times;</button>
+                            </div>
+                            <div style="
+                                padding: 20px !important;
+                                overflow-y: auto !important;
+                                flex-grow: 1 !important;
+                            ">
+                                ${modalContent}
+                            </div>
+                            <div style="
+                                padding: 20px !important;
+                                border-top: 1px solid #dee2e6 !important;
+                                display: flex !important;
+                                justify-content: flex-end !important;
+                                gap: 10px !important;
+                                flex-shrink: 0 !important;
+                            ">
+                                <button onclick="editProject('${project.id}')" class="btn btn-primary">
+                                    <i class="fas fa-edit me-2"></i>Редактировать
+                                </button>
+                                <button onclick="closeCustomModal()" class="btn btn-secondary">
+                                    Закрыть
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
                 
-                // Удаляем старые обработчики событий чтобы избежать дублирования
-                modalElement.removeEventListener('shown.bs.modal', null);
+                // Добавляем модальное окно в body
+                document.body.insertAdjacentHTML('beforeend', modalHTML);
                 
-                // Создаем новый экземпляр модального окна
-                const modal = new bootstrap.Modal(modalElement, {
-                    backdrop: true,
-                    keyboard: true,
-                    focus: false  // Отключаем автофокус чтобы избежать ошибки aria-hidden
-                });
-                
-                // Сбрасываем позицию скролла страницы и блокируем прокрутку
-                document.body.style.position = 'fixed';
-                document.body.style.top = `-${scrollPosition}px`;
-                document.body.style.width = '100%';
-                
-                // Показываем модальное окно
-                modal.show();
-                
-                // Принудительное центрирование после показа
-                setTimeout(() => {
-                    const modalDialog = document.querySelector('#projectModal .modal-dialog');
-                    if (modalDialog) {
-                        // Сбрасываем все стили которые могут мешать
-                        modalDialog.style.marginTop = '';
-                        modalDialog.style.marginBottom = '';
-                        modalDialog.scrollTop = 0;
-                    }
-                    // Прокручиваем контент модального окна вверх
-                    modalBody.scrollTop = 0;
-                }, 50);
+                // Блокируем скролл основной страницы
+                document.body.style.overflow = 'hidden';
             } else {
                 console.error('Ошибка API:', data);
                 showNotification(data.message || 'Ошибка загрузки проекта', 'danger');
@@ -2913,6 +2959,15 @@ tr .project-color-indicator {
         }
     }
 
+    // Функция закрытия кастомного модального окна
+    function closeCustomModal() {
+        const modal = document.getElementById('customCenterModal');
+        if (modal) {
+            modal.remove();
+            document.body.style.overflow = '';
+        }
+    }
+    
     // Функция для связи с клиентом
 
 
