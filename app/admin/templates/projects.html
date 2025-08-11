@@ -2408,16 +2408,167 @@ tr .project-color-indicator {
     function showCreateProjectModal() {
         console.log('Функция showCreateProjectModal вызвана');
         
-        // Очищаем форму
-        document.getElementById('createProjectForm').reset();
+        // Удаляем старое кастомное модальное окно если есть
+        const existingModal = document.getElementById('customCreateModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
         
-        // Используем Bootstrap модальное окно
-        const modal = new bootstrap.Modal(document.getElementById('createProjectModal'));
-        modal.show();
+        // Создаем КАСТОМНОЕ модальное окно для создания проекта
+        const modalHTML = `
+            <div id="customCreateModal" style="
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                width: 100vw !important;
+                height: 100vh !important;
+                background: rgba(0, 0, 0, 0.6) !important;
+                z-index: 999999 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                overflow: hidden !important;
+            " onclick="if(event.target.id === 'customCreateModal') hideCreateProjectModal()">
+                <div style="
+                    background: white !important;
+                    border-radius: 8px !important;
+                    width: 90% !important;
+                    max-width: 800px !important;
+                    max-height: 90vh !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    position: relative !important;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.3) !important;
+                " onclick="event.stopPropagation()">
+                    <div style="
+                        padding: 20px !important;
+                        border-bottom: 1px solid #dee2e6 !important;
+                        display: flex !important;
+                        justify-content: space-between !important;
+                        align-items: center !important;
+                        flex-shrink: 0 !important;
+                    ">
+                        <h4 style="margin: 0 !important; color: #333 !important;">
+                            <i class="fas fa-plus me-2"></i>Создать новый проект
+                        </h4>
+                        <button onclick="hideCreateProjectModal()" style="
+                            background: none !important;
+                            border: none !important;
+                            font-size: 28px !important;
+                            line-height: 1 !important;
+                            cursor: pointer !important;
+                            color: #6c757d !important;
+                            padding: 0 !important;
+                            width: 30px !important;
+                            height: 30px !important;
+                        ">&times;</button>
+                    </div>
+                    <div style="
+                        padding: 20px !important;
+                        overflow-y: auto !important;
+                        flex-grow: 1 !important;
+                    ">
+                        <form id="createProjectForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Название проекта <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" id="createTitle" required placeholder="Например: Бот для автоматизации">
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Тип проекта <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="createProjectType" required>
+                                            <option value="">Выберите тип</option>
+                                            <option value="telegram_bot">Telegram-бот</option>
+                                            <option value="web_app">Веб-приложение</option>
+                                            <option value="mobile_app">Мобильное приложение</option>
+                                            <option value="integration">Интеграция</option>
+                                            <option value="other">Другое</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label class="form-label">Сложность</label>
+                                        <select class="form-select" id="createComplexity">
+                                            <option value="simple">Простой</option>
+                                            <option value="medium" selected>Средний</option>
+                                            <option value="complex">Сложный</option>
+                                            <option value="premium">Премиум</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Описание проекта <span class="text-danger">*</span></label>
+                                <textarea class="form-control" id="createDescription" rows="4" required placeholder="Опишите, что должен делать проект..."></textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Оценочная стоимость (₽)</label>
+                                        <input type="number" class="form-control" id="createEstimatedCost" placeholder="50000">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Срок выполнения (дней)</label>
+                                        <input type="number" class="form-control" id="createDeadlineDays" placeholder="30">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label class="form-label">Назначить исполнителя</label>
+                                        <select class="form-select" id="createAssignedExecutor">
+                                            <option value="">Не назначен</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Дополнительные требования</label>
+                                <textarea class="form-control" id="createRequirements" rows="3" placeholder="Особые требования или пожелания..."></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div style="
+                        padding: 20px !important;
+                        border-top: 1px solid #dee2e6 !important;
+                        display: flex !important;
+                        justify-content: flex-end !important;
+                        gap: 10px !important;
+                        flex-shrink: 0 !important;
+                    ">
+                        <button onclick="hideCreateProjectModal()" class="btn btn-secondary">
+                            Отмена
+                        </button>
+                        <button onclick="createProject()" class="btn btn-primary">
+                            <i class="fas fa-save me-2"></i>Создать проект
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Добавляем модальное окно в body
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        // Блокируем скролл основной страницы
+        document.body.style.overflow = 'hidden';
+        
+        // Загружаем список исполнителей
+        loadExecutors();
         
         // Фокус на первое поле
         setTimeout(() => {
-            const firstInput = document.querySelector('#createProjectModal input');
+            const firstInput = document.getElementById('createTitle');
             if (firstInput) {
                 firstInput.focus();
             }
@@ -2426,9 +2577,10 @@ tr .project-color-indicator {
     
     function hideCreateProjectModal() {
         console.log('Закрываем модальное окно');
-        const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
+        const modal = document.getElementById('customCreateModal');
         if (modal) {
-            modal.hide();
+            modal.remove();
+            document.body.style.overflow = '';
         }
     }
 
