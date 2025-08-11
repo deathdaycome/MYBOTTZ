@@ -1903,6 +1903,7 @@ tr .project-color-indicator {
     
     // Функция загрузки исполнителей
     async function loadExecutors() {
+        console.log('Загружаем список исполнителей...');
         try {
             const response = await fetch('/admin/api/users/executors', {
                 method: 'GET',
@@ -1911,26 +1912,53 @@ tr .project-color-indicator {
                 }
             });
             
+            console.log('Ответ от API:', response.status);
+            
             if (response.ok) {
                 const data = await response.json();
-                const executorSelect = document.getElementById('createAssignedExecutor');
+                console.log('Полученные данные:', data);
                 
-                if (executorSelect && data.executors) {
-                    // Очищаем существующие опции (кроме "Выберите исполнителя")
-                    while (executorSelect.children.length > 1) {
-                        executorSelect.removeChild(executorSelect.lastChild);
-                    }
+                const executorSelect = document.getElementById('createAssignedExecutor');
+                console.log('Элемент select найден:', executorSelect);
+                
+                if (executorSelect) {
+                    // Очищаем существующие опции
+                    executorSelect.innerHTML = '<option value="">Выберите исполнителя</option>';
                     
-                    // Добавляем исполнителей
-                    data.executors.forEach(executor => {
-                        const option = document.createElement('option');
-                        option.value = executor.id;
-                        option.textContent = `${executor.full_name || executor.username} (${executor.role})`;
-                        executorSelect.appendChild(option);
-                    });
+                    if (data.executors && data.executors.length > 0) {
+                        // Добавляем исполнителей
+                        data.executors.forEach(executor => {
+                            const option = document.createElement('option');
+                            option.value = executor.id;
+                            const name = executor.first_name || executor.full_name || executor.username;
+                            const role = executor.role || 'Исполнитель';
+                            option.textContent = `${name} (${role})`;
+                            executorSelect.appendChild(option);
+                        });
+                        console.log(`Добавлено ${data.executors.length} исполнителей`);
+                    } else if (data.users && data.users.length > 0) {
+                        // Если данные приходят в поле users
+                        data.users.forEach(user => {
+                            if (user.role === 'executor' || user.role === 'admin') {
+                                const option = document.createElement('option');
+                                option.value = user.id;
+                                const name = user.first_name || user.full_name || user.username;
+                                option.textContent = `${name} (${user.role})`;
+                                executorSelect.appendChild(option);
+                            }
+                        });
+                        console.log(`Добавлено исполнителей из users`);
+                    } else {
+                        console.warn('Список исполнителей пуст');
+                        executorSelect.innerHTML = '<option value="">Нет доступных исполнителей</option>';
+                    }
+                } else {
+                    console.error('Элемент select не найден!');
                 }
             } else {
-                console.warn('Не удалось загрузить список исполнителей');
+                console.error('Ошибка ответа от сервера:', response.status);
+                const errorText = await response.text();
+                console.error('Текст ошибки:', errorText);
             }
         } catch (error) {
             console.error('Ошибка загрузки исполнителей:', error);

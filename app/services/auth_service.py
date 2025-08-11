@@ -114,11 +114,12 @@ class AuthService:
     
     @staticmethod
     def get_executors() -> list:
-        """Получить всех исполнителей"""
+        """Получить всех исполнителей и админов"""
         db = next(get_db_connection())
         try:
+            # Получаем всех активных пользователей (админы и исполнители могут назначаться на проекты)
             executors = db.query(AdminUser).filter(
-                AdminUser.role == 'executor',
+                AdminUser.role.in_(['executor', 'admin', 'owner']),
                 AdminUser.is_active == True
             ).all()
             return [user.to_dict() for user in executors]
