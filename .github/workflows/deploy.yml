@@ -103,25 +103,26 @@ jobs:
           # Выполняем миграции базы данных
           echo "🔄 Выполняем миграции базы данных..."
           if [ -f "scripts/migrate_db.py" ]; then
-            python scripts/migrate_db.py
+            chmod +x scripts/migrate_db.py
+            python3 scripts/migrate_db.py
             echo "✅ Миграции выполнены"
           else
             echo "⚠️ Скрипт миграции не найден, пытаемся добавить колонку вручную..."
             # Добавляем колонку color если её нет
-            python -c "
+            python3 -c "
 import sqlite3
 import os
 if os.path.exists('business_card_bot.db'):
     conn = sqlite3.connect('business_card_bot.db')
     cursor = conn.cursor()
     try:
-        cursor.execute('ALTER TABLE projects ADD COLUMN color VARCHAR(20) DEFAULT \"default\"')
+        cursor.execute('ALTER TABLE projects ADD COLUMN color VARCHAR(20) DEFAULT \\"default\\"')
         conn.commit()
         print('✅ Колонка color добавлена')
     except:
         print('ℹ️ Колонка color уже существует')
     conn.close()
-            "
+"
           fi
           
           # Полностью останавливаем и удаляем процесс
