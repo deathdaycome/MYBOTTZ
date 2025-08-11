@@ -3970,33 +3970,63 @@ tr .project-color-indicator {
     }
 
     window.deleteProject = async function() {
+        console.log('=== НАЧАЛО УДАЛЕНИЯ ПРОЕКТА ===');
+        
         const projectIdElement = document.getElementById('deleteProjectId');
+        console.log('Элемент deleteProjectId:', projectIdElement);
+        
         if (!projectIdElement) {
-            console.error('Элемент deleteProjectId не найден!');
+            console.error('КРИТИЧЕСКАЯ ОШИБКА: Элемент deleteProjectId не найден в DOM!');
             showNotification('Ошибка: не найден ID проекта для удаления', 'danger');
             return;
         }
         
         const projectId = projectIdElement.value;
-        console.log('Удаляем проект с ID:', projectId);
+        console.log('ID проекта из элемента:', projectId);
+        console.log('Тип значения ID:', typeof projectId);
         
-        if (!projectId) {
+        if (!projectId || projectId === '' || projectId === 'undefined') {
+            console.error('ОШИБКА: ID проекта пустой или невалидный!', projectId);
             showNotification('Ошибка: ID проекта не указан', 'danger');
             return;
         }
         
+        // Преобразуем в число если это строка
+        const numericProjectId = parseInt(projectId, 10);
+        if (isNaN(numericProjectId)) {
+            console.error('ОШИБКА: ID проекта не является числом!', projectId);
+            showNotification('Ошибка: некорректный ID проекта', 'danger');
+            return;
+        }
+        
+        const deleteUrl = `/admin/api/projects/${numericProjectId}`;
+        console.log('URL для удаления:', deleteUrl);
+        console.log('Авторизация:', window.username, '/', window.password ? 'есть пароль' : 'нет пароля');
+        
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}`, {
+            console.log('Отправляем DELETE запрос...');
+            const response = await fetch(deleteUrl, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
+            console.log('Статус ответа:', response.status);
+            console.log('Статус текст:', response.statusText);
+            
+            if (!response.ok) {
+                console.error('HTTP ошибка:', response.status, response.statusText);
+                const errorText = await response.text();
+                console.error('Текст ошибки:', errorText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const data = await response.json();
-            console.log('Ответ сервера:', data);
+            console.log('Полный ответ сервера:', JSON.stringify(data, null, 2));
             
             if (data.success) {
+                console.log('УСПЕХ: Проект удален!');
                 showNotification('Проект успешно удален!', 'success');
                 
                 // Закрываем кастомное модальное окно
@@ -4004,15 +4034,20 @@ tr .project-color-indicator {
                 
                 // Обновляем список проектов
                 setTimeout(() => {
+                    console.log('Перезагружаем страницу...');
                     location.reload();
                 }, 1000);
             } else {
-                throw new Error(data.message || 'Ошибка удаления проекта');
+                console.error('Сервер вернул success=false:', data.message);
+                throw new Error(data.message || 'Ошибка удаления проекта на сервере');
             }
         } catch (error) {
-            console.error('Ошибка при удалении проекта:', error);
+            console.error('КРИТИЧЕСКАЯ ОШИБКА при удалении проекта:', error);
+            console.error('Стек ошибки:', error.stack);
             showNotification('Ошибка удаления проекта: ' + error.message, 'danger');
         }
+        
+        console.log('=== КОНЕЦ УДАЛЕНИЯ ПРОЕКТА ===');
     }
     
     // Глобальная функция для теста
