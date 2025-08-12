@@ -3664,7 +3664,7 @@ tr .project-color-indicator {
             uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Загрузка...';
             uploadBtn.disabled = true;
             
-            const response = await fetch('/admin/api/projects/files/upload', {
+            const response = await fetch(`/admin/api/projects/${projectId}/files`, {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
@@ -3698,7 +3698,7 @@ tr .project-color-indicator {
 
     async function downloadFile(fileId) {
         try {
-            const response = await fetch(`/admin/api/files/${fileId}/download`, {
+            const response = await fetch(`/admin/api/files/download/${fileId}`, {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
@@ -3740,8 +3740,10 @@ tr .project-color-indicator {
             return;
         }
         
+        const projectId = document.getElementById('uploadProjectId').value;
+        
         try {
-            const response = await fetch(`/admin/api/files/${fileId}`, {
+            const response = await fetch(`/admin/api/projects/${projectId}/files/${fileId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
