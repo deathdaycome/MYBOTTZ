@@ -73,6 +73,7 @@ class Project(Base):
     original_request = Column(Text, nullable=True)  # Оригинальный запрос пользователя
     structured_tz = Column(JSON, default=lambda: {})  # Структурированное ТЗ
     status = Column(String(50), default="new")  # new, review, accepted, in_progress, testing, completed, cancelled
+    is_archived = Column(Boolean, default=False)  # Архивирован ли проект
     priority = Column(String(20), default="normal")  # low, normal, high, urgent
     project_type = Column(String(50), nullable=True)  # telegram_bot, whatsapp_bot, web_bot, integration
     complexity = Column(String(20), default="medium")  # simple, medium, complex, premium
@@ -114,6 +115,7 @@ class Project(Base):
             "description": self.description,
             "original_request": self.original_request,
             "status": self.status,
+            "is_archived": self.is_archived,
             "priority": self.priority,
             "project_type": self.project_type,
             "complexity": self.complexity,

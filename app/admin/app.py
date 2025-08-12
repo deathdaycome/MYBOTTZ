@@ -442,7 +442,7 @@ async def dashboard(request: Request, username: str = Depends(authenticate)):
         })
 
 @admin_router.get("/projects", response_class=HTMLResponse)
-async def projects_page(request: Request, username: str = Depends(authenticate)):
+async def projects_page(request: Request, show_archived: bool = False, username: str = Depends(authenticate)):
     """Страница управления проектами"""
     try:
         user_role = get_user_role(username)
@@ -453,9 +453,11 @@ async def projects_page(request: Request, username: str = Depends(authenticate))
             # Базовый запрос с присоединением пользователя для избежания N+1
             query = db.query(Project).join(User, Project.user_id == User.id, isouter=True)
 
-            # Получаем проекты в зависимости от роли
-            # Не показываем завершенные проекты на главной странице
-            query = query.filter(Project.status != 'completed')
+            # Фильтр архивных проектов
+            if show_archived:
+                query = query.filter(Project.is_archived == True)
+            else:
+                query = query.filter((Project.is_archived == False) | (Project.is_archived == None))
             
             if user_role == "owner":
                 # Владелец видит все проекты
@@ -502,7 +504,8 @@ async def projects_page(request: Request, username: str = Depends(authenticate))
             "user_role": user_role,
             "navigation_items": navigation_items,
             "projects": projects,
-            "calculate_progress": calculate_progress
+            "calculate_progress": calculate_progress,
+            "show_archived": show_archived
         })
         
     except Exception as e:

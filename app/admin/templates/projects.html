@@ -774,6 +774,14 @@ tr .project-color-indicator {
                 </select>
             </div>
             <div class="col-md-2">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="showArchivedToggle" onchange="toggleArchived()" {% if show_archived %}checked{% endif %}>
+                    <label class="form-check-label" for="showArchivedToggle">
+                        Показать архив
+                    </label>
+                </div>
+            </div>
+            <div class="col-md-2">
                 <select class="form-select" id="complexityFilter" onchange="filterProjects()">
                     <option value="">Все сложности</option>
                     <option value="simple">Простые</option>
@@ -958,6 +966,11 @@ tr .project-color-indicator {
                             <td>
                                 <div class="fw-bold text-truncate" style="max-width: 200px;" title="{{ project.title }}">
                                     {{ project.title }}
+                                    {% if project.is_archived %}
+                                    <span class="badge bg-secondary ms-1">
+                                        <i class="fas fa-archive"></i> Архив
+                                    </span>
+                                    {% endif %}
                                 </div>
                                 <small class="text-muted">{{ project.project_type or 'Не указано' }}</small>
                             </td>
@@ -1041,6 +1054,11 @@ tr .project-color-indicator {
                                 {% else %}
                                 <button class="btn btn-outline-secondary" disabled title="Telegram ID отсутствует">
                                     <i class="fas fa-comment"></i>
+                                </button>
+                                {% endif %}
+                                {% if project.status == 'completed' %}
+                                <button class="btn btn-outline-success" onclick="archiveProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="{% if project.is_archived %}Восстановить из архива{% else %}Добавить в архив{% endif %}">
+                                    <i class="fas fa-{% if project.is_archived %}box-open{% else %}archive{% endif %}"></i>
                                 </button>
                                 {% endif %}
                                 <button class="btn btn-outline-danger" onclick="confirmDeleteProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="Удалить проект">
@@ -1486,14 +1504,23 @@ tr .project-color-indicator {
         searchProjects(); // Reuse search logic
     }
 
+    function toggleArchived() {
+        const showArchived = document.getElementById('showArchivedToggle').checked;
+        const url = new URL(window.location.href);
+        url.searchParams.set('show_archived', showArchived);
+        window.location.href = url.toString();
+    }
+
     function clearFilters() {
         const searchInput = document.getElementById('searchInput');
         const statusFilter = document.getElementById('statusFilter');
         const complexityFilter = document.getElementById('complexityFilter');
+        const showArchivedToggle = document.getElementById('showArchivedToggle');
         
         if (searchInput) searchInput.value = '';
         if (statusFilter) statusFilter.value = '';
         if (complexityFilter) complexityFilter.value = '';
+        if (showArchivedToggle) showArchivedToggle.checked = false;
         
         filteredProjects = [...allProjects];
         updateProjectsDisplay();
@@ -3858,6 +3885,33 @@ tr .project-color-indicator {
             }
             document.body.removeChild(textArea);
         });
+    }
+
+    // Функция для архивирования проекта
+    window.archiveProject = async function(projectId, projectTitle) {
+        if (!projectId) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/admin/api/projects/${projectId}/archive`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showNotification(data.message, 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification(data.message || 'Не удалось архивировать проект', 'danger');
+            }
+        } catch (error) {
+            showNotification('Ошибка при архивировании проекта', 'danger');
+        }
     }
 
     // Функции для удаления проекта

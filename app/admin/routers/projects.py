@@ -145,6 +145,7 @@ async def get_projects(
     priority: Optional[str] = None,
     search: Optional[str] = None,
     sort_by: str = "created_desc",
+    show_archived: bool = False,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -152,6 +153,12 @@ async def get_projects(
     try:
         # Начинаем с базового запроса
         query = db.query(Project).join(User, Project.user_id == User.id)
+        
+        # Фильтр архивных проектов
+        if show_archived:
+            query = query.filter(Project.is_archived == True)
+        else:
+            query = query.filter(or_(Project.is_archived == False, Project.is_archived == None))
         
         # Фильтрация по роли пользователя
         if current_user["role"] == "executor":
@@ -1072,6 +1079,68 @@ async def delete_project_file(
         return {
             "success": False,
             "message": f"Ошибка удаления файла: {str(e)}"
+        }
+
+@router.post("/{project_id}/archive")
+async def archive_project(
+    project_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Переместить проект в архив (только для владельца)"""
+    try:
+        logger.info(f"Запрос на архивирование проекта {project_id} от пользователя {current_user.get('username')}")
+        
+        # Проверяем права доступа (только владелец может архивировать проекты)
+        if current_user["role"] != "owner":
+            return {
+                "success": False,
+                "message": "У вас нет прав для архивирования проектов"
+            }
+        
+        # Получаем проект
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            return {
+                "success": False,
+                "message": "Проект не найден"
+            }
+        
+        # Переключаем статус архивирования
+        project.is_archived = not project.is_archived
+        project.updated_at = datetime.utcnow()
+        
+        # Логируем изменение в метаданных
+        if not project.project_metadata:
+            project.project_metadata = {}
+        
+        if "archive_history" not in project.project_metadata:
+            project.project_metadata["archive_history"] = []
+        
+        project.project_metadata["archive_history"].append({
+            "action": "archived" if project.is_archived else "unarchived",
+            "timestamp": datetime.utcnow().isoformat(),
+            "user": current_user["username"]
+        })
+        
+        db.commit()
+        db.refresh(project)
+        
+        action_text = "добавлен в архив" if project.is_archived else "восстановлен из архива"
+        logger.info(f"Проект '{project.title}' (ID: {project_id}) {action_text}")
+        
+        return {
+            "success": True,
+            "message": f"Проект '{project.title}' успешно {action_text}",
+            "is_archived": project.is_archived
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка архивирования проекта {project_id}: {e}")
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Ошибка архивирования проекта: {str(e)}"
         }
 
 @router.delete("/{project_id}")
