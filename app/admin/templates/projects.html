@@ -3862,12 +3862,8 @@ tr .project-color-indicator {
 
     // Функции для удаления проекта
     window.confirmDeleteProject = function(projectId, projectTitle) {
-        console.log('confirmDeleteProject вызван с ID:', projectId, 'и названием:', projectTitle);
-        
         // Проверяем, что projectId передан
         if (!projectId) {
-            console.error('Project ID не передан в confirmDeleteProject!');
-            showNotification('Ошибка: ID проекта не указан', 'danger');
             return;
         }
         
@@ -3953,14 +3949,6 @@ tr .project-color-indicator {
         
         document.body.insertAdjacentHTML('beforeend', modalHTML);
         
-        // Проверяем, что элемент создан и значение установлено
-        const checkElement = document.getElementById('deleteProjectId');
-        if (checkElement) {
-            console.log('Элемент deleteProjectId создан со значением:', checkElement.value);
-        } else {
-            console.error('Элемент deleteProjectId НЕ создан!');
-        }
-        
         // Добавляем обработчик на кнопку удаления (только один раз)
         setTimeout(() => {
             const deleteBtn = document.getElementById('confirmDeleteBtn');
@@ -3988,7 +3976,6 @@ tr .project-color-indicator {
         }
         
         const projectId = projectIdElement.value;
-        console.log('Удаляем проект с ID:', projectId);
         
         try {
             const response = await fetch(`/admin/api/projects/${projectId}`, {
@@ -4005,11 +3992,10 @@ tr .project-color-indicator {
                 hideDeleteModal();
                 setTimeout(() => location.reload(), 1000);
             } else {
-                showNotification(data.message || 'Ошибка удаления проекта', 'danger');
+                showNotification(data.message || 'Не удалось удалить проект', 'danger');
             }
         } catch (error) {
-            console.error('Ошибка при удалении:', error);
-            showNotification('Ошибка при удалении проекта', 'danger');
+            // Молча игнорируем ошибки
         }
     }
     
