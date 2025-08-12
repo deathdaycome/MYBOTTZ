@@ -897,9 +897,12 @@ async def get_project_files(
 ):
     """Получить файлы проекта"""
     try:
+        logger.info(f"Запрос файлов проекта {project_id} от пользователя {current_user.get('username')}")
+        
         project = db.query(Project).filter(Project.id == project_id).first()
         
         if not project:
+            logger.warning(f"Проект {project_id} не найден")
             return {
                 "success": False,
                 "message": "Проект не найден"
@@ -908,6 +911,7 @@ async def get_project_files(
         # Проверяем права доступа
         if current_user["role"] == "executor":
             if project.assigned_executor_id != current_user["id"]:
+                logger.warning(f"Отказ в доступе к файлам проекта {project_id} для исполнителя {current_user.get('username')}")
                 return {
                     "success": False,
                     "message": "У вас нет доступа к файлам этого проекта"
@@ -916,13 +920,37 @@ async def get_project_files(
         # Получаем файлы проекта из БД
         files = db.query(ProjectFile).filter(ProjectFile.project_id == project_id).all()
         
+        logger.info(f"Найдено {len(files)} файлов для проекта {project_id}")
+        
+        # Безопасно преобразуем файлы в словари
+        files_data = []
+        for file in files:
+            try:
+                files_data.append(file.to_dict())
+            except Exception as e:
+                logger.error(f"Ошибка преобразования файла {file.id} в словарь: {e}")
+                # Добавляем минимальную информацию о файле
+                files_data.append({
+                    "id": file.id,
+                    "filename": file.filename,
+                    "original_filename": file.original_filename,
+                    "file_size": file.file_size,
+                    "file_type": file.file_type,
+                    "description": file.description,
+                    "uploaded_at": file.uploaded_at.isoformat() if file.uploaded_at else None,
+                    "project_id": file.project_id,
+                    "uploaded_by_id": file.uploaded_by_id,
+                    "uploaded_by": None
+                })
+        
         return {
             "success": True,
-            "files": [file.to_dict() for file in files]
+            "files": files_data
         }
         
     except Exception as e:
         logger.error(f"Ошибка получения файлов проекта {project_id}: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return {
             "success": False,
             "message": f"Ошибка получения файлов проекта: {str(e)}"

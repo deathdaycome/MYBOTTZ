@@ -564,6 +564,13 @@ class ProjectFile(Base):
     uploaded_by = relationship("AdminUser", back_populates="uploaded_project_files")
     
     def to_dict(self):
+        uploaded_by_dict = None
+        if self.uploaded_by:
+            try:
+                uploaded_by_dict = self.uploaded_by.to_dict()
+            except:
+                uploaded_by_dict = {"id": self.uploaded_by_id, "username": "Unknown"}
+        
         return {
             "id": self.id,
             "filename": self.filename,
@@ -574,7 +581,8 @@ class ProjectFile(Base):
             "description": self.description,
             "uploaded_at": self.uploaded_at.isoformat() if self.uploaded_at else None,
             "project_id": self.project_id,
-            "uploaded_by": self.uploaded_by.to_dict() if self.uploaded_by else None
+            "uploaded_by_id": self.uploaded_by_id,
+            "uploaded_by": uploaded_by_dict
         }
 
 class ProjectStatus(Base):
