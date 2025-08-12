@@ -3939,7 +3939,7 @@ tr .project-color-indicator {
                         gap: 10px !important;
                     ">
                         <button onclick="hideDeleteModal()" class="btn btn-secondary">Отмена</button>
-                        <button id="confirmDeleteBtn" class="btn btn-danger">
+                        <button onclick="window.deleteProjectNow(${projectId})" class="btn btn-danger">
                             <i class="fas fa-trash me-1"></i>Удалить проект
                         </button>
                     </div>
@@ -3948,17 +3948,6 @@ tr .project-color-indicator {
         `;
         
         document.body.insertAdjacentHTML('beforeend', modalHTML);
-        
-        // Добавляем обработчик на кнопку удаления (только один раз)
-        setTimeout(() => {
-            const deleteBtn = document.getElementById('confirmDeleteBtn');
-            if (deleteBtn) {
-                deleteBtn.onclick = function(e) {
-                    e.preventDefault();
-                    window.deleteProject();
-                };
-            }
-        }, 100);
     }
     
     window.hideDeleteModal = function() {
@@ -3968,14 +3957,10 @@ tr .project-color-indicator {
         }
     }
 
-    window.deleteProject = async function() {
-        // Получаем ID проекта
-        const projectIdElement = document.getElementById('deleteProjectId');
-        if (!projectIdElement || !projectIdElement.value) {
-            return; // Просто выходим без сообщений об ошибке
+    window.deleteProjectNow = async function(projectId) {
+        if (!projectId) {
+            return;
         }
-        
-        const projectId = projectIdElement.value;
         
         try {
             const response = await fetch(`/admin/api/projects/${projectId}`, {
@@ -3995,7 +3980,15 @@ tr .project-color-indicator {
                 showNotification(data.message || 'Не удалось удалить проект', 'danger');
             }
         } catch (error) {
-            // Молча игнорируем ошибки
+            showNotification('Ошибка при удалении проекта', 'danger');
+        }
+    }
+    
+    // Старая функция для совместимости
+    window.deleteProject = async function() {
+        const projectIdElement = document.getElementById('deleteProjectId');
+        if (projectIdElement && projectIdElement.value) {
+            window.deleteProjectNow(projectIdElement.value);
         }
     }
     
