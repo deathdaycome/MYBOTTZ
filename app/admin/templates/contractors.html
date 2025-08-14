@@ -601,6 +601,9 @@ async function editContractor(contractorId) {
 
 // Функция отображения модального окна редактирования
 function showEditContractorModal(contractor) {
+    // Сохраняем данные исполнителя глобально для использования в других функциях
+    window.currentEditingContractor = contractor;
+    
     const editModalHtml = `
         <div class="modal fade" id="editContractorModal" tabindex="-1">
             <div class="modal-dialog">
@@ -636,7 +639,7 @@ function showEditContractorModal(contractor) {
                         </form>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-warning" onclick="showChangePasswordModal(${contractor.id})">
+                        <button type="button" class="btn btn-warning" onclick="showChangePasswordModal(${contractor.id}, '${contractor.username || ''}')">
                             <i class="fas fa-key"></i> Изменить пароль
                         </button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
@@ -702,13 +705,20 @@ async function saveEditedContractor(contractorId) {
 }
 
 // Функция показа модального окна смены пароля
-function showChangePasswordModal(contractorId) {
+function showChangePasswordModal(contractorId, contractorUsername) {
+    // Если username не передан, пытаемся получить из глобальной переменной
+    if (!contractorUsername && window.currentEditingContractor) {
+        contractorUsername = window.currentEditingContractor.username || 'исполнителя';
+    } else if (!contractorUsername) {
+        contractorUsername = 'исполнителя';
+    }
+    
     const passwordModalHtml = `
         <div class="modal fade" id="changePasswordModal" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">Изменить пароль исполнителя</h5>
+                        <h5 class="modal-title">Изменить пароль для ${contractorUsername}</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
