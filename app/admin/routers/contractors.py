@@ -298,6 +298,58 @@ async def delete_contractor(
         db.rollback()
         return {"success": False, "message": str(e)}
 
+@router.post("/{contractor_id}/change-password", response_model=dict)
+async def change_contractor_password(
+    contractor_id: int,
+    password_data: dict,
+    db: Session = Depends(get_db),
+    current_user: AdminUser = Depends(get_current_admin_user)
+):
+    """Изменить пароль исполнителя (только для администраторов)."""
+    try:
+        logger.info(f"Администратор {current_user.username} меняет пароль для исполнителя {contractor_id}")
+        
+        # Проверяем, что текущий пользователь - администратор
+        if current_user.role != 'admin':
+            logger.warning(f"Попытка смены пароля не администратором: {current_user.username}")
+            return {"success": False, "message": "Только администраторы могут менять пароли исполнителей"}
+        
+        # Находим исполнителя
+        contractor = db.query(AdminUser).filter(
+            AdminUser.id == contractor_id,
+            AdminUser.role == 'executor'
+        ).first()
+        
+        if not contractor:
+            logger.warning(f"Исполнитель с ID {contractor_id} не найден")
+            return {"success": False, "message": "Исполнитель не найден"}
+        
+        # Получаем новый пароль
+        new_password = password_data.get('new_password')
+        if not new_password:
+            return {"success": False, "message": "Новый пароль не указан"}
+        
+        if len(new_password) < 6:
+            return {"success": False, "message": "Пароль должен содержать минимум 6 символов"}
+        
+        # Устанавливаем новый пароль
+        contractor.set_password(new_password)
+        contractor.updated_at = datetime.utcnow()
+        
+        db.commit()
+        
+        logger.info(f"Пароль для исполнителя {contractor_id} ({contractor.username}) успешно изменен администратором {current_user.username}")
+        
+        return {
+            "success": True,
+            "message": f"Пароль для исполнителя {contractor.username} успешно изменен"
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка при изменении пароля исполнителя {contractor_id}: {str(e)}", exc_info=True)
+        db.rollback()
+        return {"success": False, "message": str(e)}
+
 @router.post("/{contractor_id}/payments", response_model=dict)
 async def create_payment(
     contractor_id: int,

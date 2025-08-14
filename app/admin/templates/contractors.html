@@ -636,6 +636,9 @@ function showEditContractorModal(contractor) {
                         </form>
                     </div>
                     <div class="modal-footer">
+                        <button type="button" class="btn btn-warning" onclick="showChangePasswordModal(${contractor.id})">
+                            <i class="fas fa-key"></i> Изменить пароль
+                        </button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                         <button type="button" class="btn btn-primary" onclick="saveEditedContractor(${contractor.id})">Сохранить</button>
                     </div>
@@ -695,6 +698,115 @@ async function saveEditedContractor(contractorId) {
     } catch (error) {
         console.error('Ошибка при сохранении исполнителя:', error);
         alert('Ошибка при сохранении исполнителя');
+    }
+}
+
+// Функция показа модального окна смены пароля
+function showChangePasswordModal(contractorId) {
+    const passwordModalHtml = `
+        <div class="modal fade" id="changePasswordModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Изменить пароль исполнителя</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="changePasswordForm">
+                            <div class="mb-3">
+                                <label class="form-label">Новый пароль *</label>
+                                <input type="password" class="form-control" id="newPassword" required>
+                                <small class="text-muted">Введите новый пароль для исполнителя</small>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Подтвердите новый пароль *</label>
+                                <input type="password" class="form-control" id="confirmPassword" required>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-primary" onclick="changeContractorPassword(${contractorId})">
+                            Изменить пароль
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Удаляем старое модальное окно, если есть
+    const oldModal = document.getElementById('changePasswordModal');
+    if (oldModal) {
+        oldModal.remove();
+    }
+    
+    // Добавляем новое модальное окно
+    document.body.insertAdjacentHTML('beforeend', passwordModalHtml);
+    
+    // Закрываем окно редактирования, если оно открыто
+    const editModal = document.getElementById('editContractorModal');
+    if (editModal) {
+        const editModalInstance = bootstrap.Modal.getInstance(editModal);
+        if (editModalInstance) {
+            editModalInstance.hide();
+        }
+    }
+    
+    // Показываем модальное окно смены пароля
+    const modal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
+    modal.show();
+}
+
+// Функция изменения пароля исполнителя
+async function changeContractorPassword(contractorId) {
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    if (!newPassword || !confirmPassword) {
+        alert('Пожалуйста, заполните все поля');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        alert('Пароли не совпадают');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        alert('Пароль должен содержать минимум 6 символов');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/api/contractors/${contractorId}/change-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                new_password: newPassword
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Пароль успешно изменен!');
+            
+            // Закрываем модальное окно
+            const modal = bootstrap.Modal.getInstance(document.getElementById('changePasswordModal'));
+            modal.hide();
+            
+            // Перезагружаем список исполнителей
+            loadContractors();
+        } else {
+            alert('Ошибка при изменении пароля: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Ошибка при изменении пароля:', error);
+        alert('Ошибка при изменении пароля');
     }
 }
 
