@@ -10,7 +10,51 @@ from pydantic import BaseModel
 from ...database.database import get_db
 from ...database.models import User, AdminUser, ContractorPayment
 from ...config.logging import get_logger
-from ..middleware.auth import get_current_admin_user
+from ..middleware.auth import require_admin_auth
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
+
+security = HTTPBasic()
+
+def get_current_admin_user(credentials: HTTPBasicCredentials = Depends(security), db: Session = Depends(get_db)) -> AdminUser:
+    """Получение текущего администратора"""
+    from ...config.settings import settings
+    
+    # Сначала проверяем старую систему (владелец)
+    correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
+    
+    if correct_username and correct_password:
+        # Возвращаем реального администратора из БД
+        admin_user = db.query(AdminUser).filter(AdminUser.username == credentials.username).first()
+        if admin_user:
+            return admin_user
+        # Если в БД нет такого пользователя, создаем его
+        admin = AdminUser(
+            username=settings.ADMIN_USERNAME,
+            first_name='System',
+            last_name='Administrator',
+            email='admin@system.local',
+            role='admin',
+            is_active=True,
+            created_at=datetime.utcnow()
+        )
+        admin.set_password(settings.ADMIN_PASSWORD)
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        return admin
+    
+    # Проверяем в БД для исполнителей
+    admin_user = db.query(AdminUser).filter(AdminUser.username == credentials.username).first()
+    if admin_user and admin_user.check_password(credentials.password):
+        return admin_user
+    
+    raise HTTPException(
+        status_code=401,
+        detail="Неверные учетные данные",
+        headers={"WWW-Authenticate": "Basic"},
+    )
 
 logger = get_logger(__name__)
 
