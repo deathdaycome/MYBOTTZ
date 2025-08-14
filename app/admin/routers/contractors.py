@@ -35,7 +35,7 @@ def get_current_admin_user(credentials: HTTPBasicCredentials = Depends(security)
             first_name='System',
             last_name='Administrator',
             email='admin@system.local',
-            role='admin',
+            role='owner',  # Главный администратор - владелец
             is_active=True,
             created_at=datetime.utcnow()
         )
@@ -351,11 +351,11 @@ async def change_contractor_password(
 ):
     """Изменить пароль исполнителя (только для администраторов)."""
     try:
-        logger.info(f"Администратор {current_user.username} меняет пароль для исполнителя {contractor_id}")
+        logger.info(f"Пользователь {current_user.username} (роль: {current_user.role}) меняет пароль для исполнителя {contractor_id}")
         
-        # Проверяем, что текущий пользователь - администратор
-        if current_user.role != 'admin':
-            logger.warning(f"Попытка смены пароля не администратором: {current_user.username}")
+        # Проверяем, что текущий пользователь - администратор или владелец
+        if current_user.role not in ['admin', 'owner']:
+            logger.warning(f"Попытка смены пароля не администратором: {current_user.username}, роль: {current_user.role}")
             return {"success": False, "message": "Только администраторы могут менять пароли исполнителей"}
         
         # Находим исполнителя
@@ -382,7 +382,7 @@ async def change_contractor_password(
         
         db.commit()
         
-        logger.info(f"Пароль для исполнителя {contractor_id} ({contractor.username}) успешно изменен администратором {current_user.username}")
+        logger.info(f"Пароль для исполнителя {contractor_id} ({contractor.username}) успешно изменен пользователем {current_user.username} (роль: {current_user.role})")
         
         return {
             "success": True,
