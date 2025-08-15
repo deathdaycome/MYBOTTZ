@@ -122,6 +122,14 @@ except ImportError as e:
     print(f"Ошибка импорта роутера правок: {e}")
     revisions_router = None
 
+# Импорт роутера транзакций
+try:
+    from .routers.transactions import router as transactions_router
+    print("Роутер транзакций подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера транзакций: {e}")
+    transactions_router = None
+
 logger = get_logger(__name__)
 
 # Создаем роутер для админки
@@ -170,6 +178,10 @@ if services_router:
 # Подключаем роутер правок
 if revisions_router:
     admin_router.include_router(revisions_router, prefix="")
+
+# Подключаем роутер транзакций
+if transactions_router:
+    admin_router.include_router(transactions_router, prefix="/api/transactions")
 
 # Импорт роутера аналитики
 try:
