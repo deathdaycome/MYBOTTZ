@@ -30,6 +30,23 @@ router = APIRouter(tags=["projects"])
 # Базовая аутентификация
 security = HTTPBasic()
 
+# Модель для создания проекта с обязательными полями
+class ProjectCreateModel(BaseModel):
+    title: str  # Обязательное
+    user_id: int  # Клиент (обязательное)
+    estimated_cost: float  # Стоимость (обязательное)
+    start_date: datetime  # Дата начала (обязательное)
+    planned_end_date: datetime  # Плановая дата завершения (обязательное)
+    responsible_manager_id: Optional[int] = None  # Ответственный менеджер
+    description: Optional[str] = None
+    priority: str = "normal"
+    project_type: Optional[str] = None
+    complexity: str = "medium"
+    executor_cost: Optional[float] = None
+    prepayment_amount: Optional[float] = None
+    estimated_hours: Optional[int] = 0
+    assigned_executor_id: Optional[int] = None
+
 # Модель для редактирования проекта
 class ProjectUpdateModel(BaseModel):
     title: Optional[str] = None
@@ -47,6 +64,9 @@ class ProjectUpdateModel(BaseModel):
     estimated_hours: Optional[int] = None
     actual_hours: Optional[int] = None
     deadline: Optional[str] = None  # ISO format date string
+    planned_end_date: Optional[datetime] = None
+    start_date: Optional[datetime] = None
+    responsible_manager_id: Optional[int] = None
     assigned_executor_id: Optional[int] = None
     comment: Optional[str] = None  # Комментарий к изменению
     bot_token: Optional[str] = None  # API токен Telegram бота
@@ -773,13 +793,97 @@ async def create_project_root(
             "message": f"Ошибка создания проекта: {str(e)}"
         }
 
+@router.post("/create-validated")
+async def create_project_validated(
+    project_data: ProjectCreateModel,
+    credentials: HTTPBasicCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+    """Создать новый проект с валидацией обязательных полей"""
+    try:
+        # Проверяем аутентификацию
+        from ...config.settings import settings
+        correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
+        correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
+        
+        if not (correct_username and correct_password):
+            # Проверяем в БД
+            admin_user = db.query(AdminUser).filter(AdminUser.username == credentials.username).first()
+            if not admin_user or not admin_user.check_password(credentials.password):
+                raise HTTPException(status_code=401, detail="Неверные учетные данные")
+        
+        logger.info(f"Создание проекта с валидацией: {project_data.title}")
+        
+        # Валидация обязательных полей (уже выполнена Pydantic)
+        # Проверяем существование клиента
+        user = db.query(User).filter(User.id == project_data.user_id).first()
+        if not user:
+            return {"success": False, "message": f"Клиент с ID {project_data.user_id} не найден"}
+        
+        # Проверяем менеджера если указан
+        if project_data.responsible_manager_id:
+            manager = db.query(AdminUser).filter(AdminUser.id == project_data.responsible_manager_id).first()
+            if not manager:
+                return {"success": False, "message": f"Менеджер с ID {project_data.responsible_manager_id} не найден"}
+        
+        # Проверяем корректность дат
+        if project_data.planned_end_date <= project_data.start_date:
+            return {"success": False, "message": "Дата завершения должна быть позже даты начала"}
+        
+        # Создаем проект
+        project = Project(
+            user_id=project_data.user_id,
+            title=project_data.title,
+            description=project_data.description,
+            estimated_cost=project_data.estimated_cost,
+            start_date=project_data.start_date,
+            planned_end_date=project_data.planned_end_date,
+            responsible_manager_id=project_data.responsible_manager_id,
+            priority=project_data.priority,
+            project_type=project_data.project_type,
+            complexity=project_data.complexity,
+            executor_cost=project_data.executor_cost,
+            prepayment_amount=project_data.prepayment_amount or 0,
+            estimated_hours=project_data.estimated_hours or 0,
+            assigned_executor_id=project_data.assigned_executor_id,
+            status="new",  # Автоматически новый
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        
+        db.add(project)
+        db.commit()
+        db.refresh(project)
+        
+        # Логируем создание
+        logger.info(f"Проект '{project.title}' создан с ID {project.id}")
+        
+        # Если назначен исполнитель, обновляем статус
+        if project_data.assigned_executor_id:
+            project.status = "in_progress"
+            project.assigned_at = datetime.utcnow()
+            db.commit()
+        
+        return {
+            "success": True,
+            "message": "Проект успешно создан",
+            "project": project.to_dict()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при создании проекта: {str(e)}")
+        db.rollback()
+        return {"success": False, "message": str(e)}
+
 @router.post("/create")
 async def create_project(
     project_data: ProjectCreateModel,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать новый проект вручную через админку"""
+    """Создать новый проект вручную через админку (старый метод для совместимости)"""
     try:
         logger.info(f"Попытка создания проекта пользователем {current_user.get('username')} с ролью {current_user.get('role')}")
         

@@ -67,18 +67,18 @@ class Project(Base):
     __tablename__ = "projects"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    title = Column(String(500), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Клиент (обязательное)
+    title = Column(String(500), nullable=False)  # Название проекта (обязательное)
     description = Column(Text, nullable=True)
     original_request = Column(Text, nullable=True)  # Оригинальный запрос пользователя
     structured_tz = Column(JSON, default=lambda: {})  # Структурированное ТЗ
-    status = Column(String(50), default="new")  # new, review, accepted, in_progress, testing, completed, cancelled
+    status = Column(String(50), default="new")  # new, review, accepted, in_progress, testing, completed, cancelled, overdue
     is_archived = Column(Boolean, default=False)  # Архивирован ли проект
     priority = Column(String(20), default="normal")  # low, normal, high, urgent
     project_type = Column(String(50), nullable=True)  # telegram_bot, whatsapp_bot, web_bot, integration
     complexity = Column(String(20), default="medium")  # simple, medium, complex, premium
     color = Column(String(20), default="default")  # default, green, yellow, red
-    estimated_cost = Column(Float, default=0.0)  # Полная стоимость проекта (видит только владелец)
+    estimated_cost = Column(Float, nullable=False, default=0.0)  # Полная стоимость проекта (обязательное)
     executor_cost = Column(Float, nullable=True)  # Стоимость для исполнителя (видит исполнитель)
     final_cost = Column(Float, nullable=True)
     
@@ -89,7 +89,16 @@ class Project(Base):
     
     estimated_hours = Column(Integer, default=0)
     actual_hours = Column(Integer, nullable=True)
-    deadline = Column(DateTime, nullable=True)
+    
+    # Даты проекта (обязательные)
+    start_date = Column(DateTime, nullable=False, default=datetime.utcnow)  # Дата начала (обязательное)
+    planned_end_date = Column(DateTime, nullable=False)  # Плановая дата завершения (обязательное)
+    actual_end_date = Column(DateTime, nullable=True)  # Фактическая дата завершения
+    deadline = Column(DateTime, nullable=True)  # Дедлайн (для совместимости)
+    
+    # Ответственные
+    responsible_manager_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)  # Ответственный менеджер
+    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     project_metadata = Column(JSON, default=lambda: {})  # Дополнительные данные
@@ -103,7 +112,8 @@ class Project(Base):
     messages = relationship("Message", back_populates="project")
     legacy_files = relationship("File", back_populates="project")  # Старые файлы
     files = relationship("ProjectFile", back_populates="project")  # Новые файлы проектов
-    assigned_executor = relationship("AdminUser", back_populates="assigned_projects")
+    assigned_executor = relationship("AdminUser", foreign_keys=[assigned_executor_id], back_populates="assigned_projects")
+    responsible_manager = relationship("AdminUser", foreign_keys=[responsible_manager_id])
     status_logs = relationship("ProjectStatusLog", back_populates="project")
     revisions = relationship("ProjectRevision", back_populates="project")
     
@@ -128,7 +138,11 @@ class Project(Base):
             "executor_paid_total": self.executor_paid_total,
             "estimated_hours": self.estimated_hours,
             "actual_hours": self.actual_hours,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "planned_end_date": self.planned_end_date.isoformat() if self.planned_end_date else None,
+            "actual_end_date": self.actual_end_date.isoformat() if self.actual_end_date else None,
             "deadline": self.deadline.isoformat() if self.deadline else None,
+            "responsible_manager_id": self.responsible_manager_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "structured_tz": self.structured_tz,
