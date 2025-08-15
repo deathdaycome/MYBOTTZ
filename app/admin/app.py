@@ -130,6 +130,14 @@ except ImportError as e:
     print(f"Ошибка импорта роутера транзакций: {e}")
     transactions_router = None
 
+# Импорт роутера автоматизации
+try:
+    from .routers.automation import router as automation_router
+    print("Роутер автоматизации подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера автоматизации: {e}")
+    automation_router = None
+
 logger = get_logger(__name__)
 
 # Создаем роутер для админки
@@ -182,6 +190,9 @@ if revisions_router:
 # Подключаем роутер транзакций
 if transactions_router:
     admin_router.include_router(transactions_router, prefix="/api/transactions")
+
+if automation_router:
+    admin_router.include_router(automation_router, prefix="/api/automation")
 
 # Импорт роутера аналитики
 try:
@@ -1866,6 +1877,7 @@ def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
             # {"name": "Активность", "url": "/activity", "icon": "fas fa-history"},  # TODO: Добавить миграцию
             {"name": "Сервисы", "url": "/services", "icon": "fas fa-server"},
             {"name": "Аналитика", "url": "/analytics", "icon": "fas fa-chart-line"},
+            {"name": "Автоматизация", "url": "/automation", "icon": "fas fa-robot"},
             {"name": "Уведомления", "url": "/notifications", "icon": "fas fa-bell"},
             {"name": "Настройки", "url": "/settings", "icon": "fas fa-cog"}
         ]

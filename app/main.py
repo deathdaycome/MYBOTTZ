@@ -383,12 +383,28 @@ async def startup_event():
     """Запуск Telegram-бота при старте FastAPI"""
     bot_instance.logger.info("🚀 Запускаем Telegram-бота в фоновом режиме...")
     asyncio.create_task(bot_instance.run())
+    
+    # Запускаем планировщик автоматизации
+    try:
+        from app.services.scheduler import scheduler
+        scheduler.start()
+        logger.info("✅ Планировщик автоматизации запущен")
+    except Exception as e:
+        logger.error(f"❌ Ошибка запуска планировщика: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Остановка Telegram-бота при выключении FastAPI"""
     bot_instance.logger.info("🛑 Останавливаем Telegram-бота...")
     await bot_instance.stop()
+    
+    # Останавливаем планировщик
+    try:
+        from app.services.scheduler import scheduler
+        scheduler.stop()
+        logger.info("✅ Планировщик автоматизации остановлен")
+    except Exception as e:
+        logger.error(f"❌ Ошибка остановки планировщика: {e}")
 
 # --- Webhook (если используется) ---
 @app.post("/webhook")
