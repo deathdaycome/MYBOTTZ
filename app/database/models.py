@@ -790,6 +790,108 @@ class Contractor(Base):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
 
+class Transaction(Base):
+    """Модель финансовых транзакций (доходы и расходы)"""
+    __tablename__ = "transactions"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Тип транзакции
+    transaction_type = Column(String(20), nullable=False)  # income, expense
+    
+    # Привязки
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # Привязка к проекту (обязательно для доходов)
+    contractor_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)  # Привязка к исполнителю (для расходов)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Клиент (для доходов)
+    
+    # Финансовые данные
+    amount = Column(Float, nullable=False)  # Сумма транзакции
+    currency = Column(String(10), default="RUB")  # Валюта
+    
+    # Категоризация
+    category = Column(String(100), nullable=True)  # Категория (зарплата, реклама, офис, налоги и т.д.)
+    subcategory = Column(String(100), nullable=True)  # Подкатегория
+    
+    # Детали транзакции
+    description = Column(Text, nullable=True)  # Описание/комментарий
+    payment_method = Column(String(50), nullable=True)  # Способ оплаты (bank, card, cash, crypto)
+    reference_number = Column(String(100), nullable=True)  # Номер платежа/счета
+    
+    # Статус и даты
+    status = Column(String(20), default="completed")  # pending, completed, cancelled
+    transaction_date = Column(DateTime, nullable=False)  # Дата транзакции
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Кто создал транзакцию
+    created_by_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
+    
+    # Метаданные
+    transaction_metadata = Column(JSON, default=lambda: {})  # Дополнительные данные
+    
+    # Связи
+    project = relationship("Project", backref="transactions")
+    contractor = relationship("AdminUser", foreign_keys=[contractor_id])
+    user = relationship("User", backref="transactions")
+    created_by = relationship("AdminUser", foreign_keys=[created_by_id])
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "transaction_type": self.transaction_type,
+            "project_id": self.project_id,
+            "contractor_id": self.contractor_id,
+            "user_id": self.user_id,
+            "amount": self.amount,
+            "currency": self.currency,
+            "category": self.category,
+            "subcategory": self.subcategory,
+            "description": self.description,
+            "payment_method": self.payment_method,
+            "reference_number": self.reference_number,
+            "status": self.status,
+            "transaction_date": self.transaction_date.isoformat() if self.transaction_date else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "created_by_id": self.created_by_id,
+            "transaction_metadata": self.transaction_metadata
+        }
+    
+    @property
+    def is_income(self):
+        return self.transaction_type == "income"
+    
+    @property
+    def is_expense(self):
+        return self.transaction_type == "expense"
+
+
+class ExpenseCategory(Base):
+    """Модель категорий расходов"""
+    __tablename__ = "expense_categories"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False)  # Название категории
+    description = Column(Text, nullable=True)  # Описание
+    color = Column(String(20), nullable=True)  # Цвет для отображения
+    icon = Column(String(50), nullable=True)  # Иконка
+    is_active = Column(Boolean, default=True)  # Активна ли категория
+    order_index = Column(Integer, default=0)  # Порядок отображения
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "color": self.color,
+            "icon": self.icon,
+            "is_active": self.is_active,
+            "order_index": self.order_index,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
 class ContractorPayment(Base):
     """Модель выплат исполнителям"""
     __tablename__ = "contractor_payments"
