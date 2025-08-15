@@ -315,6 +315,52 @@
 
     <!-- Right Column -->
     <div class="col-md-4">
+        <!-- Financial Block -->
+        <div class="chart-container mb-4" id="financialBlock">
+            <h5 class="mb-3">
+                <i class="fas fa-chart-line me-2"></i>
+                Финансы проекта
+            </h5>
+            <div class="finance-stats">
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Стоимость проекта:</span>
+                    <strong class="text-primary">{{ '{:,.0f}'.format(project.estimated_cost or 0) }} ₽</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Получено от клиента:</span>
+                    <strong class="text-success" id="clientPaid">0 ₽</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Остаток к оплате:</span>
+                    <strong class="text-warning" id="clientRemaining">{{ '{:,.0f}'.format(project.estimated_cost or 0) }} ₽</strong>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Расходы по проекту:</span>
+                    <strong class="text-danger" id="projectExpenses">0 ₽</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Прибыль:</span>
+                    <strong class="text-info" id="projectProfit">0 ₽</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-3">
+                    <span class="text-muted">Рентабельность:</span>
+                    <strong id="projectProfitability">0%</strong>
+                </div>
+                <div class="mt-3 d-grid gap-2">
+                    <button class="btn btn-sm btn-success" onclick="addIncome({{ project.id }})">
+                        <i class="fas fa-plus-circle"></i> Добавить доход
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="addExpense({{ project.id }})">
+                        <i class="fas fa-minus-circle"></i> Добавить расход
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewTransactions({{ project.id }})">
+                        <i class="fas fa-list"></i> Все транзакции
+                    </button>
+                </div>
+            </div>
+        </div>
+        
         <!-- Project Timeline -->
         <div class="chart-container mb-4">
             <h5 class="mb-3">
@@ -467,5 +513,132 @@ function showRevisions() {
 function generateReport() {
     showNotification('Функция в разработке', 'info');
 }
+
+// Функции для работы с финансами
+async function loadProjectFinance() {
+    const projectId = {{ project.id }};
+    try {
+        const response = await fetch(`/admin/api/transactions/project/${projectId}/finance`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            // Обновляем UI с финансовыми данными
+            document.getElementById('clientPaid').textContent = formatCurrency(data.finance.total_income);
+            document.getElementById('clientRemaining').textContent = formatCurrency(data.finance.client_remaining);
+            document.getElementById('projectExpenses').textContent = formatCurrency(data.finance.total_expense);
+            document.getElementById('projectProfit').textContent = formatCurrency(data.finance.profit);
+            document.getElementById('projectProfitability').textContent = data.finance.profitability + '%';
+            
+            // Меняем цвет рентабельности
+            const profitabilityEl = document.getElementById('projectProfitability');
+            if (data.finance.profitability > 30) {
+                profitabilityEl.className = 'text-success';
+            } else if (data.finance.profitability > 0) {
+                profitabilityEl.className = 'text-warning';
+            } else {
+                profitabilityEl.className = 'text-danger';
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки финансов:', error);
+    }
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount);
+}
+
+async function addIncome(projectId) {
+    const amount = prompt('Введите сумму дохода (₽):');
+    if (!amount || isNaN(amount)) return;
+    
+    const description = prompt('Описание платежа:') || 'Оплата по проекту';
+    const paymentMethod = prompt('Способ оплаты (bank/card/cash):') || 'bank';
+    
+    try {
+        const response = await fetch('/admin/api/transactions/income', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                transaction_type: 'income',
+                project_id: projectId,
+                amount: parseFloat(amount),
+                description: description,
+                payment_method: paymentMethod,
+                transaction_date: new Date().toISOString(),
+                status: 'completed'
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Доход успешно добавлен!', 'success');
+            loadProjectFinance(); // Перезагружаем финансовые данные
+        } else {
+            showNotification('Ошибка: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error.message, 'danger');
+    }
+}
+
+async function addExpense(projectId) {
+    const amount = prompt('Введите сумму расхода (₽):');
+    if (!amount || isNaN(amount)) return;
+    
+    const category = prompt('Категория расхода (например: Зарплата исполнителям):') || 'Прочие расходы';
+    const description = prompt('Описание расхода:') || '';
+    
+    try {
+        const response = await fetch('/admin/api/transactions/expense', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                transaction_type: 'expense',
+                project_id: projectId,
+                amount: parseFloat(amount),
+                category: category,
+                description: description,
+                transaction_date: new Date().toISOString(),
+                status: 'completed'
+            })
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Расход успешно добавлен!', 'success');
+            loadProjectFinance(); // Перезагружаем финансовые данные
+        } else {
+            showNotification('Ошибка: ' + data.message, 'danger');
+        }
+    } catch (error) {
+        showNotification('Ошибка: ' + error.message, 'danger');
+    }
+}
+
+function viewTransactions(projectId) {
+    // Открываем страницу со всеми транзакциями проекта
+    window.location.href = `/admin/transactions?project_id=${projectId}`;
+}
+
+// Загружаем финансовые данные при загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+    loadProjectFinance();
+});
 </script>
 {% endblock %}
