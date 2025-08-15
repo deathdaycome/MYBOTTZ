@@ -5,6 +5,58 @@
 {% block page_title %}📊 Дашборд{% endblock %}
 
 {% block content %}
+<!-- Financial Metrics Row -->
+<div class="row mb-4" id="financialMetrics">
+    <div class="col-md-3">
+        <div class="metric-card gradient-green">
+            <div class="metric-icon">
+                <i class="fas fa-arrow-up"></i>
+            </div>
+            <div class="metric-content">
+                <h4 id="monthlyIncome">0 ₽</h4>
+                <p>Доход за месяц</p>
+                <small class="metric-change positive" id="incomeChange">+0%</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="metric-card gradient-red">
+            <div class="metric-icon">
+                <i class="fas fa-arrow-down"></i>
+            </div>
+            <div class="metric-content">
+                <h4 id="monthlyExpense">0 ₽</h4>
+                <p>Расходы за месяц</p>
+                <small class="metric-change negative" id="expenseChange">-0%</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="metric-card gradient-blue">
+            <div class="metric-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="metric-content">
+                <h4 id="monthlyProfit">0 ₽</h4>
+                <p>Прибыль за месяц</p>
+                <small class="metric-change" id="profitChange">0%</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="metric-card gradient-purple">
+            <div class="metric-icon">
+                <i class="fas fa-percentage"></i>
+            </div>
+            <div class="metric-content">
+                <h4 id="profitMargin">0%</h4>
+                <p>Рентабельность</p>
+                <small id="marginTrend">Целевая: 30%</small>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Statistics Cards -->
 <div class="row mb-4">
     <div class="col-xl-3 col-md-6 mb-3">
@@ -311,7 +363,69 @@
     document.addEventListener('DOMContentLoaded', function() {
         initProjectsChart();
         initStatusChart();
+        loadFinancialMetrics();
     });
+
+    // Load financial metrics
+    async function loadFinancialMetrics() {
+        try {
+            const response = await fetch('/admin/api/reports/dashboard-metrics', {
+                headers: {
+                    'Authorization': 'Basic ' + btoa('admin:qwerty123')
+                }
+            });
+            
+            const data = await response.json();
+            if (data.success && data.metrics) {
+                const metrics = data.metrics;
+                
+                // Update income
+                document.getElementById('monthlyIncome').textContent = formatCurrency(metrics.current_month.income);
+                const incomeChangeEl = document.getElementById('incomeChange');
+                const incomeChange = metrics.changes.income_change;
+                incomeChangeEl.textContent = `${incomeChange >= 0 ? '+' : ''}${incomeChange.toFixed(1)}%`;
+                incomeChangeEl.className = `metric-change ${incomeChange >= 0 ? 'positive' : 'negative'}`;
+                
+                // Update expense
+                document.getElementById('monthlyExpense').textContent = formatCurrency(metrics.current_month.expense);
+                const expenseChangeEl = document.getElementById('expenseChange');
+                const expenseChange = metrics.changes.expense_change;
+                expenseChangeEl.textContent = `${expenseChange >= 0 ? '+' : ''}${expenseChange.toFixed(1)}%`;
+                
+                // Update profit
+                document.getElementById('monthlyProfit').textContent = formatCurrency(metrics.current_month.profit);
+                const profitChangeEl = document.getElementById('profitChange');
+                const profitChange = metrics.changes.profit_change;
+                profitChangeEl.textContent = formatCurrency(profitChange);
+                profitChangeEl.className = `metric-change ${profitChange >= 0 ? 'positive' : 'negative'}`;
+                
+                // Update profit margin
+                document.getElementById('profitMargin').textContent = `${metrics.current_month.profit_margin.toFixed(1)}%`;
+                const marginTrend = document.getElementById('marginTrend');
+                if (metrics.current_month.profit_margin >= 30) {
+                    marginTrend.textContent = 'Отлично!';
+                    marginTrend.style.color = 'rgba(255,255,255,0.8)';
+                } else if (metrics.current_month.profit_margin >= 20) {
+                    marginTrend.textContent = 'Хорошо';
+                    marginTrend.style.color = 'rgba(255,255,255,0.8)';
+                } else {
+                    marginTrend.textContent = 'Требует внимания';
+                    marginTrend.style.color = 'rgba(255,255,255,0.8)';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading financial metrics:', error);
+        }
+    }
+
+    function formatCurrency(amount) {
+        return new Intl.NumberFormat('ru-RU', {
+            style: 'currency',
+            currency: 'RUB',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount);
+    }
 
     function initProjectsChart() {
         const ctx = document.getElementById('projectsChart').getContext('2d');

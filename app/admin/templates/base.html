@@ -230,6 +230,81 @@
             margin-bottom: 0.5rem;
         }
 
+        /* Financial Metrics Cards */
+        .metric-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .metric-card.gradient-green {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .metric-card.gradient-red {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .metric-card.gradient-blue {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+        }
+
+        .metric-card.gradient-purple {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            color: white;
+        }
+
+        .metric-icon {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            font-size: 2rem;
+            opacity: 0.3;
+        }
+
+        .metric-content h4 {
+            font-size: 1.75rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-content p {
+            margin-bottom: 0.5rem;
+            opacity: 0.9;
+        }
+
+        .metric-change {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .metric-change.positive {
+            color: #10b981;
+        }
+
+        .metric-change.negative {
+            color: #ef4444;
+        }
+
+        .metric-card.gradient-green .metric-change,
+        .metric-card.gradient-red .metric-change,
+        .metric-card.gradient-blue .metric-change,
+        .metric-card.gradient-purple .metric-change {
+            color: rgba(255,255,255,0.8);
+        }
+
         .stat-label {
             color: #64748b;
             font-size: 0.875rem;

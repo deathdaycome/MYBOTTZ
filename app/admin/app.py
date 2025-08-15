@@ -138,6 +138,14 @@ except ImportError as e:
     print(f"Ошибка импорта роутера автоматизации: {e}")
     automation_router = None
 
+# Импорт роутера отчетов
+try:
+    from .routers.reports import router as reports_router
+    print("Роутер отчетов подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера отчетов: {e}")
+    reports_router = None
+
 logger = get_logger(__name__)
 
 # Создаем роутер для админки
@@ -193,6 +201,9 @@ if transactions_router:
 
 if automation_router:
     admin_router.include_router(automation_router, prefix="/api/automation")
+
+if reports_router:
+    admin_router.include_router(reports_router, prefix="/api/reports")
 
 # Импорт роутера аналитики
 try:
@@ -1877,6 +1888,7 @@ def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
             # {"name": "Активность", "url": "/activity", "icon": "fas fa-history"},  # TODO: Добавить миграцию
             {"name": "Сервисы", "url": "/services", "icon": "fas fa-server"},
             {"name": "Аналитика", "url": "/analytics", "icon": "fas fa-chart-line"},
+            {"name": "Отчеты", "url": "/reports", "icon": "fas fa-file-chart-line"},
             {"name": "Автоматизация", "url": "/automation", "icon": "fas fa-robot"},
             {"name": "Уведомления", "url": "/notifications", "icon": "fas fa-bell"},
             {"name": "Настройки", "url": "/settings", "icon": "fas fa-cog"}

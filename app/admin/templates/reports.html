@@ -1,0 +1,877 @@
+{% extends "base.html" %}
+
+{% block title %}Отчеты и аналитика - Админ панель{% endblock %}
+
+{% block page_title %}
+<h4>Отчеты и аналитика</h4>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.report-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-align: center;
+    height: 100%;
+}
+
+.metric-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin: 0.5rem 0;
+}
+
+.metric-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.metric-change {
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+}
+
+.metric-change.positive {
+    color: #10b981;
+}
+
+.metric-change.negative {
+    color: #ef4444;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    height: 400px;
+}
+
+.filter-section {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.report-tabs {
+    border-bottom: 2px solid #dee2e6;
+    margin-bottom: 2rem;
+}
+
+.report-tab {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: none;
+    color: #6c757d;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+}
+
+.report-tab.active {
+    color: #667eea;
+}
+
+.report-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #667eea;
+}
+
+.top-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.top-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid #e9ecef;
+    transition: background 0.2s;
+}
+
+.top-list-item:hover {
+    background: #f8f9fa;
+}
+
+.top-list-item:last-child {
+    border-bottom: none;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.date-range-picker {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.quick-period-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.quick-period-btn:hover {
+    background: #f8f9fa;
+}
+
+.quick-period-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Фильтры -->
+<div class="filter-section">
+    <div class="row align-items-center">
+        <div class="col-md-6">
+            <div class="date-range-picker">
+                <input type="date" id="startDate" class="form-control" style="max-width: 150px;">
+                <span>до</span>
+                <input type="date" id="endDate" class="form-control" style="max-width: 150px;">
+                <button class="btn btn-primary" onclick="applyFilters()">
+                    <i class="fas fa-filter"></i> Применить
+                </button>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="quick-period-btn" onclick="setQuickPeriod('today')">Сегодня</button>
+                <button class="quick-period-btn active" onclick="setQuickPeriod('week')">Неделя</button>
+                <button class="quick-period-btn" onclick="setQuickPeriod('month')">Месяц</button>
+                <button class="quick-period-btn" onclick="setQuickPeriod('year')">Год</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Табы отчетов -->
+<div class="report-tabs">
+    <button class="report-tab active" data-tab="overview" onclick="switchTab('overview')">
+        <i class="fas fa-chart-pie me-2"></i>Обзор
+    </button>
+    <button class="report-tab" data-tab="financial" onclick="switchTab('financial')">
+        <i class="fas fa-dollar-sign me-2"></i>Финансы
+    </button>
+    <button class="report-tab" data-tab="projects" onclick="switchTab('projects')">
+        <i class="fas fa-project-diagram me-2"></i>Проекты
+    </button>
+    <button class="report-tab" data-tab="executors" onclick="switchTab('executors')">
+        <i class="fas fa-users me-2"></i>Исполнители
+    </button>
+</div>
+
+<!-- Контент табов -->
+<div id="overview-content" class="tab-content">
+    <!-- Метрики -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="metric-card">
+                <div class="metric-label">Доход за период</div>
+                <div class="metric-value" id="totalIncome">0 ₽</div>
+                <div class="metric-change positive" id="incomeChange">
+                    <i class="fas fa-arrow-up"></i> +0%
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                <div class="metric-label">Расходы</div>
+                <div class="metric-value" id="totalExpense">0 ₽</div>
+                <div class="metric-change negative" id="expenseChange">
+                    <i class="fas fa-arrow-down"></i> -0%
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                <div class="metric-label">Прибыль</div>
+                <div class="metric-value" id="totalProfit">0 ₽</div>
+                <div class="metric-change positive" id="profitChange">
+                    <i class="fas fa-arrow-up"></i> +0%
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="metric-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                <div class="metric-label">Проектов завершено</div>
+                <div class="metric-value" id="completedProjects">0</div>
+                <div class="metric-change" id="completionRate">0% успешность</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Графики -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="chart-container">
+                <h5 class="mb-3">Доходы и расходы по месяцам</h5>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="chart-container">
+                <h5 class="mb-3">Категории расходов</h5>
+                <canvas id="expenseCategoriesChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Топ списки -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="report-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-trophy text-warning me-2"></i>
+                    Топ клиентов
+                </h5>
+                <ul class="top-list" id="topClients">
+                    <li class="top-list-item">
+                        <span class="text-muted">Нет данных</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="report-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-star text-primary me-2"></i>
+                    Топ проектов
+                </h5>
+                <ul class="top-list" id="topProjects">
+                    <li class="top-list-item">
+                        <span class="text-muted">Нет данных</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="report-card">
+                <h5 class="mb-3">
+                    <i class="fas fa-user-tie text-success me-2"></i>
+                    Лучшие исполнители
+                </h5>
+                <ul class="top-list" id="topExecutors">
+                    <li class="top-list-item">
+                        <span class="text-muted">Нет данных</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Финансовый отчет -->
+<div id="financial-content" class="tab-content" style="display: none;">
+    <div class="report-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5>Финансовый отчет</h5>
+            <div class="export-buttons">
+                <button class="btn btn-sm btn-outline-success" onclick="exportReport('financial', 'excel')">
+                    <i class="fas fa-file-excel"></i> Excel
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="exportReport('financial', 'pdf')">
+                    <i class="fas fa-file-pdf"></i> PDF
+                </button>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table" id="financialTable">
+                <thead>
+                    <tr>
+                        <th>Месяц</th>
+                        <th>Доходы</th>
+                        <th>Расходы</th>
+                        <th>Прибыль</th>
+                        <th>Рентабельность</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Загрузка данных...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="chart-container" style="height: 300px;">
+                    <h6>Денежный поток</h6>
+                    <canvas id="cashFlowChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container" style="height: 300px;">
+                    <h6>Прогноз на следующий месяц</h6>
+                    <div id="forecastData" class="p-3">
+                        <div class="mb-2">
+                            <strong>Ожидаемый доход:</strong> 
+                            <span id="forecastIncome">0 ₽</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Ожидаемые расходы:</strong> 
+                            <span id="forecastExpense">0 ₽</span>
+                        </div>
+                        <div>
+                            <strong>Ожидаемая прибыль:</strong> 
+                            <span id="forecastProfit">0 ₽</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Отчет по проектам -->
+<div id="projects-content" class="tab-content" style="display: none;">
+    <div class="report-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5>Отчет по проектам</h5>
+            <div class="export-buttons">
+                <button class="btn btn-sm btn-outline-success" onclick="exportReport('projects', 'excel')">
+                    <i class="fas fa-file-excel"></i> Excel
+                </button>
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <select class="form-select" id="projectStatusFilter">
+                    <option value="">Все статусы</option>
+                    <option value="new">Новые</option>
+                    <option value="in_progress">В работе</option>
+                    <option value="completed">Завершенные</option>
+                    <option value="overdue">Просроченные</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="executorFilter">
+                    <option value="">Все исполнители</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table" id="projectsTable">
+                <thead>
+                    <tr>
+                        <th>Проект</th>
+                        <th>Клиент</th>
+                        <th>Исполнитель</th>
+                        <th>Статус</th>
+                        <th>Стоимость</th>
+                        <th>Прогресс</th>
+                        <th>Дедлайн</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">Загрузка данных...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Отчет по исполнителям -->
+<div id="executors-content" class="tab-content" style="display: none;">
+    <div class="report-card">
+        <h5 class="mb-3">Отчет по исполнителям</h5>
+        
+        <div class="row" id="executorsCards">
+            <!-- Карточки исполнителей будут добавлены динамически -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const username = 'admin';
+const password = 'qwerty123';
+let currentPeriod = 'month';
+let monthlyChart, expenseCategoriesChart, cashFlowChart;
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', () => {
+    initCharts();
+    loadDashboardMetrics();
+    loadQuickStats('month');
+});
+
+// Инициализация графиков
+function initCharts() {
+    // График доходов/расходов по месяцам
+    const monthlyCtx = document.getElementById('monthlyChart').getContext('2d');
+    monthlyChart = new Chart(monthlyCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Доходы',
+                data: [],
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Расходы',
+                data: [],
+                borderColor: '#ef4444',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // График категорий расходов
+    const expenseCtx = document.getElementById('expenseCategoriesChart').getContext('2d');
+    expenseCategoriesChart = new Chart(expenseCtx, {
+        type: 'doughnut',
+        data: {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [
+                    '#667eea',
+                    '#764ba2',
+                    '#f093fb',
+                    '#f5576c',
+                    '#4facfe',
+                    '#00f2fe'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Загрузка метрик дашборда
+async function loadDashboardMetrics() {
+    try {
+        const response = await fetch('/admin/api/reports/dashboard-metrics', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            updateMetrics(data.metrics);
+            updateCharts(data.metrics);
+            updateTopLists(data.metrics);
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки метрик:', error);
+    }
+}
+
+// Загрузка быстрой статистики
+async function loadQuickStats(period) {
+    currentPeriod = period;
+    
+    // Обновляем активную кнопку
+    document.querySelectorAll('.quick-period-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase().includes(period) || 
+            (period === 'week' && btn.textContent === 'Неделя') ||
+            (period === 'today' && btn.textContent === 'Сегодня') ||
+            (period === 'year' && btn.textContent === 'Год')) {
+            btn.classList.add('active');
+        }
+    });
+    
+    try {
+        const response = await fetch(`/admin/api/reports/quick-stats?period=${period}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            updateQuickStats(data.stats);
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки статистики:', error);
+    }
+}
+
+// Обновление метрик
+function updateMetrics(metrics) {
+    // Текущий месяц
+    document.getElementById('totalIncome').textContent = formatCurrency(metrics.current_month.income);
+    document.getElementById('totalExpense').textContent = formatCurrency(metrics.current_month.expense);
+    document.getElementById('totalProfit').textContent = formatCurrency(metrics.current_month.profit);
+    
+    // Изменения
+    const incomeChange = metrics.changes.income_change;
+    const expenseChange = metrics.changes.expense_change;
+    
+    const incomeChangeEl = document.getElementById('incomeChange');
+    incomeChangeEl.innerHTML = `<i class="fas fa-arrow-${incomeChange >= 0 ? 'up' : 'down'}"></i> ${incomeChange >= 0 ? '+' : ''}${incomeChange.toFixed(1)}%`;
+    incomeChangeEl.className = `metric-change ${incomeChange >= 0 ? 'positive' : 'negative'}`;
+    
+    const expenseChangeEl = document.getElementById('expenseChange');
+    expenseChangeEl.innerHTML = `<i class="fas fa-arrow-${expenseChange >= 0 ? 'up' : 'down'}"></i> ${expenseChange >= 0 ? '+' : ''}${expenseChange.toFixed(1)}%`;
+    
+    // Прогноз
+    if (metrics.forecast) {
+        document.getElementById('forecastIncome').textContent = formatCurrency(metrics.forecast.income);
+        document.getElementById('forecastExpense').textContent = formatCurrency(metrics.forecast.expense);
+        document.getElementById('forecastProfit').textContent = formatCurrency(metrics.forecast.profit);
+    }
+}
+
+// Обновление графиков
+function updateCharts(metrics) {
+    // Здесь нужно загрузить полный финансовый отчет для графиков
+    loadFinancialReport();
+}
+
+// Обновление топ-списков
+function updateTopLists(metrics) {
+    // Топ проектов
+    if (metrics.top_projects && metrics.top_projects.length > 0) {
+        const topProjectsEl = document.getElementById('topProjects');
+        topProjectsEl.innerHTML = metrics.top_projects.map((project, index) => `
+            <li class="top-list-item">
+                <span>
+                    <span class="badge bg-primary me-2">${index + 1}</span>
+                    ${project[0]}
+                </span>
+                <strong>${formatCurrency(project[1])}</strong>
+            </li>
+        `).join('');
+    }
+}
+
+// Загрузка финансового отчета
+async function loadFinancialReport() {
+    try {
+        const response = await fetch('/admin/api/reports/financial', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success && data.report) {
+            // Обновляем график по месяцам
+            if (data.report.monthly_data) {
+                const labels = data.report.monthly_data.map(m => m.month);
+                const incomes = data.report.monthly_data.map(m => m.income);
+                const expenses = data.report.monthly_data.map(m => m.expense);
+                
+                monthlyChart.data.labels = labels;
+                monthlyChart.data.datasets[0].data = incomes;
+                monthlyChart.data.datasets[1].data = expenses;
+                monthlyChart.update();
+                
+                // Обновляем таблицу
+                updateFinancialTable(data.report.monthly_data);
+            }
+            
+            // Обновляем категории расходов
+            if (data.report.expense_categories) {
+                const categories = Object.keys(data.report.expense_categories);
+                const values = Object.values(data.report.expense_categories);
+                
+                expenseCategoriesChart.data.labels = categories;
+                expenseCategoriesChart.data.datasets[0].data = values;
+                expenseCategoriesChart.update();
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки финансового отчета:', error);
+    }
+}
+
+// Обновление финансовой таблицы
+function updateFinancialTable(monthlyData) {
+    const tbody = document.querySelector('#financialTable tbody');
+    
+    if (!monthlyData || monthlyData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Нет данных</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = monthlyData.map(month => {
+        const profitMargin = month.income > 0 ? (month.profit / month.income * 100).toFixed(1) : 0;
+        return `
+            <tr>
+                <td>${month.month}</td>
+                <td class="text-success">${formatCurrency(month.income)}</td>
+                <td class="text-danger">${formatCurrency(month.expense)}</td>
+                <td class="${month.profit >= 0 ? 'text-success' : 'text-danger'}">
+                    ${formatCurrency(month.profit)}
+                </td>
+                <td>${profitMargin}%</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Переключение табов
+function switchTab(tabName) {
+    // Скрываем все табы
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.style.display = 'none';
+    });
+    
+    // Убираем активный класс со всех табов
+    document.querySelectorAll('.report-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Показываем выбранный таб
+    document.getElementById(`${tabName}-content`).style.display = 'block';
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    
+    // Загружаем данные для таба
+    if (tabName === 'financial') {
+        loadFinancialReport();
+    } else if (tabName === 'projects') {
+        loadProjectsReport();
+    } else if (tabName === 'executors') {
+        loadExecutorsReport();
+    }
+}
+
+// Загрузка отчета по проектам
+async function loadProjectsReport() {
+    const status = document.getElementById('projectStatusFilter').value;
+    const executorId = document.getElementById('executorFilter').value;
+    
+    let url = '/admin/api/reports/projects?';
+    if (status) url += `status=${status}&`;
+    if (executorId) url += `executor_id=${executorId}&`;
+    
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success && data.report) {
+            updateProjectsTable(data.report.projects);
+            
+            // Обновляем количество завершенных проектов
+            const completed = data.report.projects.filter(p => p.status === 'completed').length;
+            document.getElementById('completedProjects').textContent = completed;
+            document.getElementById('completionRate').textContent = 
+                `${data.report.summary.completion_rate.toFixed(1)}% успешность`;
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки отчета по проектам:', error);
+    }
+}
+
+// Обновление таблицы проектов
+function updateProjectsTable(projects) {
+    const tbody = document.querySelector('#projectsTable tbody');
+    
+    if (!projects || projects.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Нет проектов</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = projects.map(project => {
+        const statusBadge = getStatusBadge(project.status);
+        const progressBar = `
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar" style="width: ${project.completion_percentage}%"></div>
+            </div>
+            <small>${project.completion_percentage}%</small>
+        `;
+        
+        return `
+            <tr>
+                <td>${project.title}</td>
+                <td>${project.client}</td>
+                <td>${project.executor || '-'}</td>
+                <td>${statusBadge}</td>
+                <td>${formatCurrency(project.estimated_cost || 0)}</td>
+                <td>${progressBar}</td>
+                <td>${project.deadline ? new Date(project.deadline).toLocaleDateString() : '-'}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Экспорт отчета
+async function exportReport(reportType, format) {
+    const params = new URLSearchParams();
+    params.append('report_type', reportType);
+    
+    // Добавляем фильтры если нужно
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    
+    if (format === 'excel') {
+        const url = `/admin/api/reports/export/excel?${params.toString()}`;
+        window.open(url, '_blank');
+    }
+}
+
+// Установка быстрого периода
+function setQuickPeriod(period) {
+    const now = new Date();
+    let startDate, endDate = now;
+    
+    switch(period) {
+        case 'today':
+            startDate = now;
+            break;
+        case 'week':
+            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            break;
+        case 'month':
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            break;
+        case 'year':
+            startDate = new Date(now.getFullYear(), 0, 1);
+            break;
+    }
+    
+    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+    
+    loadQuickStats(period);
+}
+
+// Применение фильтров
+function applyFilters() {
+    loadFinancialReport();
+    loadProjectsReport();
+}
+
+// Вспомогательные функции
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount);
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'new': '<span class="badge bg-info">Новый</span>',
+        'in_progress': '<span class="badge bg-primary">В работе</span>',
+        'completed': '<span class="badge bg-success">Завершен</span>',
+        'overdue': '<span class="badge bg-danger">Просрочен</span>',
+        'cancelled': '<span class="badge bg-secondary">Отменен</span>'
+    };
+    return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
+}
+
+// Обновление быстрой статистики
+function updateQuickStats(stats) {
+    if (stats.projects) {
+        document.getElementById('completedProjects').textContent = stats.projects.completed;
+        document.getElementById('completionRate').textContent = 
+            `${stats.projects.completion_rate.toFixed(1)}% успешность`;
+    }
+    
+    if (stats.top_clients) {
+        const topClientsEl = document.getElementById('topClients');
+        topClientsEl.innerHTML = stats.top_clients.map((client, index) => `
+            <li class="top-list-item">
+                <span>
+                    <span class="badge bg-warning me-2">${index + 1}</span>
+                    ${client.name}
+                </span>
+                <strong>${formatCurrency(client.total_revenue)}</strong>
+            </li>
+        `).join('') || '<li class="top-list-item"><span class="text-muted">Нет данных</span></li>';
+    }
+    
+    if (stats.top_executors) {
+        const topExecutorsEl = document.getElementById('topExecutors');
+        topExecutorsEl.innerHTML = stats.top_executors.map((executor, index) => `
+            <li class="top-list-item">
+                <span>
+                    <span class="badge bg-success me-2">${index + 1}</span>
+                    ${executor.name}
+                </span>
+                <small>${executor.completed_count} проектов</small>
+            </li>
+        `).join('') || '<li class="top-list-item"><span class="text-muted">Нет данных</span></li>';
+    }
+}
+
+// Загрузка отчета по исполнителям
+async function loadExecutorsReport() {
+    // Здесь будет загрузка отчета по исполнителям
+    const executorsCards = document.getElementById('executorsCards');
+    executorsCards.innerHTML = '<div class="col-12 text-center text-muted">Функция в разработке</div>';
+}
+</script>
+{% endblock %}
