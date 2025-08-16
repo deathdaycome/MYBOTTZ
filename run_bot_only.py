@@ -31,5 +31,6 @@ async def main():
         logger.error(f"❌ Ошибка запуска бота: {e}")
         raise
 
+
 if __name__ == "__main__":
     asyncio.run(main())

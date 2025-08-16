@@ -521,7 +521,8 @@ class AdminUser(Base):
     last_login = Column(DateTime, nullable=True)
     
     # Связи
-    assigned_projects = relationship("Project", back_populates="assigned_executor")
+    assigned_projects = relationship("Project", foreign_keys="[Project.assigned_executor_id]", back_populates="assigned_executor")
+    managed_projects = relationship("Project", foreign_keys="[Project.responsible_manager_id]", overlaps="responsible_manager")
     uploaded_project_files = relationship("ProjectFile", back_populates="uploaded_by")
     created_statuses = relationship("ProjectStatus", back_populates="created_by")
     status_changes = relationship("ProjectStatusLog", back_populates="changed_by")
@@ -1432,7 +1433,6 @@ class ReceiptFile(Base):
         }
 
 # Обновляем связи существующих моделей
-AdminUser.assigned_projects = relationship("Project", back_populates="assigned_executor")
 AdminUser.assigned_tasks = relationship("Task", foreign_keys="[Task.assigned_to_id]", back_populates="assigned_to")
 AdminUser.created_tasks = relationship("Task", foreign_keys="[Task.created_by_id]", back_populates="created_by")
 AdminUser.task_comments = relationship("TaskComment", back_populates="author")
@@ -1471,4 +1471,3 @@ User.created_revisions = relationship("ProjectRevision", back_populates="created
 #             "user_agent": self.user_agent,
 #             "created_at": self.created_at.isoformat() if self.created_at else None
 #         }
-AdminUser.assigned_revisions = relationship("ProjectRevision", back_populates="assigned_to")
