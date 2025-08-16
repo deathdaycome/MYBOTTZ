@@ -704,8 +704,11 @@ async def users_page(request: Request, username: str = Depends(authenticate)):
             # Владелец видит всех, исполнитель только себя
             if user_role == 'executor':
                 # Исполнитель видит только свою учетную запись
-                user_id = current_user['id'] if isinstance(current_user, dict) else current_user.id
-                users_raw = db.query(AdminUser).filter(AdminUser.id == user_id).all()
+                if current_user:
+                    user_id = current_user['id'] if isinstance(current_user, dict) else current_user.id
+                    users_raw = db.query(AdminUser).filter(AdminUser.id == user_id).all()
+                else:
+                    users_raw = []
             else:
                 # Владелец видит всех пользователей
                 users_raw = db.query(AdminUser).order_by(AdminUser.created_at.desc()).all()
@@ -1702,9 +1705,16 @@ async def health_check():
 
 
 @admin_router.get("/notifications")
-async def notifications_page(request: Request):
+async def notifications_page(request: Request, username: str = Depends(authenticate)):
     """Страница тестирования уведомлений"""
-    return templates.TemplateResponse("notifications.html", {"request": request})
+    user_role = get_user_role(username)
+    navigation_items = get_navigation_items(user_role)
+    return templates.TemplateResponse("notifications.html", {
+        "request": request,
+        "username": username,
+        "user_role": user_role,
+        "navigation_items": navigation_items
+    })
 
 
 
