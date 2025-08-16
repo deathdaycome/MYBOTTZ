@@ -13,11 +13,11 @@ from ...config.logging import get_logger
 from ..auth import get_current_admin_user
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/reports", tags=["reports"])
+router = APIRouter(tags=["reports"])
 templates = Jinja2Templates(directory="app/admin/templates")
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/reports", response_class=HTMLResponse)
 async def reports_page(
     request: Request,
     current_user: AdminUser = Depends(get_current_admin_user)
@@ -32,7 +32,7 @@ async def reports_page(
     )
 
 
-@router.get("/projects")
+@router.get("/reports/projects")
 async def get_projects_report(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -64,7 +64,7 @@ async def get_projects_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/financial")
+@router.get("/reports/financial")
 async def get_financial_report(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -92,7 +92,7 @@ async def get_financial_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/executor/{executor_id}")
+@router.get("/reports/executor/{executor_id}")
 async def get_executor_report(
     executor_id: int,
     db: Session = Depends(get_db),
@@ -112,7 +112,7 @@ async def get_executor_report(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/export/excel")
+@router.get("/reports/export/excel")
 async def export_report_to_excel(
     report_type: str = Query(..., description="Тип отчета: projects, financial, executor"),
     start_date: Optional[str] = Query(None),
@@ -172,7 +172,7 @@ async def export_report_to_excel(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/dashboard-metrics")
+@router.get("/reports/dashboard-metrics")
 async def get_dashboard_metrics(
     db: Session = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user)
@@ -251,7 +251,7 @@ async def get_dashboard_metrics(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/quick-stats")
+@router.get("/reports/quick-stats")
 async def get_quick_stats(
     period: str = Query("month", description="Период: today, week, month, year"),
     db: Session = Depends(get_db),

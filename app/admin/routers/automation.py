@@ -14,11 +14,11 @@ from ...config.logging import get_logger
 from ..auth import get_current_admin_user
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/automation", tags=["automation"])
+router = APIRouter(tags=["automation"])
 templates = Jinja2Templates(directory="app/admin/templates")
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/automation", response_class=HTMLResponse)
 async def automation_page(
     request: Request,
     current_user: AdminUser = Depends(get_current_admin_user)
@@ -34,7 +34,7 @@ async def automation_page(
     )
 
 
-@router.get("/summary")
+@router.get("/automation/summary")
 async def get_automation_summary(
     db: Session = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user)
@@ -54,7 +54,7 @@ async def get_automation_summary(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/check-overdue")
+@router.post("/automation/check-overdue")
 async def check_overdue_projects(
     db: Session = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user)
@@ -82,7 +82,7 @@ async def check_overdue_projects(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/check-unpaid")
+@router.post("/automation/check-unpaid")
 async def check_unpaid_projects(
     db: Session = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user)
@@ -126,7 +126,7 @@ async def check_unpaid_projects(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/run-daily")
+@router.post("/automation/run-daily")
 async def run_daily_checks(
     db: Session = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user)
@@ -147,7 +147,7 @@ async def run_daily_checks(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/send-notification")
+@router.post("/automation/send-notification")
 async def send_test_notification(
     message: str,
     db: Session = Depends(get_db),
@@ -168,7 +168,7 @@ async def send_test_notification(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/scheduler/start")
+@router.post("/automation/scheduler/start")
 async def start_scheduler(
     current_user: AdminUser = Depends(get_current_admin_user)
 ) -> Dict[str, Any]:
@@ -184,7 +184,7 @@ async def start_scheduler(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/scheduler/stop")
+@router.post("/automation/scheduler/stop")
 async def stop_scheduler(
     current_user: AdminUser = Depends(get_current_admin_user)
 ) -> Dict[str, Any]:
@@ -200,7 +200,7 @@ async def stop_scheduler(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/scheduler/run-task")
+@router.post("/automation/scheduler/run-task")
 async def run_scheduler_task(
     task_name: str,
     current_user: AdminUser = Depends(get_current_admin_user)
@@ -224,7 +224,7 @@ async def run_scheduler_task(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/scheduler/status")
+@router.get("/automation/scheduler/status")
 async def get_scheduler_status(
     current_user: AdminUser = Depends(get_current_admin_user)
 ) -> Dict[str, Any]:
