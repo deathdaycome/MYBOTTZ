@@ -22,12 +22,12 @@ async def services_page(request: Request, user: AdminUser = Depends(require_admi
     """Страница управления сервисами"""
     # Получаем элементы навигации
     from app.admin.app import get_navigation_items
-    navigation_items = get_navigation_items(user.role)
+    navigation_items = get_navigation_items(user.get("role", "admin") if isinstance(user, dict) else user.role)
     
     return templates.TemplateResponse("services.html", {
         "request": request,
         "user": user,
-        "username": user.username,
+        "username": user.get("username") if isinstance(user, dict) else user.username,
         "user_role": user.role,
         "navigation_items": navigation_items
     })

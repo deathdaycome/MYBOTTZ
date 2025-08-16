@@ -200,10 +200,12 @@ if transactions_router:
     admin_router.include_router(transactions_router, prefix="/api/transactions")
 
 if automation_router:
-    admin_router.include_router(automation_router, prefix="/api/automation")
+    # Подключаем роутер для страниц автоматизации
+    admin_router.include_router(automation_router)
 
 if reports_router:
-    admin_router.include_router(reports_router, prefix="/api/reports")
+    # Подключаем роутер для страниц отчетов
+    admin_router.include_router(reports_router)
 
 # Импорт роутера аналитики
 try:
@@ -702,7 +704,8 @@ async def users_page(request: Request, username: str = Depends(authenticate)):
             # Владелец видит всех, исполнитель только себя
             if user_role == 'executor':
                 # Исполнитель видит только свою учетную запись
-                users_raw = db.query(AdminUser).filter(AdminUser.id == current_user['id']).all()
+                user_id = current_user['id'] if isinstance(current_user, dict) else current_user.id
+                users_raw = db.query(AdminUser).filter(AdminUser.id == user_id).all()
             else:
                 # Владелец видит всех пользователей
                 users_raw = db.query(AdminUser).order_by(AdminUser.created_at.desc()).all()
