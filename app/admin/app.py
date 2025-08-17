@@ -202,39 +202,10 @@ if transactions_router:
 if automation_router:
     # Подключаем роутер для страниц автоматизации
     admin_router.include_router(automation_router)
-else:
-    # Если роутер не загружен, добавляем fallback страницу
-    @admin_router.get("/automation", response_class=HTMLResponse)  
-    async def automation_page_fallback(request: Request, username: str = Depends(authenticate)):
-        """Страница автоматизации (резервная)"""
-        user_role = get_user_role(username)
-        navigation_items = get_navigation_items(user_role)
-        return templates.TemplateResponse("automation.html", {
-            "request": request,
-            "username": username,
-            "user_role": user_role,
-            "navigation_items": navigation_items,
-            "user": {"username": username, "role": user_role},
-            "scheduler_running": False
-        })
 
 if reports_router:
     # Подключаем роутер для страниц отчетов
     admin_router.include_router(reports_router)
-else:
-    # Если роутер не загружен, добавляем fallback страницу
-    @admin_router.get("/reports", response_class=HTMLResponse)
-    async def reports_page_fallback(request: Request, username: str = Depends(authenticate)):
-        """Страница отчетов (резервная)"""
-        user_role = get_user_role(username)
-        navigation_items = get_navigation_items(user_role)
-        return templates.TemplateResponse("reports.html", {
-            "request": request,
-            "username": username,
-            "user_role": user_role,
-            "navigation_items": navigation_items,
-            "user": {"username": username, "role": user_role}
-        })
 
 # Импорт роутера аналитики
 try:
@@ -1744,6 +1715,36 @@ async def notifications_page(request: Request, username: str = Depends(authentic
         "user_role": user_role,
         "navigation_items": navigation_items
     })
+
+# Добавляем fallback страницы если роутеры не загрузились
+if not automation_router:
+    @admin_router.get("/automation", response_class=HTMLResponse)  
+    async def automation_page_fallback(request: Request, username: str = Depends(authenticate)):
+        """Страница автоматизации (резервная)"""
+        user_role = get_user_role(username)
+        navigation_items = get_navigation_items(user_role)
+        return templates.TemplateResponse("automation.html", {
+            "request": request,
+            "username": username,
+            "user_role": user_role,
+            "navigation_items": navigation_items,
+            "user": {"username": username, "role": user_role},
+            "scheduler_running": False
+        })
+
+if not reports_router:
+    @admin_router.get("/reports", response_class=HTMLResponse)
+    async def reports_page_fallback(request: Request, username: str = Depends(authenticate)):
+        """Страница отчетов (резервная)"""
+        user_role = get_user_role(username)
+        navigation_items = get_navigation_items(user_role)
+        return templates.TemplateResponse("reports.html", {
+            "request": request,
+            "username": username,
+            "user_role": user_role,
+            "navigation_items": navigation_items,
+            "user": {"username": username, "role": user_role}
+        })
 
 
 
