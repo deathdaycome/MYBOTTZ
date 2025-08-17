@@ -695,7 +695,7 @@
             {% if navigation_items and navigation_items|length > 0 %}
                 <!-- Динамическое меню исполнителя -->
                 {% for item in navigation_items %}
-                <a class="nav-link" href="/admin{{ item.url }}">
+                <a class="nav-link" href="{{ item.url }}">
                     <i class="{{ item.icon }}"></i>
                     {{ item.name }}
                 </a>
