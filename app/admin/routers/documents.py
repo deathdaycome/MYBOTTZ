@@ -25,7 +25,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 async def documents_page(
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Страница управления документами"""
     rbac = RBACService(db)
@@ -81,7 +81,7 @@ async def get_documents(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Получить список документов"""
     rbac = RBACService(db)
@@ -154,7 +154,7 @@ async def get_documents(
 async def generate_document(
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Генерация документа из шаблона"""
     rbac = RBACService(db)
@@ -199,7 +199,7 @@ async def generate_document(
 async def batch_generate_documents(
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Массовая генерация документов"""
     rbac = RBACService(db)
@@ -239,7 +239,7 @@ async def batch_generate_documents(
 async def get_document(
     document_id: int,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Получить документ по ID"""
     rbac = RBACService(db)
@@ -278,7 +278,7 @@ async def update_document_status(
     document_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Обновить статус документа"""
     rbac = RBACService(db)
@@ -318,7 +318,7 @@ async def send_document(
     document_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Отправить документ"""
     rbac = RBACService(db)
@@ -353,7 +353,7 @@ async def send_document(
 async def duplicate_document(
     document_id: int,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Дублировать документ"""
     rbac = RBACService(db)
@@ -383,7 +383,7 @@ async def download_document(
     document_id: int,
     format: str = 'pdf',
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Скачать документ"""
     rbac = RBACService(db)
@@ -433,7 +433,7 @@ async def download_document(
 async def templates_page(
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Страница управления шаблонами"""
     rbac = RBACService(db)
@@ -456,7 +456,7 @@ async def templates_page(
 async def get_templates(
     type: Optional[str] = None,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Получить список шаблонов"""
     rbac = RBACService(db)
@@ -491,7 +491,7 @@ async def get_templates(
 async def create_template(
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Создать новый шаблон"""
     rbac = RBACService(db)
@@ -518,7 +518,7 @@ async def update_template(
     template_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Обновить шаблон"""
     rbac = RBACService(db)
@@ -548,7 +548,7 @@ async def update_template(
 async def delete_template(
     template_id: int,
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Удалить (деактивировать) шаблон"""
     rbac = RBACService(db)
@@ -575,7 +575,7 @@ async def delete_template(
 @router.post("/templates/api/create-defaults")
 async def create_default_templates(
     db: Session = Depends(get_db),
-    user=Depends(authenticate)
+    user=Depends(get_current_admin_user)
 ):
     """Создать стандартные шаблоны"""
     rbac = RBACService(db)
