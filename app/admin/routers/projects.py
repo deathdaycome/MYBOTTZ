@@ -82,9 +82,10 @@ class ProjectUpdateModel(BaseModel):
 class ProjectCreateModel(BaseModel):
     title: str
     description: str
-    client_telegram_id: Optional[str] = None  # Telegram ID клиента
-    client_name: Optional[str] = None  # Имя клиента
-    client_phone: Optional[str] = None  # Телефон клиента
+    user_id: Optional[int] = None  # ID существующего клиента
+    client_telegram_id: Optional[str] = None  # Telegram ID клиента (для создания нового)
+    client_name: Optional[str] = None  # Имя клиента (для создания нового)
+    client_phone: Optional[str] = None  # Телефон клиента (для создания нового)
     project_type: str = "website"
     complexity: str = "medium"
     priority: str = "medium"
@@ -733,28 +734,44 @@ async def create_project_root(
         data = await request.json()
         logger.info(f"Данные проекта: {data}")
         
-        # Нужно найти или создать пользователя на основе client_telegram_id или client_name
+        # Проверяем, передан ли user_id (существующий клиент) или нужно создать нового
         user = None
-        client_telegram_id = data.get('client_telegram_id')
-        client_name = data.get('client_name', 'Клиент')
+        user_id = data.get('user_id')
         
-        if client_telegram_id:
-            # Ищем пользователя по telegram_id
-            user = db.query(User).filter(User.telegram_id == str(client_telegram_id)).first()
-            
-        if not user:
+        if user_id:
+            # Используем существующего пользователя
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                return {
+                    "success": False,
+                    "message": f"Клиент с ID {user_id} не найден"
+                }
+        else:
             # Создаем нового пользователя
-            user = User(
-                telegram_id=str(client_telegram_id) if client_telegram_id else None,
-                username=client_name.replace(' ', '_').lower(),
-                first_name=client_name,
-                phone=data.get('client_phone'),
-                registration_date=datetime.utcnow(),
-                is_active=True,
-                state='registered'
-            )
-            db.add(user)
-            db.flush()  # Получаем ID пользователя
+            client_telegram_id = data.get('client_telegram_id')
+            client_name = data.get('client_name', 'Клиент')
+            
+            if client_telegram_id:
+                # Проверяем, нет ли уже пользователя с таким telegram_id
+                user = db.query(User).filter(User.telegram_id == str(client_telegram_id)).first()
+            
+            if not user:
+                # Создаем нового пользователя
+                import time
+                base_username = (client_name or "client").replace(' ', '_').lower()
+                username = f"{base_username}_{int(time.time())}"
+                
+                user = User(
+                    telegram_id=str(client_telegram_id) if client_telegram_id else None,
+                    username=username,
+                    first_name=client_name,
+                    phone=data.get('client_phone'),
+                    registration_date=datetime.utcnow(),
+                    is_active=True,
+                    state='registered'
+                )
+                db.add(user)
+                db.flush()  # Получаем ID пользователя
         
         # Создаем объект проекта
         new_project = Project(
@@ -895,29 +912,40 @@ async def create_project(
                 "message": "У вас нет прав для создания проектов"
             }
         
-        # Проверяем или создаем клиента
+        # Проверяем, передан ли user_id или нужно создать нового клиента
         user = None
-        if project_data.client_telegram_id:
-            # Ищем существующего пользователя по Telegram ID
-            user = db.query(User).filter(User.telegram_id == project_data.client_telegram_id).first()
         
-        if not user:
-            # Генерируем уникальный username на основе имени клиента или используем временную метку
-            import time
-            base_username = (project_data.client_name or "client").replace(' ', '_').lower()
-            username = f"{base_username}_{int(time.time())}"
+        # Проверяем, есть ли user_id в данных (для существующего клиента)
+        if hasattr(project_data, 'user_id') and project_data.user_id:
+            user = db.query(User).filter(User.id == project_data.user_id).first()
+            if not user:
+                return {
+                    "success": False,
+                    "message": f"Клиент с ID {project_data.user_id} не найден"
+                }
+        else:
+            # Создаем нового клиента
+            if project_data.client_telegram_id:
+                # Ищем существующего пользователя по Telegram ID
+                user = db.query(User).filter(User.telegram_id == project_data.client_telegram_id).first()
             
-            # Создаем нового пользователя
-            user = User(
-                telegram_id=project_data.client_telegram_id if project_data.client_telegram_id else None,  # Используем None вместо пустой строки
-                first_name=project_data.client_name or "Клиент",
-                last_name="",
-                username=username,  # Используем уникальный username
-                phone=project_data.client_phone,
-                is_active=True
-            )
-            db.add(user)
-            db.flush()  # Получаем ID пользователя
+            if not user:
+                # Генерируем уникальный username на основе имени клиента или используем временную метку
+                import time
+                base_username = (project_data.client_name or "client").replace(' ', '_').lower()
+                username = f"{base_username}_{int(time.time())}"
+                
+                # Создаем нового пользователя
+                user = User(
+                    telegram_id=project_data.client_telegram_id if project_data.client_telegram_id else None,
+                    first_name=project_data.client_name or "Клиент",
+                    last_name="",
+                    username=username,
+                    phone=project_data.client_phone,
+                    is_active=True
+                )
+                db.add(user)
+                db.flush()  # Получаем ID пользователя
         
         # Создаем проект
         project = Project(

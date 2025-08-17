@@ -17,6 +17,169 @@ html, body {
     min-height: 100vh;
 }
 
+/* Цветовая индикация статусов проектов */
+#projectsTable tbody tr {
+    transition: background-color 0.3s ease;
+}
+
+/* Новый проект */
+#projectsTable tbody tr[data-status="new"] {
+    background-color: #e3f2fd !important;
+    border-left: 4px solid #2196F3;
+}
+
+/* На рассмотрении */
+#projectsTable tbody tr[data-status="review"] {
+    background-color: #fff3e0 !important;
+    border-left: 4px solid #FF9800;
+}
+
+/* Принят */
+#projectsTable tbody tr[data-status="accepted"] {
+    background-color: #f3e5f5 !important;
+    border-left: 4px solid #9C27B0;
+}
+
+/* В работе */
+#projectsTable tbody tr[data-status="in_progress"] {
+    background-color: #fff8e1 !important;
+    border-left: 4px solid #FFC107;
+}
+
+/* Тестирование */
+#projectsTable tbody tr[data-status="testing"] {
+    background-color: #e8f5e9 !important;
+    border-left: 4px solid #4CAF50;
+}
+
+/* Завершен */
+#projectsTable tbody tr[data-status="completed"] {
+    background-color: #c8e6c9 !important;
+    border-left: 4px solid #66BB6A;
+}
+
+/* Отменен */
+#projectsTable tbody tr[data-status="cancelled"] {
+    background-color: #ffebee !important;
+    border-left: 4px solid #f44336;
+}
+
+/* Просрочен */
+#projectsTable tbody tr[data-status="overdue"] {
+    background-color: #ffccbc !important;
+    border-left: 4px solid #FF5722;
+}
+
+/* Hover эффект для строк */
+#projectsTable tbody tr:hover {
+    filter: brightness(0.95);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Стили для карточек проектов */
+.project-card-item[data-status="new"] {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+}
+
+.project-card-item[data-status="in_progress"] {
+    background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+}
+
+.project-card-item[data-status="completed"] {
+    background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%);
+}
+
+.project-card-item[data-status="cancelled"] {
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+}
+
+/* Изменяемые столбцы таблицы */
+#projectsTable {
+    table-layout: fixed;
+    width: 100%;
+}
+
+#projectsTable th {
+    position: relative;
+    min-width: 100px;
+    border-right: 1px solid #dee2e6;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#projectsTable th:last-child {
+    border-right: none;
+}
+
+/* Ресайзер для столбцов */
+.column-resizer {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 10;
+}
+
+.column-resizer:hover {
+    background: #007bff;
+    opacity: 0.5;
+}
+
+/* Фиксированные ширины по умолчанию */
+#projectsTable th:nth-child(1) { width: 60px; } /* ID */
+#projectsTable th:nth-child(2) { min-width: 250px; } /* Название */
+#projectsTable th:nth-child(3) { width: 200px; } /* Клиент */
+#projectsTable th:nth-child(4) { width: 150px; } /* Статус */
+#projectsTable th:nth-child(5) { width: 120px; } /* Сложность */
+#projectsTable th:nth-child(6) { width: 120px; } /* Стоимость */
+#projectsTable th:nth-child(7) { width: 120px; } /* Дата */
+#projectsTable th:nth-child(8) { width: 150px; } /* Действия */
+
+#projectsTable td {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 8px;
+}
+
+/* Полное название при наведении */
+#projectsTable td:nth-child(2):hover {
+    overflow: visible;
+    white-space: normal;
+    position: relative;
+    z-index: 100;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* Стили для легенды статусов */
+.status-legend-color {
+    width: 20px;
+    height: 12px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+/* Стили для архивных проектов */
+.archived-project {
+    position: relative;
+}
+
+.archived-project::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #6c757d;
+    z-index: 1;
+}
+
 /* Исправление прокрутки модального окна */
 #projectModal .modal-dialog {
     max-height: 90vh;
@@ -739,6 +902,9 @@ tr .project-color-indicator {
     <button class="btn btn-secondary btn-custom" onclick="refreshProjects()">
         <i class="fas fa-sync-alt me-1"></i> Обновить
     </button>
+    <button class="btn btn-warning btn-custom" id="toggleArchiveBtn" onclick="toggleArchiveView()">
+        <i class="fas fa-archive me-1"></i> <span id="archiveBtnText">Показать архив</span>
+    </button>
     {% if user_role == 'owner' %}
     <button class="btn btn-success btn-custom" onclick="exportProjects()">
         <i class="fas fa-download me-1"></i> Экспорт
@@ -924,6 +1090,45 @@ tr .project-color-indicator {
     </div>
 </div>
 
+<!-- Status Legend -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="d-flex flex-wrap align-items-center">
+            <span class="text-muted me-3"><strong>Легенда статусов:</strong></span>
+            <div class="d-flex flex-wrap gap-2">
+                <div class="d-flex align-items-center me-3">
+                    <div class="status-legend-color" style="background-color: #e3f2fd; border-left: 4px solid #2196F3;"></div>
+                    <small class="ms-2">Новый</small>
+                </div>
+                <div class="d-flex align-items-center me-3">
+                    <div class="status-legend-color" style="background-color: #fff3e0; border-left: 4px solid #FF9800;"></div>
+                    <small class="ms-2">На рассмотрении</small>
+                </div>
+                <div class="d-flex align-items-center me-3">
+                    <div class="status-legend-color" style="background-color: #f3e5f5; border-left: 4px solid #9C27B0;"></div>
+                    <small class="ms-2">Принят</small>
+                </div>
+                <div class="d-flex align-items-center me-3">
+                    <div class="status-legend-color" style="background-color: #fff8e1; border-left: 4px solid #FFC107;"></div>
+                    <small class="ms-2">В работе</small>
+                </div>
+                <div class="d-flex align-items-center me-3">
+                    <div class="status-legend-color" style="background-color: #e8f5e9; border-left: 4px solid #4CAF50;"></div>
+                    <small class="ms-2">Тестирование</small>
+                </div>
+                <div class="d-flex align-items-center me-3">
+                    <div class="status-legend-color" style="background-color: #c8e6c9; border-left: 4px solid #66BB6A;"></div>
+                    <small class="ms-2">Завершен</small>
+                </div>
+                <div class="d-flex align-items-center me-3">
+                    <div class="status-legend-color" style="background-color: #ffebee; border-left: 4px solid #f44336;"></div>
+                    <small class="ms-2">Отменен</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Projects Table -->
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -1078,7 +1283,7 @@ tr .project-color-indicator {
         <div class="row p-3" id="projectsCards">
             {% for project in projects %}
             <div class="col-md-6 col-lg-4 mb-4 project-card color-{{ project.get('color', 'default') }}" data-project-id="{{ project.id }}" data-status="{{ project.status }}" data-complexity="{{ project.complexity }}" data-priority="{{ project.priority }}" data-title="{{ project.title.lower() }}" data-client="{{ (project.user.first_name or '').lower() }}">
-                <div class="card h-100 shadow-sm project-card-item" style="position: relative;">
+                <div class="card h-100 shadow-sm project-card-item" data-status="{{ project.status }}" style="position: relative;">
                     <button class="color-indicator-btn {{ project.get('color', 'default') }}" 
                           onclick="changeProjectColor({{ project.id }}, '{{ project.get('color', 'default') }}'); event.stopPropagation();"
                           title="Изменить цветовую метку"></button>
@@ -1453,7 +1658,240 @@ tr .project-color-indicator {
     let allProjects = {{ projects|tojson|safe }};
     let filteredProjects = [...allProjects];
     let projectStatuses = []; // Массив для хранения статусов проектов
+    let showArchived = false; // Флаг для отображения архивных проектов
 
+    // Функция переключения архива
+    async function toggleArchiveView() {
+        showArchived = !showArchived;
+        const btn = document.getElementById('toggleArchiveBtn');
+        const btnText = document.getElementById('archiveBtnText');
+        
+        if (showArchived) {
+            btn.classList.remove('btn-warning');
+            btn.classList.add('btn-info');
+            btnText.textContent = 'Скрыть архив';
+        } else {
+            btn.classList.remove('btn-info');
+            btn.classList.add('btn-warning');
+            btnText.textContent = 'Показать архив';
+        }
+        
+        // Перезагружаем проекты с учетом архива
+        await loadProjects();
+    }
+    
+    // Функция загрузки проектов
+    async function loadProjects() {
+        try {
+            const response = await fetch(`/admin/api/projects/?show_archived=${showArchived}`, {
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                allProjects = data.projects || [];
+                filteredProjects = [...allProjects];
+                
+                // Обновляем отображение
+                updateProjectsDisplay();
+                
+                // Обновляем счетчик
+                const counter = document.getElementById('projectsCount');
+                if (counter) {
+                    const archivedText = showArchived ? ' (архив)' : '';
+                    counter.textContent = `Показано: ${filteredProjects.length}${archivedText}`;
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки проектов:', error);
+            showNotification('Ошибка загрузки проектов', 'danger');
+        }
+    }
+    
+    // Функция создания строки таблицы для проекта
+    function createProjectRow(project) {
+        const tr = document.createElement('tr');
+        tr.dataset.projectId = project.id;
+        tr.dataset.status = project.status;
+        
+        // Добавляем специальный класс для архивных проектов
+        if (project.is_archived) {
+            tr.classList.add('archived-project');
+            tr.style.opacity = '0.7';
+            tr.style.backgroundColor = '#f5f5f5';
+        }
+        
+        // Применяем цветовую индикацию статуса
+        tr.setAttribute('data-status', project.status);
+        
+        const statusBadge = getStatusBadge(project.status);
+        const archiveBadge = project.is_archived ? '<span class="badge bg-secondary ms-1"><i class="fas fa-archive"></i> Архив</span>' : '';
+        
+        tr.innerHTML = `
+            <td><span class="badge bg-secondary">#${project.id}</span></td>
+            <td>
+                <div class="fw-bold text-truncate" style="max-width: 200px;" title="${project.title}">
+                    ${project.title}
+                    ${archiveBadge}
+                </div>
+                <small class="text-muted">${project.project_type || 'Не указано'}</small>
+            </td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="user-avatar me-2">
+                        ${(project.user?.first_name || 'U')[0]}
+                    </div>
+                    <div>
+                        <div class="fw-medium">${project.user?.first_name || 'Неизвестно'}</div>
+                        <small class="text-muted">@${project.user?.username || 'нет'}</small>
+                    </div>
+                </div>
+            </td>
+            <td>${statusBadge}</td>
+            <td><span class="badge bg-info">${project.complexity || 'medium'}</span></td>
+            <td>
+                <div class="fw-bold">${(project.estimated_cost || 0).toLocaleString('ru-RU')}₽</div>
+            </td>
+            <td>
+                <div>${project.created_at ? new Date(project.created_at).toLocaleDateString('ru-RU') : 'Н/Д'}</div>
+            </td>
+            <td>
+                <div class="btn-group btn-group-sm">
+                    ${project.is_archived ? `
+                        <button class="btn btn-outline-success" onclick="restoreProject(${project.id})" title="Восстановить из архива">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-outline-primary" onclick="viewProject(${project.id})" title="Просмотр">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-outline-info" onclick="openEditModal(${project.id})" title="Редактировать">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </div>
+            </td>
+        `;
+        
+        return tr;
+    }
+    
+    // Функция создания карточки проекта
+    function createProjectCard(project) {
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4 mb-4 project-card';
+        col.dataset.projectId = project.id;
+        col.dataset.status = project.status;
+        
+        const archiveBadge = project.is_archived ? '<span class="badge bg-secondary"><i class="fas fa-archive"></i> Архив</span>' : '';
+        const opacity = project.is_archived ? 'style="opacity: 0.85;"' : '';
+        
+        col.innerHTML = `
+            <div class="card h-100 shadow-sm project-card-item" data-status="${project.status}" ${opacity}>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0 text-truncate" title="${project.title}">${project.title}</h6>
+                    <div>
+                        <span class="badge bg-secondary">#${project.id}</span>
+                        ${archiveBadge}
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-2 user-info">
+                        <div class="user-avatar me-2">
+                            ${(project.user?.first_name || 'U')[0]}
+                        </div>
+                        <div>
+                            <div class="fw-medium">${project.user?.first_name || 'Неизвестно'}</div>
+                            <small class="text-muted">@${project.user?.username || 'нет'}</small>
+                        </div>
+                    </div>
+                    <div class="mb-2">${getStatusBadge(project.status)}</div>
+                    <div class="d-flex justify-content-between">
+                        <span class="badge bg-info">${project.complexity || 'medium'}</span>
+                        <div>
+                            <div class="fw-bold">${(project.estimated_cost || 0).toLocaleString('ru-RU')}₽</div>
+                            <small class="text-muted">${project.created_at ? new Date(project.created_at).toLocaleDateString('ru-RU') : 'Н/Д'}</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-light d-flex justify-content-end">
+                    <div class="btn-group btn-group-sm">
+                        ${project.is_archived ? `
+                            <button class="btn btn-outline-success" onclick="restoreProject(${project.id})" title="Восстановить">
+                                <i class="fas fa-undo"></i>
+                            </button>
+                        ` : ''}
+                        <button class="btn btn-outline-primary" onclick="viewProject(${project.id})" title="Просмотр">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-outline-info" onclick="openEditModal(${project.id})" title="Редактировать">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        return col;
+    }
+    
+    // Функция получения бейджа статуса
+    function getStatusBadge(status) {
+        const statusNames = {
+            'new': '🆕 Новый',
+            'review': '👀 На рассмотрении',
+            'accepted': '✅ Принят',
+            'in_progress': '🔄 В работе',
+            'testing': '🧪 Тестирование',
+            'completed': '🎉 Завершен',
+            'cancelled': '❌ Отменен',
+            'overdue': '⏰ Просрочен'
+        };
+        
+        const statusColors = {
+            'new': 'primary',
+            'review': 'warning',
+            'accepted': 'info',
+            'in_progress': 'warning',
+            'testing': 'success',
+            'completed': 'success',
+            'cancelled': 'danger',
+            'overdue': 'danger'
+        };
+        
+        const name = statusNames[status] || status;
+        const color = statusColors[status] || 'secondary';
+        
+        return `<span class="badge bg-${color}">${name}</span>`;
+    }
+    
+    // Функция обновления отображения проектов
+    function updateProjectsDisplay() {
+        // Очищаем текущее отображение
+        const tableBody = document.querySelector('#projectsTable tbody');
+        const cardsContainer = document.getElementById('projectsCards');
+        
+        if (tableBody) {
+            tableBody.innerHTML = '';
+            filteredProjects.forEach(project => {
+                const row = createProjectRow(project);
+                tableBody.appendChild(row);
+            });
+        }
+        
+        if (cardsContainer) {
+            cardsContainer.innerHTML = '';
+            filteredProjects.forEach(project => {
+                const card = createProjectCard(project);
+                cardsContainer.appendChild(card);
+            });
+        }
+        
+        // Применяем фильтры
+        filterProjects();
+    }
+    
     // View Management
     function changeView(view) {
         currentView = view;
@@ -1699,6 +2137,86 @@ tr .project-color-indicator {
         }, 5000);
     }
 
+    // Функция восстановления проекта из архива
+    async function restoreProject(projectId) {
+        if (!confirm('Восстановить проект из архива?')) {
+            return;
+        }
+        
+        try {
+            // Сначала меняем флаг архива
+            const response = await fetch(`/admin/api/projects/${projectId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                },
+                body: JSON.stringify({
+                    is_archived: false,
+                    status: 'new'  // Возвращаем статус "новый" при восстановлении
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                showNotification('Проект успешно восстановлен из архива!', 'success');
+                
+                // Перезагружаем проекты
+                await loadProjects();
+            } else {
+                showNotification('Ошибка при восстановлении проекта', 'danger');
+            }
+        } catch (error) {
+            console.error('Ошибка восстановления:', error);
+            showNotification('Ошибка при восстановлении проекта', 'danger');
+        }
+    }
+    
+    // Функция архивирования проекта
+    async function archiveProject(projectId, silent = false) {
+        try {
+            const response = await fetch(`/admin/api/projects/${projectId}/archive`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                if (!silent) {
+                    showNotification('Проект успешно архивирован!', 'success');
+                }
+                // Скрываем проект из текущего списка
+                const projectRow = document.querySelector(`tr[data-project-id="${projectId}"]`);
+                const projectCard = document.querySelector(`.project-card[data-project-id="${projectId}"]`);
+                
+                if (projectRow) {
+                    projectRow.style.display = 'none';
+                }
+                if (projectCard) {
+                    projectCard.style.display = 'none';
+                }
+                
+                return true;
+            } else {
+                if (!silent) {
+                    showNotification('Ошибка при архивировании проекта', 'danger');
+                }
+                return false;
+            }
+        } catch (error) {
+            console.error('Ошибка архивирования:', error);
+            if (!silent) {
+                showNotification('Ошибка при архивировании проекта', 'danger');
+            }
+            return false;
+        }
+    }
+    
     // Project Management
     async function updateStatus(projectId, newStatus, comment = '') {
         try {
@@ -1714,7 +2232,13 @@ tr .project-color-indicator {
             const data = await response.json();
             
             if (data.success) {
-                showNotification('Статус проекта успешно обновлен!', 'success');
+                // Если статус изменен на "completed", автоматически архивируем проект
+                if (newStatus === 'completed') {
+                    await archiveProject(projectId, true);
+                    showNotification('Проект завершен и перемещен в архив!', 'success');
+                } else {
+                    showNotification('Статус проекта успешно обновлен!', 'success');
+                }
                 // Обновляем статус в UI
                 updateStatusInUI(projectId, newStatus);
                 // Обновляем прогресс-бар
@@ -1832,7 +2356,58 @@ tr .project-color-indicator {
         sortProjects();
         loadProjectStatuses();
         loadExecutors();
+        
+        // Инициализация изменяемых столбцов
+        initResizableColumns();
     });
+    
+    // Функция для изменяемых столбцов таблицы
+    function initResizableColumns() {
+        const table = document.getElementById('projectsTable');
+        if (!table) return;
+        
+        const headers = table.querySelectorAll('th');
+        
+        headers.forEach((header, index) => {
+            // Не добавляем ресайзер для последнего столбца
+            if (index < headers.length - 1) {
+                const resizer = document.createElement('div');
+                resizer.className = 'column-resizer';
+                header.appendChild(resizer);
+                
+                let startX = 0;
+                let startWidth = 0;
+                
+                resizer.addEventListener('mousedown', (e) => {
+                    startX = e.pageX;
+                    startWidth = header.offsetWidth;
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                    e.preventDefault();
+                });
+                
+                function handleMouseMove(e) {
+                    const newWidth = startWidth + (e.pageX - startX);
+                    if (newWidth > 50) { // Минимальная ширина
+                        header.style.width = newWidth + 'px';
+                        // Сохраняем ширину в localStorage
+                        localStorage.setItem(`column_width_${index}`, newWidth);
+                    }
+                }
+                
+                function handleMouseUp() {
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    document.removeEventListener('mouseup', handleMouseUp);
+                }
+                
+                // Восстанавливаем сохраненную ширину
+                const savedWidth = localStorage.getItem(`column_width_${index}`);
+                if (savedWidth) {
+                    header.style.width = savedWidth + 'px';
+                }
+            }
+        });
+    }
     
     // Функция для инициализации фильтров
     function initializeFilters() {
@@ -2553,27 +3128,41 @@ tr .project-color-indicator {
                             </div>
                             
                             <div class="row">
-                                <div class="col-md-6">
+                                <div class="col-md-12">
                                     <div class="mb-3">
-                                        <label class="form-label">Имя клиента</label>
-                                        <input type="text" class="form-control" id="createClientName" placeholder="Имя клиента">
+                                        <label class="form-label">Клиент <span class="text-danger">*</span></label>
+                                        <select class="form-select" id="createClientSelect" required onchange="onClientSelectChange()">
+                                            <option value="">Выберите клиента...</option>
+                                            <option value="new">+ Создать нового клиента</option>
+                                        </select>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Telegram ID клиента</label>
-                                        <input type="text" class="form-control" id="createClientTelegramId" placeholder="Например: 123456789">
+                            </div>
+                            
+                            <div id="newClientFields" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Имя клиента</label>
+                                            <input type="text" class="form-control" id="createClientName" placeholder="Имя клиента">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Telegram ID клиента</label>
+                                            <input type="text" class="form-control" id="createClientTelegramId" placeholder="Например: 123456789">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Телефон клиента</label>
+                                            <input type="text" class="form-control" id="createClientPhone" placeholder="+7 900 000 00 00">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Телефон клиента</label>
-                                        <input type="text" class="form-control" id="createClientPhone" placeholder="+7 (999) 123-45-67">
-                                    </div>
-                                </div>
                                 <div class="col-md-6">
                                     <div class="mb-3">
                                         <label class="form-label">Сложность</label>
@@ -2732,8 +3321,11 @@ tr .project-color-indicator {
         // Блокируем скролл основной страницы
         document.body.style.overflow = 'hidden';
         
-        // Загружаем список исполнителей ПОСЛЕ создания модального окна
+        // Загружаем список исполнителей и клиентов ПОСЛЕ создания модального окна
         setTimeout(async () => {
+            // Загружаем клиентов
+            await loadClients();
+            
             console.log('Начинаем загрузку исполнителей...');
             try {
                 const response = await fetch('/admin/api/users/executors', {
@@ -2811,6 +3403,62 @@ tr .project-color-indicator {
         }
     }
 
+    // Функция для загрузки списка клиентов
+    async function loadClients() {
+        try {
+            const response = await fetch('/admin/api/clients/', {
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success) {
+                    const clientSelect = document.getElementById('createClientSelect');
+                    if (clientSelect) {
+                        // Сохраняем опцию создания нового клиента
+                        clientSelect.innerHTML = `
+                            <option value="">Выберите клиента...</option>
+                            <option value="new">+ Создать нового клиента</option>
+                        `;
+                        
+                        // Добавляем существующих клиентов
+                        data.clients.forEach(client => {
+                            const option = document.createElement('option');
+                            option.value = client.id;
+                            option.textContent = `${client.first_name || 'Без имени'} ${client.last_name || ''} ${client.username ? '@' + client.username : ''}`.trim();
+                            option.dataset.telegramId = client.telegram_id || '';
+                            option.dataset.phone = client.phone || '';
+                            clientSelect.appendChild(option);
+                        });
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки клиентов:', error);
+        }
+    }
+    
+    // Функция обработки изменения выбора клиента
+    window.onClientSelectChange = function() {
+        const clientSelect = document.getElementById('createClientSelect');
+        const newClientFields = document.getElementById('newClientFields');
+        
+        if (clientSelect.value === 'new') {
+            // Показываем поля для создания нового клиента
+            newClientFields.style.display = 'block';
+        } else {
+            // Скрываем поля для создания нового клиента
+            newClientFields.style.display = 'none';
+            
+            // Очищаем поля
+            document.getElementById('createClientName').value = '';
+            document.getElementById('createClientTelegramId').value = '';
+            document.getElementById('createClientPhone').value = '';
+        }
+    }
+    
     window.createProject = async function() {
         console.log('Функция createProject вызвана');
         
@@ -2847,9 +3495,36 @@ tr .project-color-indicator {
         };
         
         const projectType = getElementValue('createProjectType');
-        const clientName = getElementValue('createClientName');
-        const clientTelegramId = getElementValue('createClientTelegramId');
-        const clientPhone = getElementValue('createClientPhone');
+        
+        // Получаем данные о клиенте
+        const clientSelect = document.getElementById('createClientSelect');
+        let clientData = {};
+        
+        if (!clientSelect.value) {
+            showNotification('Выберите клиента или создайте нового', 'warning');
+            return;
+        }
+        
+        if (clientSelect.value === 'new') {
+            // Создаем нового клиента
+            clientData = {
+                isNew: true,
+                name: getElementValue('createClientName'),
+                telegramId: getElementValue('createClientTelegramId'),
+                phone: getElementValue('createClientPhone')
+            };
+            
+            if (!clientData.name && !clientData.telegramId) {
+                showNotification('Укажите имя или Telegram ID для нового клиента', 'warning');
+                return;
+            }
+        } else {
+            // Используем существующего клиента
+            clientData = {
+                isNew: false,
+                userId: clientSelect.value
+            };
+        }
         const complexity = getElementValue('createProjectComplexity');
         const priority = getElementValue('createProjectPriority');
         const status = getElementValue('createProjectStatus');
@@ -2898,9 +3573,14 @@ tr .project-color-indicator {
                     title: title.trim(),
                     description: description.trim(),
                     project_type: projectType || 'bot',
-                    client_name: clientName.trim(),
-                    client_telegram_id: clientTelegramId.trim(),
-                    client_phone: clientPhone.trim(),
+                    // Данные клиента в зависимости от выбора
+                    ...(clientData.isNew ? {
+                        client_name: clientData.name?.trim() || '',
+                        client_telegram_id: clientData.telegramId?.trim() || '',
+                        client_phone: clientData.phone?.trim() || '',
+                    } : {
+                        user_id: parseInt(clientData.userId)
+                    }),
                     complexity: complexity || 'medium',
                     priority: priority || 'medium',
                     status: status || 'new',
