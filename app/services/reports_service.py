@@ -480,3 +480,49 @@ class ReportsService:
             "recent_activities": recent_activities[:10],
             "revenue_chart": revenue_chart
         }
+    
+    def get_financial_report(self, start_date: datetime = None, end_date: datetime = None) -> Dict[str, Any]:
+        """Получение финансового отчета"""
+        if not start_date:
+            start_date = datetime.now() - timedelta(days=30)
+        if not end_date:
+            end_date = datetime.now()
+        
+        # Доходы
+        income = self.db.query(func.sum(FinanceTransaction.amount)).filter(
+            FinanceTransaction.type == 'income',
+            FinanceTransaction.created_at >= start_date,
+            FinanceTransaction.created_at <= end_date
+        ).scalar() or 0
+        
+        # Расходы
+        expense = self.db.query(func.sum(FinanceTransaction.amount)).filter(
+            FinanceTransaction.type == 'expense',
+            FinanceTransaction.created_at >= start_date,
+            FinanceTransaction.created_at <= end_date
+        ).scalar() or 0
+        
+        # Прибыль
+        profit = income - expense
+        
+        return {
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            },
+            "income": float(income),
+            "expense": float(expense),
+            "profit": float(profit),
+            "transactions": {
+                "income_count": self.db.query(func.count(FinanceTransaction.id)).filter(
+                    FinanceTransaction.type == 'income',
+                    FinanceTransaction.created_at >= start_date,
+                    FinanceTransaction.created_at <= end_date
+                ).scalar() or 0,
+                "expense_count": self.db.query(func.count(FinanceTransaction.id)).filter(
+                    FinanceTransaction.type == 'expense',
+                    FinanceTransaction.created_at >= start_date,
+                    FinanceTransaction.created_at <= end_date
+                ).scalar() or 0
+            }
+        }

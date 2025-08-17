@@ -14,7 +14,8 @@ from ..database.rbac_models import (
     Role, Permission, DataAccessRule, Team, TeamMembership,
     role_permissions, user_roles, user_permissions
 )
-from ..database.crm_models import Client, Lead, Deal, AuditLog
+from ..database.crm_models import Client, Lead, Deal
+from ..database.audit_models import AuditLog
 from ..config.logging import get_logger
 
 logger = get_logger(__name__)
