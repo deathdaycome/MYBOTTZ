@@ -24,11 +24,20 @@ async def automation_page(
     current_user: AdminUser = Depends(get_current_admin_user)
 ):
     """Страница управления автоматизацией"""
+    # Импортируем функцию get_navigation_items
+    from ..app import get_navigation_items
+    
+    user_role = current_user.get("role", "owner") if isinstance(current_user, dict) else current_user.role
+    navigation_items = get_navigation_items(user_role)
+    
     return templates.TemplateResponse(
         "automation.html",
         {
             "request": request,
             "user": current_user,
+            "username": current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+            "user_role": user_role,
+            "navigation_items": navigation_items,
             "scheduler_running": scheduler.is_running
         }
     )
