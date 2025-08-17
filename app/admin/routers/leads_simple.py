@@ -28,6 +28,16 @@ async def leads_page(
             "request": request,
             "user": current_user,
             "leads": [],
+            "stats": {  # Добавляем статистику
+                "new": 0,
+                "contact_made": 0,
+                "qualification": 0,
+                "proposal_sent": 0,
+                "negotiation": 0,
+                "won_month": 0,
+                "lost_month": 0,
+                "conversion_rate": 0
+            },
             "navigation_items": [
                 {"name": "Дашборд", "url": "/dashboard", "icon": "fas fa-chart-line"},
                 {"name": "Проекты", "url": "/projects", "icon": "fas fa-project-diagram"},

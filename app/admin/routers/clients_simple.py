@@ -31,6 +31,12 @@ async def clients_page(
                 "request": request,
                 "user": current_user,
                 "clients": [],  # Пустой список пока
+                "stats": {  # Добавляем статистику
+                    "total": 0,
+                    "active": 0,
+                    "vip": 0,
+                    "new_month": 0
+                },
                 "navigation_items": [
                     {"name": "Дашборд", "url": "/dashboard", "icon": "fas fa-chart-line"},
                     {"name": "Проекты", "url": "/projects", "icon": "fas fa-project-diagram"},

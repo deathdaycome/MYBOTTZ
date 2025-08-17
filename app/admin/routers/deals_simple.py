@@ -28,6 +28,27 @@ async def deals_page(
             "request": request,
             "user": current_user,
             "deals": [],
+            "stats": {  # Добавляем статистику
+                "total": 0,
+                "active": 0,
+                "total_amount": 0,
+                "payment_progress": 0,
+                "new": 0,
+                "discussion": 0,
+                "contract_signed": 0,
+                "in_work": 0,
+                "testing": 0,
+                "payment": 0,
+                "count": 0
+            },
+            "pipeline": {  # Добавляем данные пайплайна
+                "new": [],
+                "discussion": [],
+                "contract": [],
+                "in_work": [],
+                "testing": [],
+                "payment": []
+            },
             "navigation_items": [
                 {"name": "Дашборд", "url": "/dashboard", "icon": "fas fa-chart-line"},
                 {"name": "Проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
