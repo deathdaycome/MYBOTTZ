@@ -1706,7 +1706,7 @@ tr .project-color-indicator {
     // Функция загрузки проектов
     async function loadProjects() {
         try {
-            const response = await fetch(`/admin/api/projects/?show_archived=${showArchived}`, {
+            const response = await fetch(`/admin/projects/?show_archived=${showArchived}`, {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
@@ -2087,7 +2087,7 @@ tr .project-color-indicator {
         const nextColor = colors[(currentIndex + 1) % colors.length];
         
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}`, {
+            const response = await fetch(`/admin/projects/${projectId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -2202,7 +2202,7 @@ tr .project-color-indicator {
 
         try {
             // Обновляем статус на "completed" 
-            const response = await fetch(`/admin/api/projects/${projectId}/status`, {
+            const response = await fetch(`/admin/projects/${projectId}/status`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2248,7 +2248,7 @@ tr .project-color-indicator {
         
         try {
             // Сначала меняем флаг архива
-            const response = await fetch(`/admin/api/projects/${projectId}`, {
+            const response = await fetch(`/admin/projects/${projectId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2279,7 +2279,7 @@ tr .project-color-indicator {
     // Функция архивирования проекта
     async function archiveProject(projectId, silent = false) {
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}/archive`, {
+            const response = await fetch(`/admin/projects/${projectId}/archive`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2323,7 +2323,7 @@ tr .project-color-indicator {
     // Project Management
     async function updateStatus(projectId, newStatus, comment = '') {
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}/status`, {
+            const response = await fetch(`/admin/projects/${projectId}/status`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -2813,7 +2813,7 @@ tr .project-color-indicator {
             }
             
             // Загружаем данные проекта
-            const response = await fetch(`/admin/api/projects/${projectId}`, {
+            const response = await fetch(`/admin/projects/${projectId}`, {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
@@ -3060,7 +3060,7 @@ tr .project-color-indicator {
         }
         
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}`, {
+            const response = await fetch(`/admin/projects/${projectId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -3617,7 +3617,7 @@ tr .project-color-indicator {
                 status: status || 'new'
             });
             
-            const response = await fetch('/admin/api/projects/create', {
+            const response = await fetch('/admin/projects/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -3689,7 +3689,7 @@ tr .project-color-indicator {
 
     async function exportProjects() {
         try {
-            const response = await fetch('/admin/api/projects/export', {
+            const response = await fetch('/admin/projects/export', {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
@@ -3762,7 +3762,7 @@ tr .project-color-indicator {
         
         // Обновляем статус проекта
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}/status`, {
+            const response = await fetch(`/admin/projects/${projectId}/status`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -3794,7 +3794,7 @@ tr .project-color-indicator {
     // ПОЛНОСТЬЮ ПЕРЕПИСАННАЯ функция просмотра проекта БЕЗ Bootstrap
     async function viewProject(projectId) {
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}`, {
+            const response = await fetch(`/admin/projects/${projectId}`, {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
@@ -4259,7 +4259,7 @@ tr .project-color-indicator {
 
     async function loadProjectFiles(projectId) {
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}/files`, {
+            const response = await fetch(`/admin/projects/${projectId}/files`, {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
@@ -4398,7 +4398,7 @@ tr .project-color-indicator {
             uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Загрузка...';
             uploadBtn.disabled = true;
             
-            const response = await fetch(`/admin/api/projects/${projectId}/files`, {
+            const response = await fetch(`/admin/projects/${projectId}/files`, {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
@@ -4477,7 +4477,7 @@ tr .project-color-indicator {
         const projectId = document.getElementById('uploadProjectId').value;
         
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}/files/${fileId}`, {
+            const response = await fetch(`/admin/projects/${projectId}/files/${fileId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
@@ -4630,7 +4630,7 @@ tr .project-color-indicator {
         }
         
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}/archive`, {
+            const response = await fetch(`/admin/projects/${projectId}/archive`, {
                 method: 'POST',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
@@ -4753,7 +4753,7 @@ tr .project-color-indicator {
         }
         
         try {
-            const response = await fetch(`/admin/api/projects/${projectId}`, {
+            const response = await fetch(`/admin/projects/${projectId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)

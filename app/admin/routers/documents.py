@@ -10,7 +10,7 @@ import json
 
 from ...database.database import get_db
 from sqlalchemy.orm import Session
-from ...auth import authenticate
+from ..auth import get_current_admin_user
 from ...services.document_service import DocumentService
 from ...services.rbac_service import RBACService
 from ...database.crm_models import Document, DocumentTemplate

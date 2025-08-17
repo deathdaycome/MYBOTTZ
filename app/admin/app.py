@@ -164,7 +164,7 @@ if portfolio_router:
 
 # Подключаем роутер проектов
 if projects_router:
-    admin_router.include_router(projects_router, prefix="/api/projects")
+    admin_router.include_router(projects_router, prefix="/projects")
 
 # Подключаем роутер пользователей
 if users_router:

@@ -10,9 +10,8 @@ from decimal import Decimal
 import calendar
 import json
 
-from ..database.models import Project, AdminUser, ProjectFile
+from ..database.models import Project, AdminUser, ProjectFile, FinanceTransaction, FinanceCategory
 from ..database.crm_models import Client, Lead, Deal, DealStatus, LeadStatus
-from ..database.crm_models import FinanceTransaction, FinanceCategory
 from ..database.audit_models import AuditLog
 from ..config.logging import get_logger
 
