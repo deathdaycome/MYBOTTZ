@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 
 from ...database.database import get_db
 from ...database.models import AdminUser
-from ...database.crm_models import Lead, LeadStatus, Client, Deal, DealStatus, AuditLog
+from ...database.crm_models import Lead, LeadStatus, Client, Deal, DealStatus
+from ...database.audit_models import AuditLog
 from ...services.rbac_service import RBACService
 from ...config.logging import get_logger
 from ..auth import get_current_admin_user

@@ -14,7 +14,7 @@ from decimal import Decimal
 
 from ..database.models import Project, AdminUser
 from ..database.crm_models import Client, Deal, Document, DocumentTemplate
-from ..database.finance_models import Invoice, PaymentSchedule
+from ..database.crm_models import Invoice, PaymentSchedule
 from ..config.logging import get_logger
 
 logger = get_logger(__name__)

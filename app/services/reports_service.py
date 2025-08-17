@@ -12,8 +12,8 @@ import json
 
 from ..database.models import Project, AdminUser, ProjectFile
 from ..database.crm_models import Client, Lead, Deal, DealStatus, LeadStatus
-from ..database.finance_models import FinanceTransaction, FinanceCategory
-from ..database.rbac_models import AuditLog
+from ..database.crm_models import FinanceTransaction, FinanceCategory
+from ..database.audit_models import AuditLog
 from ..config.logging import get_logger
 
 logger = get_logger(__name__)

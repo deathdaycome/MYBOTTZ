@@ -11,7 +11,7 @@ import calendar
 
 from ..database.models import Project, AdminUser
 from ..database.crm_models import Client, Deal, DealStatus
-from ..database.finance_models import (
+from ..database.crm_models import (
     FinanceTransaction, FinanceCategory, Budget, 
     CashFlow, Invoice, PaymentSchedule
 )

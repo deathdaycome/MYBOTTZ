@@ -242,7 +242,7 @@ async def create_client(
         db.refresh(client)
         
         # Логируем действие
-        from ...database.crm_models import AuditLog
+        from ...database.audit_models import AuditLog
         audit_log = AuditLog(
             action="create",
             entity_type="client",
@@ -378,7 +378,7 @@ async def update_client(
         db.commit()
         
         # Логируем действие
-        from ...database.crm_models import AuditLog
+        from ...database.audit_models import AuditLog
         audit_log = AuditLog(
             action="update",
             entity_type="client",
@@ -437,7 +437,7 @@ async def delete_client(
         db.commit()
         
         # Логируем действие
-        from ...database.crm_models import AuditLog
+        from ...database.audit_models import AuditLog
         audit_log = AuditLog(
             action="delete",
             entity_type="client",

@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
 
-from ...database.db import get_db
+from ...database.database import get_db
 from sqlalchemy.orm import Session
 from ...auth import authenticate
 from ...services.document_service import DocumentService

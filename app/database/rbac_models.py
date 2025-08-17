@@ -62,7 +62,7 @@ class Role(Base):
     
     # Связи
     permissions = relationship("Permission", secondary=role_permissions, back_populates="roles")
-    users = relationship("AdminUser", secondary=user_roles, back_populates="roles")
+    users = relationship("AdminUser", secondary=user_roles, backref="roles")
     
     def to_dict(self):
         return {
@@ -262,7 +262,7 @@ def extend_admin_user():
     
     # Добавляем новые атрибуты если их еще нет
     if not hasattr(AdminUser, 'roles'):
-        AdminUser.roles = relationship("Role", secondary=user_roles, back_populates="users")
+        pass  # Связь создается через backref в Role модели
     
     if not hasattr(AdminUser, 'additional_permissions'):
         AdminUser.additional_permissions = relationship("Permission", secondary=user_permissions)
