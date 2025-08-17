@@ -137,23 +137,40 @@ html, body {
 #projectsTable th:nth-child(5) { width: 120px; } /* Сложность */
 #projectsTable th:nth-child(6) { width: 120px; } /* Стоимость */
 #projectsTable th:nth-child(7) { width: 120px; } /* Дата */
-#projectsTable th:nth-child(8) { width: 150px; } /* Действия */
+#projectsTable th:nth-child(8) { min-width: 250px; } /* Действия - увеличена для всех кнопок */
 
 #projectsTable td {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     padding: 8px;
 }
 
+/* Специальный стиль для столбца с названием */
+#projectsTable td:nth-child(2) {
+    max-width: 100%;
+}
+
+#projectsTable td:nth-child(2) .text-truncate {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* При увеличении ширины столбца показываем полное название */
+#projectsTable th:nth-child(2):not([style*="width"]) + tbody td:nth-child(2) .text-truncate,
+#projectsTable td:nth-child(2) .text-truncate {
+    max-width: 100%;
+}
+
 /* Полное название при наведении */
-#projectsTable td:nth-child(2):hover {
+#projectsTable td:nth-child(2):hover .text-truncate {
     overflow: visible;
     white-space: normal;
     position: relative;
     z-index: 100;
     background: white;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    padding: 5px;
+    border-radius: 4px;
 }
 
 /* Стили для легенды статусов */
@@ -601,8 +618,26 @@ body.modal-open {
 }
 
 .project-card-item:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 15px 40px rgba(99, 102, 241, 0.2) !important;
+    transform: translateY(-8px) scale(1.02);
+    border-color: rgba(99, 102, 241, 0.3) !important;
+}
+
+.project-card-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 10;
+}
+
+.project-card-item:hover::before {
+    opacity: 1;
 }
 
 /* Цветовое кодирование по приоритету */
@@ -632,16 +667,20 @@ body.modal-open {
 
 /* Стили для карточек проектов */
 .project-card {
-    min-height: 350px;
-    max-height: 400px;
+    min-height: 450px;
     position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .project-card-item {
-    min-height: 330px;
-    max-height: 380px;
+    min-height: 430px;
     display: flex;
     flex-direction: column;
+    border-radius: 20px !important;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid transparent !important;
+    position: relative;
 }
 
 /* Цветовые индикаторы для карточек */
@@ -724,6 +763,21 @@ tr .project-color-indicator {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    padding: 1.5rem !important;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.project-card-item .card-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    border-bottom: 2px solid #e2e8f0 !important;
+    padding: 1.25rem !important;
+    font-weight: 600;
+}
+
+.project-card-item .card-header h6 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
 }
 
 .project-card-item .description-preview {
@@ -758,8 +812,46 @@ tr .project-color-indicator {
 }
 
 .project-card-item .badge {
-    font-size: 0.7rem;
-    padding: 0.25em 0.5em;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 12px;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+}
+
+.project-card-item .status-new {
+    background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+    color: white !important;
+}
+
+.project-card-item .status-review {
+    background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+    color: white !important;
+}
+
+.project-card-item .status-accepted {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
+    color: white !important;
+}
+
+.project-card-item .status-in_progress {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b) !important;
+    color: white !important;
+}
+
+.project-card-item .status-testing {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: white !important;
+}
+
+.project-card-item .status-completed {
+    background: linear-gradient(135deg, #10b981, #059669) !important;
+    color: white !important;
+}
+
+.project-card-item .status-cancelled {
+    background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+    color: white !important;
 }
 
 .project-card-item .progress {
@@ -1694,12 +1786,34 @@ tr .project-color-indicator {
                         <button class="btn btn-outline-success" onclick="restoreProject(${project.id})" title="Восстановить из архива">
                             <i class="fas fa-undo"></i>
                         </button>
-                    ` : ''}
+                    ` : `
+                        <button class="btn btn-outline-success" onclick="completeProject(${project.id})" title="Завершить проект">
+                            <i class="fas fa-check-circle"></i>
+                        </button>
+                    `}
                     <button class="btn btn-outline-primary" onclick="viewProject(${project.id})" title="Просмотр">
                         <i class="fas fa-eye"></i>
                     </button>
+                    <button class="btn btn-outline-secondary" onclick="window.location.href='/admin/projects/${project.id}/detail'" title="Детали">
+                        <i class="fas fa-info-circle"></i>
+                    </button>
                     <button class="btn btn-outline-info" onclick="openEditModal(${project.id})" title="Редактировать">
                         <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="showFilesModal(${project.id})" title="Файлы">
+                        <i class="fas fa-file"></i>
+                    </button>
+                    ${project.user && project.user.telegram_id ? `
+                        <button class="btn btn-outline-success" onclick="contactClient(${project.user.telegram_id})" title="Связаться">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                    ` : `
+                        <button class="btn btn-outline-secondary" disabled title="Telegram ID отсутствует">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                    `}
+                    <button class="btn btn-outline-danger" onclick="deleteProject(${project.id})" title="Удалить">
+                        <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </td>
@@ -2068,6 +2182,64 @@ tr .project-color-indicator {
         }, 5000);
     }
 
+    // Функция завершения проекта
+    async function completeProject(projectId) {
+        // Показываем красивое подтверждение
+        const result = await Swal.fire({
+            title: 'Завершить проект?',
+            text: 'Проект будет помечен как завершенный и перемещен в архив. Вы сможете восстановить его позже.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Да, завершить!',
+            cancelButtonText: 'Отмена'
+        });
+
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        try {
+            // Обновляем статус на "completed" 
+            const response = await fetch(`/admin/api/projects/${projectId}/status`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                },
+                body: JSON.stringify({ 
+                    status: 'completed',
+                    comment: 'Проект завершен'
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Архивируем проект
+                await archiveProject(projectId, true);
+                
+                // Показываем успешное уведомление
+                await Swal.fire({
+                    title: 'Проект завершен!',
+                    text: 'Проект успешно завершен и перемещен в архив',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                
+                // Перезагружаем список проектов
+                await loadProjects();
+            } else {
+                Swal.fire('Ошибка!', 'Не удалось завершить проект', 'error');
+            }
+        } catch (error) {
+            console.error('Ошибка завершения проекта:', error);
+            Swal.fire('Ошибка!', 'Произошла ошибка при завершении проекта', 'error');
+        }
+    }
+    
     // Функция восстановления проекта из архива
     async function restoreProject(projectId) {
         if (!confirm('Восстановить проект из архива?')) {
