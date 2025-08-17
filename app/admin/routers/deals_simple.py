@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ...database.database import get_db
 from ...database.models import AdminUser
 from ..auth import get_current_admin_user
+from ..navigation import get_navigation_items
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 templates = Jinja2Templates(directory="app/admin/templates")
@@ -49,14 +50,7 @@ async def deals_page(
                 "testing": [],
                 "payment": []
             },
-            "navigation_items": [
-                {"name": "Дашборд", "url": "/dashboard", "icon": "fas fa-chart-line"},
-                {"name": "Проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
-                {"name": "Клиенты", "url": "/clients", "icon": "fas fa-address-book"},
-                {"name": "Лиды", "url": "/leads", "icon": "fas fa-user-check"},
-                {"name": "Сделки", "url": "/deals", "icon": "fas fa-handshake", "active": True},
-                {"name": "Финансы", "url": "/finance", "icon": "fas fa-chart-bar"},
-            ]
+            "navigation_items": get_navigation_items("/admin/deals")
         }
     )
 

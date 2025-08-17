@@ -1,5 +1,5 @@
 """
-Простой роутер для лидов (временное решение)
+Простой роутер для финансов (временное решение)
 """
 
 from fastapi import APIRouter, Request, Depends
@@ -12,47 +12,43 @@ from ...database.models import AdminUser
 from ..auth import get_current_admin_user
 from ..navigation import get_navigation_items
 
-router = APIRouter(prefix="/leads", tags=["leads"])
+router = APIRouter(prefix="/finance", tags=["finance"])
 templates = Jinja2Templates(directory="app/admin/templates")
 
 
 @router.get("/", response_class=HTMLResponse)
-async def leads_page(
+async def finance_page(
     request: Request,
     db: Session = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
-    """Страница лидов"""
+    """Страница финансов"""
     return templates.TemplateResponse(
-        "leads.html",
+        "finance.html",
         {
             "request": request,
             "user": current_user,
-            "leads": [],
+            "transactions": [],
             "stats": {  # Добавляем статистику
-                "new": 0,
-                "contact_made": 0,
-                "qualification": 0,
-                "proposal_sent": 0,
-                "negotiation": 0,
-                "won_month": 0,
-                "lost_month": 0,
-                "conversion_rate": 0
+                "income": 0,
+                "expenses": 0,
+                "balance": 0,
+                "pending": 0
             },
-            "navigation_items": get_navigation_items("/admin/leads")
+            "navigation_items": get_navigation_items("/admin/finance")
         }
     )
 
 
 @router.get("/api/list")
-async def get_leads_api(
+async def get_finance_api(
     db: Session = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
-    """API для получения списка лидов"""
+    """API для получения финансовых данных"""
     return {
         "success": True,
-        "leads": [],
+        "transactions": [],
         "total": 0,
-        "message": "Модуль лидов в разработке"
+        "message": "Модуль финансов в разработке"
     }

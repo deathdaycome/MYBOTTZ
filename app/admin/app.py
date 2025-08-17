@@ -83,13 +83,19 @@ except ImportError as e:
     print(f"Ошибка импорта роутера статусов проектов: {e}")
     project_statuses_router = None
 
-# Импорт роутера финансов
+# Импорт роутера финансов (простая версия)
 try:
-    from .routers.finance import router as finance_router
-    print("Роутер финансов подключен")
+    from .routers.finance_simple import router as finance_router
+    print("Роутер финансов (простая версия) подключен")
 except ImportError as e:
     print(f"Ошибка импорта роутера финансов: {e}")
-    finance_router = None
+    # Fallback на основной роутер
+    try:
+        from .routers.finance import router as finance_router
+        print("Роутер финансов подключен")
+    except ImportError as e2:
+        print(f"Ошибка импорта роутера финансов: {e2}")
+        finance_router = None
 
 # Импорт роутера настроек
 try:
@@ -178,7 +184,7 @@ if project_statuses_router:
 
 # Подключаем роутер финансов
 if finance_router:
-    admin_router.include_router(finance_router, prefix="/api/finance")
+    admin_router.include_router(finance_router)
 
 # Подключаем роутер настроек
 if settings_router:
