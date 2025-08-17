@@ -391,7 +391,7 @@ class Document(Base):
     # Дополнительно
     description = Column(Text, nullable=True)
     tags = Column(JSON, default=list)
-    metadata = Column(JSON, nullable=True)
+    extra_data = Column(JSON, nullable=True)  # Переименовано из metadata
     
     # Системные поля
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -424,7 +424,7 @@ class Document(Base):
             "signed_at": self.signed_at.isoformat() if self.signed_at else None,
             "description": self.description,
             "tags": self.tags,
-            "metadata": self.metadata,
+            "extra_data": self.extra_data,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "created_by_id": self.created_by_id
@@ -474,58 +474,7 @@ class DocumentTemplate(Base):
         }
 
 
-class AuditLog(Base):
-    """Модель аудит-лога"""
-    __tablename__ = "audit_logs"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    
-    # Информация о действии
-    action = Column(String(100), nullable=False, index=True)  # create, update, delete, view, export, etc.
-    entity_type = Column(String(50), nullable=False, index=True)  # client, lead, deal, project, etc.
-    entity_id = Column(Integer, nullable=True)
-    
-    # Данные
-    old_data = Column(JSON, nullable=True)  # Старые значения
-    new_data = Column(JSON, nullable=True)  # Новые значения
-    changes = Column(JSON, nullable=True)  # Список изменений
-    
-    # Дополнительная информация
-    description = Column(Text, nullable=True)
-    ip_address = Column(String(50), nullable=True)
-    user_agent = Column(String(500), nullable=True)
-    request_id = Column(String(100), nullable=True)  # ID запроса для группировки
-    
-    # Пользователь
-    user_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
-    user_name = Column(String(200), nullable=True)  # Сохраняем имя на момент действия
-    user_role = Column(String(50), nullable=True)  # Роль на момент действия
-    
-    # Время
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    
-    # Связи
-    user = relationship("AdminUser", backref="audit_logs")
-    
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "action": self.action,
-            "entity_type": self.entity_type,
-            "entity_id": self.entity_id,
-            "old_data": self.old_data,
-            "new_data": self.new_data,
-            "changes": self.changes,
-            "description": self.description,
-            "ip_address": self.ip_address,
-            "user_agent": self.user_agent,
-            "request_id": self.request_id,
-            "user_id": self.user_id,
-            "user_name": self.user_name,
-            "user_role": self.user_role,
-            "created_at": self.created_at.isoformat() if self.created_at else None
-        }
-
+# Модель AuditLog перенесена в audit_models.py
 
 class ClientTag(Base):
     """Модель тега для клиентов"""
