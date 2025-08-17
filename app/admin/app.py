@@ -220,10 +220,10 @@ except ImportError as e:
 if analytics_router:
     admin_router.include_router(analytics_router)
 
-# Импорт роутера клиентов CRM
+# Импорт роутера клиентов CRM (простая версия)
 try:
-    from .routers.clients import router as clients_router
-    print("Роутер клиентов CRM подключен")
+    from .routers.clients_simple import router as clients_router
+    print("Роутер клиентов (простая версия) подключен")
 except ImportError as e:
     print(f"Ошибка импорта роутера клиентов: {e}")
     clients_router = None
@@ -232,10 +232,10 @@ except ImportError as e:
 if clients_router:
     admin_router.include_router(clients_router)
 
-# Импорт роутера лидов
+# Импорт роутера лидов (простая версия)
 try:
-    from .routers.leads import router as leads_router
-    print("Роутер лидов подключен")
+    from .routers.leads_simple import router as leads_router
+    print("Роутер лидов (простая версия) подключен")
 except ImportError as e:
     print(f"Ошибка импорта роутера лидов: {e}")
     leads_router = None
@@ -244,10 +244,10 @@ except ImportError as e:
 if leads_router:
     admin_router.include_router(leads_router)
 
-# Импорт роутера сделок
+# Импорт роутера сделок (простая версия)
 try:
-    from .routers.deals import router as deals_router
-    print("Роутер сделок подключен")
+    from .routers.deals_simple import router as deals_router
+    print("Роутер сделок (простая версия) подключен")
 except ImportError as e:
     print(f"Ошибка импорта роутера сделок: {e}")
     deals_router = None
