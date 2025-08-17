@@ -1,0 +1,899 @@
+{% extends "base.html" %}
+
+{% block title %}Документы - BotDev Admin{% endblock %}
+
+{% block page_title %}
+<h4>Управление документами</h4>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.document-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-align: center;
+    height: 100%;
+}
+
+.stat-card.draft {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.stat-card.sent {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.stat-card.signed {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.stat-card.templates {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.document-status {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-draft { background: #e3f2fd; color: #1976d2; }
+.status-sent { background: #fff3e0; color: #ef6c00; }
+.status-signed { background: #e8f5e9; color: #2e7d32; }
+.status-cancelled { background: #ffebee; color: #c62828; }
+
+.document-type {
+    padding: 0.2rem 0.6rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.type-contract { background: #f3e5f5; color: #7b1fa2; }
+.type-invoice { background: #e0f2f1; color: #00796b; }
+.type-act { background: #fce4ec; color: #c2185b; }
+.type-offer { background: #e1f5fe; color: #0277bd; }
+.type-other { background: #f5f5f5; color: #616161; }
+
+.document-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.generate-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+.generate-button:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    color: white;
+}
+
+.template-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.template-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+}
+
+.template-card.selected {
+    border-color: #667eea;
+    background: #f5f7ff;
+}
+
+.document-preview {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    background: #fafafa;
+    max-height: 500px;
+    overflow-y: auto;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total }}</div>
+            <div class="stat-label">Всего документов</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card draft">
+            <div class="stat-number">{{ stats.draft }}</div>
+            <div class="stat-label">Черновики</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card sent">
+            <div class="stat-number">{{ stats.sent }}</div>
+            <div class="stat-label">Отправлено</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card signed">
+            <div class="stat-number">{{ stats.signed }}</div>
+            <div class="stat-label">Подписано</div>
+        </div>
+    </div>
+</div>
+
+<!-- Панель управления -->
+<div class="document-card">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h5><i class="fas fa-file-alt me-2"></i>Документы</h5>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="window.location.href='/admin/documents/templates'">
+                <i class="fas fa-file-code me-2"></i>Шаблоны
+            </button>
+            <button class="btn generate-button" onclick="showGenerateModal()">
+                <i class="fas fa-magic me-2"></i>Генерировать документ
+            </button>
+        </div>
+    </div>
+    
+    <!-- Фильтры -->
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <input type="text" class="form-control" id="searchInput" 
+                   placeholder="Поиск по номеру, названию...">
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="typeFilter">
+                <option value="">Все типы</option>
+                <option value="contract">Договор</option>
+                <option value="invoice">Счет</option>
+                <option value="act">Акт</option>
+                <option value="offer">КП</option>
+                <option value="other">Другое</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="statusFilter">
+                <option value="">Все статусы</option>
+                <option value="draft">Черновик</option>
+                <option value="sent">Отправлен</option>
+                <option value="signed">Подписан</option>
+                <option value="cancelled">Отменен</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="date" class="form-control" id="dateFrom" placeholder="От">
+        </div>
+        <div class="col-md-2">
+            <input type="date" class="form-control" id="dateTo" placeholder="До">
+        </div>
+        <div class="col-md-1">
+            <button class="btn btn-primary w-100" onclick="loadDocuments()">
+                <i class="fas fa-filter"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Таблица документов -->
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Тип</th>
+                    <th>Название</th>
+                    <th>Статус</th>
+                    <th>Связан с</th>
+                    <th>Создан</th>
+                    <th>Отправлен</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="documentsTableBody">
+                <!-- Загрузка данных -->
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Пагинация -->
+    <nav>
+        <ul class="pagination justify-content-center" id="pagination">
+            <!-- Генерируется динамически -->
+        </ul>
+    </nav>
+</div>
+
+<!-- Модальное окно генерации документа -->
+<div class="modal fade" id="generateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Генерация документа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Шаг 1: Выбор шаблона -->
+                <div id="step1" class="step-content">
+                    <h6 class="mb-3">1. Выберите шаблон</h6>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <select class="form-select mb-3" id="templateTypeFilter">
+                                <option value="">Все типы шаблонов</option>
+                                <option value="contract">Договоры</option>
+                                <option value="invoice">Счета</option>
+                                <option value="act">Акты</option>
+                                <option value="offer">КП</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="templatesList">
+                        <!-- Загружается динамически -->
+                    </div>
+                </div>
+                
+                <!-- Шаг 2: Выбор объекта -->
+                <div id="step2" class="step-content" style="display: none;">
+                    <h6 class="mb-3">2. Выберите объект для документа</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Тип объекта</label>
+                            <select class="form-select" id="entityType">
+                                <option value="">Выберите тип</option>
+                                <option value="client">Клиент</option>
+                                <option value="deal">Сделка</option>
+                                <option value="project">Проект</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Объект</label>
+                            <select class="form-select" id="entitySelect">
+                                <option value="">Сначала выберите тип</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Данные из выбранного объекта будут автоматически подставлены в документ
+                    </div>
+                </div>
+                
+                <!-- Шаг 3: Предпросмотр -->
+                <div id="step3" class="step-content" style="display: none;">
+                    <h6 class="mb-3">3. Предпросмотр документа</h6>
+                    <div class="document-preview" id="documentPreview">
+                        <!-- Предпросмотр документа -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="prevBtn" onclick="previousStep()" style="display: none;">
+                    <i class="fas fa-arrow-left me-2"></i>Назад
+                </button>
+                <button type="button" class="btn btn-primary" id="nextBtn" onclick="nextStep()">
+                    Далее<i class="fas fa-arrow-right ms-2"></i>
+                </button>
+                <button type="button" class="btn generate-button" id="generateBtn" onclick="generateDocument()" style="display: none;">
+                    <i class="fas fa-file-export me-2"></i>Создать документ
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно отправки документа -->
+<div class="modal fade" id="sendModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Отправка документа</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="sendDocumentId">
+                <div class="mb-3">
+                    <label class="form-label">Email получателя <span class="text-danger">*</span></label>
+                    <input type="email" class="form-control" id="recipientEmail" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Сообщение</label>
+                    <textarea class="form-control" id="emailMessage" rows="4">
+Добрый день!
+
+Направляем вам документы для ознакомления и подписания.
+
+С уважением,
+Команда BotDev
+                    </textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="sendDocument()">
+                    <i class="fas fa-paper-plane me-2"></i>Отправить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const username = 'admin';
+const password = 'qwerty123';
+let currentPage = 1;
+let currentStep = 1;
+let selectedTemplate = null;
+let selectedEntity = null;
+
+// Загрузка документов
+async function loadDocuments(page = 1) {
+    currentPage = page;
+    
+    const params = new URLSearchParams({
+        page: page,
+        limit: 20
+    });
+    
+    const search = document.getElementById('searchInput').value;
+    const type = document.getElementById('typeFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    
+    if (search) params.append('search', search);
+    if (type) params.append('type', type);
+    if (status) params.append('status', status);
+    if (dateFrom) params.append('date_from', dateFrom);
+    if (dateTo) params.append('date_to', dateTo);
+    
+    try {
+        const response = await fetch(`/admin/documents/api?${params}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            renderDocuments(data.documents);
+            renderPagination(data.pagination);
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки документов:', error);
+    }
+}
+
+// Отображение документов
+function renderDocuments(documents) {
+    const tbody = document.getElementById('documentsTableBody');
+    
+    if (documents.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center text-muted py-4">
+                    <i class="fas fa-file-alt fa-3x mb-3"></i>
+                    <p>Документы не найдены</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = documents.map(doc => `
+        <tr>
+            <td>${doc.number}</td>
+            <td><span class="document-type type-${doc.type}">${getTypeLabel(doc.type)}</span></td>
+            <td>${doc.title}</td>
+            <td><span class="document-status status-${doc.status}">${getStatusLabel(doc.status)}</span></td>
+            <td>${doc.entity_type ? `${getEntityLabel(doc.entity_type)} #${doc.entity_id}` : '-'}</td>
+            <td>${formatDate(doc.created_at)}</td>
+            <td>${doc.sent_at ? formatDate(doc.sent_at) : '-'}</td>
+            <td>
+                <div class="document-actions">
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewDocument(${doc.id})"
+                            title="Просмотр">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    ${doc.file_path ? `
+                        <button class="btn btn-sm btn-outline-success" onclick="downloadDocument(${doc.id})"
+                                title="Скачать">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    ` : ''}
+                    ${doc.status === 'draft' ? `
+                        <button class="btn btn-sm btn-outline-info" onclick="showSendModal(${doc.id})"
+                                title="Отправить">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    ` : ''}
+                    ${doc.status === 'sent' ? `
+                        <button class="btn btn-sm btn-outline-success" onclick="markAsSigned(${doc.id})"
+                                title="Отметить как подписанный">
+                            <i class="fas fa-check"></i>
+                        </button>
+                    ` : ''}
+                    <button class="btn btn-sm btn-outline-secondary" onclick="duplicateDocument(${doc.id})"
+                            title="Дублировать">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Показать модальное окно генерации
+async function showGenerateModal() {
+    currentStep = 1;
+    showStep(1);
+    await loadTemplates();
+    const modal = new bootstrap.Modal(document.getElementById('generateModal'));
+    modal.show();
+}
+
+// Загрузка шаблонов
+async function loadTemplates(type = null) {
+    const params = new URLSearchParams();
+    if (type) params.append('type', type);
+    
+    try {
+        const response = await fetch(`/admin/documents/templates/api?${params}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            renderTemplates(data.templates);
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки шаблонов:', error);
+    }
+}
+
+// Отображение шаблонов
+function renderTemplates(templates) {
+    const container = document.getElementById('templatesList');
+    
+    if (templates.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <p>Шаблоны не найдены</p>
+                <button class="btn btn-sm btn-primary" onclick="createDefaultTemplates()">
+                    Создать стандартные шаблоны
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = templates.map(tpl => `
+        <div class="template-card" onclick="selectTemplate(${tpl.id}, '${tpl.name}')">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1">${tpl.name}</h6>
+                    <span class="document-type type-${tpl.type}">${getTypeLabel(tpl.type)}</span>
+                </div>
+                <i class="fas fa-check-circle text-success" style="display: none;" id="template-check-${tpl.id}"></i>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Выбор шаблона
+function selectTemplate(templateId, templateName) {
+    selectedTemplate = {id: templateId, name: templateName};
+    
+    // Убираем выделение со всех
+    document.querySelectorAll('.template-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    document.querySelectorAll('[id^="template-check-"]').forEach(check => {
+        check.style.display = 'none';
+    });
+    
+    // Выделяем выбранный
+    event.currentTarget.classList.add('selected');
+    document.getElementById(`template-check-${templateId}`).style.display = 'block';
+}
+
+// Управление шагами
+function showStep(step) {
+    document.querySelectorAll('.step-content').forEach(content => {
+        content.style.display = 'none';
+    });
+    document.getElementById(`step${step}`).style.display = 'block';
+    
+    // Управление кнопками
+    document.getElementById('prevBtn').style.display = step > 1 ? 'inline-block' : 'none';
+    document.getElementById('nextBtn').style.display = step < 3 ? 'inline-block' : 'none';
+    document.getElementById('generateBtn').style.display = step === 3 ? 'inline-block' : 'none';
+}
+
+async function nextStep() {
+    if (currentStep === 1) {
+        if (!selectedTemplate) {
+            showAlert('warning', 'Выберите шаблон документа');
+            return;
+        }
+        currentStep = 2;
+        showStep(2);
+    } else if (currentStep === 2) {
+        const entityType = document.getElementById('entityType').value;
+        const entityId = document.getElementById('entitySelect').value;
+        
+        if (!entityType || !entityId) {
+            showAlert('warning', 'Выберите объект для документа');
+            return;
+        }
+        
+        selectedEntity = {type: entityType, id: entityId};
+        await loadPreview();
+        currentStep = 3;
+        showStep(3);
+    }
+}
+
+function previousStep() {
+    if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+    }
+}
+
+// Загрузка объектов при изменении типа
+document.getElementById('entityType').addEventListener('change', async function() {
+    const type = this.value;
+    const select = document.getElementById('entitySelect');
+    
+    if (!type) {
+        select.innerHTML = '<option value="">Сначала выберите тип</option>';
+        return;
+    }
+    
+    select.innerHTML = '<option value="">Загрузка...</option>';
+    
+    let endpoint = '';
+    if (type === 'client') endpoint = '/admin/clients/api';
+    else if (type === 'deal') endpoint = '/admin/deals/api';
+    else if (type === 'project') endpoint = '/admin/projects';
+    
+    try {
+        const response = await fetch(`${endpoint}?limit=100`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        let items = [];
+        
+        if (type === 'client') items = data.clients || [];
+        else if (type === 'deal') items = data.deals || [];
+        else if (type === 'project') items = data.projects || [];
+        
+        select.innerHTML = '<option value="">Выберите объект</option>' +
+            items.map(item => 
+                `<option value="${item.id}">${item.name || item.title}</option>`
+            ).join('');
+    } catch (error) {
+        console.error('Ошибка загрузки объектов:', error);
+        select.innerHTML = '<option value="">Ошибка загрузки</option>';
+    }
+});
+
+// Предпросмотр документа
+async function loadPreview() {
+    const preview = document.getElementById('documentPreview');
+    preview.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Загрузка...</span>
+            </div>
+            <p class="mt-2">Генерация предпросмотра...</p>
+        </div>
+    `;
+    
+    // В реальном приложении здесь был бы запрос к API для генерации превью
+    setTimeout(() => {
+        preview.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                Документ будет сгенерирован на основе шаблона "${selectedTemplate.name}"
+                с данными из ${getEntityLabel(selectedEntity.type)} #${selectedEntity.id}
+            </div>
+            <p>После создания документа вы сможете:</p>
+            <ul>
+                <li>Скачать его в формате PDF или HTML</li>
+                <li>Отправить клиенту по email</li>
+                <li>Отслеживать статус подписания</li>
+                <li>Внести изменения при необходимости</li>
+            </ul>
+        `;
+    }, 1000);
+}
+
+// Генерация документа
+async function generateDocument() {
+    try {
+        const response = await fetch('/admin/documents/api/generate', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                template_id: selectedTemplate.id,
+                entity_type: selectedEntity.type,
+                entity_id: parseInt(selectedEntity.id)
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('generateModal')).hide();
+            showAlert('success', result.message);
+            loadDocuments(currentPage);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка генерации документа: ' + error.message);
+    }
+}
+
+// Создание стандартных шаблонов
+async function createDefaultTemplates() {
+    try {
+        const response = await fetch('/admin/documents/templates/api/create-defaults', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message);
+            loadTemplates();
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка создания шаблонов: ' + error.message);
+    }
+}
+
+// Показать модальное окно отправки
+function showSendModal(documentId) {
+    document.getElementById('sendDocumentId').value = documentId;
+    document.getElementById('recipientEmail').value = '';
+    const modal = new bootstrap.Modal(document.getElementById('sendModal'));
+    modal.show();
+}
+
+// Отправка документа
+async function sendDocument() {
+    const documentId = document.getElementById('sendDocumentId').value;
+    const email = document.getElementById('recipientEmail').value;
+    const message = document.getElementById('emailMessage').value;
+    
+    if (!email) {
+        showAlert('warning', 'Укажите email получателя');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/documents/api/${documentId}/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({email, message})
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            bootstrap.Modal.getInstance(document.getElementById('sendModal')).hide();
+            showAlert('success', result.message);
+            loadDocuments(currentPage);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка отправки: ' + error.message);
+    }
+}
+
+// Скачивание документа
+function downloadDocument(documentId) {
+    window.open(`/admin/documents/api/${documentId}/download?format=pdf`, '_blank');
+}
+
+// Отметить как подписанный
+async function markAsSigned(documentId) {
+    if (!confirm('Отметить документ как подписанный?')) return;
+    
+    try {
+        const response = await fetch(`/admin/documents/api/${documentId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({status: 'signed'})
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', 'Документ отмечен как подписанный');
+            loadDocuments(currentPage);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка: ' + error.message);
+    }
+}
+
+// Дублирование документа
+async function duplicateDocument(documentId) {
+    if (!confirm('Создать копию документа?')) return;
+    
+    try {
+        const response = await fetch(`/admin/documents/api/${documentId}/duplicate`, {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message);
+            loadDocuments(currentPage);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка дублирования: ' + error.message);
+    }
+}
+
+// Вспомогательные функции
+function getTypeLabel(type) {
+    const labels = {
+        'contract': 'Договор',
+        'invoice': 'Счет',
+        'act': 'Акт',
+        'offer': 'КП',
+        'other': 'Другое'
+    };
+    return labels[type] || type;
+}
+
+function getStatusLabel(status) {
+    const labels = {
+        'draft': 'Черновик',
+        'sent': 'Отправлен',
+        'signed': 'Подписан',
+        'cancelled': 'Отменен'
+    };
+    return labels[status] || status;
+}
+
+function getEntityLabel(entityType) {
+    const labels = {
+        'client': 'Клиент',
+        'deal': 'Сделка',
+        'project': 'Проект'
+    };
+    return labels[entityType] || entityType;
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('ru-RU');
+}
+
+function renderPagination(pagination) {
+    const paginationEl = document.getElementById('pagination');
+    if (!pagination || pagination.pages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // Предыдущая страница
+    html += `
+        <li class="page-item ${pagination.page === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadDocuments(${pagination.page - 1}); return false;">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+    `;
+    
+    // Страницы
+    for (let i = 1; i <= Math.min(pagination.pages, 10); i++) {
+        html += `
+            <li class="page-item ${pagination.page === i ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadDocuments(${i}); return false;">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Следующая страница
+    html += `
+        <li class="page-item ${pagination.page === pagination.pages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadDocuments(${pagination.page + 1}); return false;">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+    `;
+    
+    paginationEl.innerHTML = html;
+}
+
+function showAlert(type, message) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('.container-fluid');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) alert.remove();
+    }, 5000);
+}
+
+// Фильтр шаблонов по типу
+document.getElementById('templateTypeFilter').addEventListener('change', function() {
+    loadTemplates(this.value || null);
+});
+
+// Загрузка при старте
+document.addEventListener('DOMContentLoaded', () => {
+    loadDocuments();
+});
+</script>
+{% endblock %}

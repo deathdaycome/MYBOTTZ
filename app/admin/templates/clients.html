@@ -1,0 +1,963 @@
+{% extends "base.html" %}
+
+{% block title %}Клиенты - BotDev Admin{% endblock %}
+
+{% block page_title %}
+<h4>Управление клиентами</h4>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.client-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    margin-bottom: 1.5rem;
+    transition: transform 0.2s;
+}
+
+.client-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-top: 0.5rem;
+}
+
+.client-type-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.type-individual {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.type-company {
+    background: #f3e5f5;
+    color: #7b1fa2;
+}
+
+.type-ip {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.type-self_employed {
+    background: #fff3e0;
+    color: #f57c00;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.status-new {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.status-active {
+    background: #e8f5e9;
+    color: #388e3c;
+}
+
+.status-inactive {
+    background: #fafafa;
+    color: #757575;
+}
+
+.status-vip {
+    background: linear-gradient(135deg, #ffd700, #ffed4e);
+    color: #6b5b00;
+}
+
+.status-blacklist {
+    background: #ffebee;
+    color: #c62828;
+}
+
+.search-filters {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.client-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 40px;
+    margin-bottom: 1.5rem;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 30px;
+    bottom: -20px;
+    width: 2px;
+    background: #e0e0e0;
+}
+
+.timeline-item:last-child::before {
+    display: none;
+}
+
+.timeline-icon {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid #667eea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: #667eea;
+}
+
+.communication-form {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.segment-chart {
+    height: 300px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total }}</div>
+            <div class="stat-label">Всего клиентов</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card" style="background: linear-gradient(135deg, #4caf50, #81c784);">
+            <div class="stat-value">{{ stats.active }}</div>
+            <div class="stat-label">Активных</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card" style="background: linear-gradient(135deg, #ffd700, #ffed4e);">
+            <div class="stat-value">{{ stats.vip }}</div>
+            <div class="stat-label">VIP клиентов</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card" style="background: linear-gradient(135deg, #03a9f4, #4fc3f7);">
+            <div class="stat-value">{{ stats.new_month }}</div>
+            <div class="stat-label">Новых за месяц</div>
+        </div>
+    </div>
+</div>
+
+<!-- Панель управления -->
+<div class="client-card">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5><i class="fas fa-users me-2"></i>База клиентов</h5>
+        <button class="btn btn-primary" onclick="showCreateClientModal()">
+            <i class="fas fa-plus me-2"></i>Добавить клиента
+        </button>
+    </div>
+    
+    <!-- Фильтры и поиск -->
+    <div class="search-filters">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="searchInput" 
+                           placeholder="Поиск по имени, email, телефону...">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="statusFilter">
+                    <option value="">Все статусы</option>
+                    <option value="new">Новый</option>
+                    <option value="active">Активный</option>
+                    <option value="inactive">Неактивный</option>
+                    <option value="vip">VIP</option>
+                    <option value="blacklist">Черный список</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="typeFilter">
+                    <option value="">Все типы</option>
+                    <option value="individual">Физ. лицо</option>
+                    <option value="company">Компания</option>
+                    <option value="ip">ИП</option>
+                    <option value="self_employed">Самозанятый</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" id="segmentFilter">
+                    <option value="">Все сегменты</option>
+                    <option value="A">Сегмент A</option>
+                    <option value="B">Сегмент B</option>
+                    <option value="C">Сегмент C</option>
+                    <option value="D">Сегмент D</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-outline-primary w-100" onclick="loadClients()">
+                    <i class="fas fa-filter me-2"></i>Применить
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Список клиентов -->
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Клиент</th>
+                    <th>Тип</th>
+                    <th>Статус</th>
+                    <th>Контакты</th>
+                    <th>Менеджер</th>
+                    <th>Сделки</th>
+                    <th>Доход</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="clientsTableBody">
+                <!-- Загрузка данных -->
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Пагинация -->
+    <nav>
+        <ul class="pagination justify-content-center" id="pagination">
+            <!-- Генерируется динамически -->
+        </ul>
+    </nav>
+</div>
+
+<!-- Модальное окно создания клиента -->
+<div class="modal fade" id="createClientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Новый клиент</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createClientForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Имя/Название <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="name" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Тип клиента</label>
+                                <select class="form-select" name="type">
+                                    <option value="individual">Физическое лицо</option>
+                                    <option value="company">Компания</option>
+                                    <option value="ip">ИП</option>
+                                    <option value="self_employed">Самозанятый</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Телефон</label>
+                                <input type="tel" class="form-control" name="phone">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" name="email">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Telegram</label>
+                                <input type="text" class="form-control" name="telegram" placeholder="@username">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">WhatsApp</label>
+                                <input type="tel" class="form-control" name="whatsapp">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="company-fields" style="display: none;">
+                        <hr>
+                        <h6>Реквизиты компании</h6>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <div class="mb-3">
+                                    <label class="form-label">Полное название компании</label>
+                                    <input type="text" class="form-control" name="company_name">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">ИНН</label>
+                                    <input type="text" class="form-control" name="inn">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">КПП</label>
+                                    <input type="text" class="form-control" name="kpp">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">ОГРН/ОГРНИП</label>
+                                    <input type="text" class="form-control" name="ogrn">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Адрес</label>
+                        <textarea class="form-control" name="address" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Источник привлечения</label>
+                                <select class="form-select" name="source">
+                                    <option value="">Не указан</option>
+                                    <option value="website">Сайт</option>
+                                    <option value="telegram">Telegram</option>
+                                    <option value="referral">Рекомендация</option>
+                                    <option value="ads">Реклама</option>
+                                    <option value="social">Соц. сети</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Условия оплаты</label>
+                                <input type="text" class="form-control" name="payment_terms" 
+                                       placeholder="Например: 50% предоплата">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Примечания</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="createClient()">
+                    <i class="fas fa-save me-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно просмотра клиента -->
+<div class="modal fade" id="viewClientModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Карточка клиента</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="clientDetails">
+                    <!-- Загружается динамически -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const username = 'admin';
+const password = 'qwerty123';
+let currentPage = 1;
+let currentClients = [];
+
+// Загрузка клиентов
+async function loadClients(page = 1) {
+    currentPage = page;
+    
+    const search = document.getElementById('searchInput').value;
+    const status = document.getElementById('statusFilter').value;
+    const type = document.getElementById('typeFilter').value;
+    const segment = document.getElementById('segmentFilter').value;
+    
+    const params = new URLSearchParams({
+        page: page,
+        limit: 20
+    });
+    
+    if (search) params.append('search', search);
+    if (status) params.append('status', status);
+    if (type) params.append('type', type);
+    if (segment) params.append('segment', segment);
+    
+    try {
+        const response = await fetch(`/admin/clients/api?${params}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            currentClients = data.clients;
+            renderClients(data.clients);
+            renderPagination(data.pagination);
+        } else {
+            showAlert('danger', data.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка загрузки клиентов: ' + error.message);
+    }
+}
+
+// Отображение клиентов
+function renderClients(clients) {
+    const tbody = document.getElementById('clientsTableBody');
+    
+    if (clients.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center text-muted py-4">
+                    <i class="fas fa-users fa-3x mb-3"></i>
+                    <p>Клиенты не найдены</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = clients.map(client => `
+        <tr>
+            <td>${client.id}</td>
+            <td>
+                <strong>${client.name}</strong>
+                ${client.company_name ? `<br><small class="text-muted">${client.company_name}</small>` : ''}
+            </td>
+            <td>
+                <span class="client-type-badge type-${client.type}">
+                    ${getTypeLabel(client.type)}
+                </span>
+            </td>
+            <td>
+                <span class="status-badge status-${client.status}">
+                    ${getStatusLabel(client.status)}
+                </span>
+            </td>
+            <td>
+                ${client.phone ? `<i class="fas fa-phone"></i> ${client.phone}<br>` : ''}
+                ${client.email ? `<i class="fas fa-envelope"></i> ${client.email}<br>` : ''}
+                ${client.telegram ? `<i class="fab fa-telegram"></i> ${client.telegram}` : ''}
+            </td>
+            <td>${client.manager_name || '-'}</td>
+            <td>
+                <span class="badge bg-primary">${client.active_deals || 0}</span> / 
+                <span class="badge bg-secondary">${client.deals_count || 0}</span>
+            </td>
+            <td>${formatCurrency(client.total_revenue || 0)}</td>
+            <td>
+                <div class="client-actions">
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewClient(${client.id})" 
+                            title="Просмотр">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="editClient(${client.id})"
+                            title="Редактировать">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteClient(${client.id})"
+                            title="Удалить">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Отображение пагинации
+function renderPagination(pagination) {
+    const paginationEl = document.getElementById('pagination');
+    if (!pagination || pagination.pages <= 1) {
+        paginationEl.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // Предыдущая страница
+    html += `
+        <li class="page-item ${pagination.page === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadClients(${pagination.page - 1}); return false;">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+    `;
+    
+    // Страницы
+    for (let i = 1; i <= Math.min(pagination.pages, 10); i++) {
+        html += `
+            <li class="page-item ${pagination.page === i ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="loadClients(${i}); return false;">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Следующая страница
+    html += `
+        <li class="page-item ${pagination.page === pagination.pages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadClients(${pagination.page + 1}); return false;">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+    `;
+    
+    paginationEl.innerHTML = html;
+}
+
+// Показать модальное окно создания клиента
+function showCreateClientModal() {
+    const modal = new bootstrap.Modal(document.getElementById('createClientModal'));
+    document.getElementById('createClientForm').reset();
+    modal.show();
+}
+
+// Создание клиента
+async function createClient() {
+    const form = document.getElementById('createClientForm');
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        if (value) data[key] = value;
+    }
+    
+    try {
+        const response = await fetch('/admin/clients/api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            showAlert('success', result.message);
+            bootstrap.Modal.getInstance(document.getElementById('createClientModal')).hide();
+            loadClients(currentPage);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка создания клиента: ' + error.message);
+    }
+}
+
+// Просмотр клиента
+async function viewClient(clientId) {
+    try {
+        const response = await fetch(`/admin/clients/api/${clientId}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showClientDetails(data.client);
+        } else {
+            showAlert('danger', data.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка загрузки клиента: ' + error.message);
+    }
+}
+
+// Отображение деталей клиента
+function showClientDetails(client) {
+    const detailsHtml = `
+        <div class="row">
+            <div class="col-md-8">
+                <h5>${client.name}</h5>
+                ${client.company_name ? `<p class="text-muted">${client.company_name}</p>` : ''}
+                
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <h6>Контактная информация</h6>
+                        <p>
+                            ${client.phone ? `<i class="fas fa-phone"></i> ${client.phone}<br>` : ''}
+                            ${client.email ? `<i class="fas fa-envelope"></i> ${client.email}<br>` : ''}
+                            ${client.telegram ? `<i class="fab fa-telegram"></i> ${client.telegram}<br>` : ''}
+                            ${client.whatsapp ? `<i class="fab fa-whatsapp"></i> ${client.whatsapp}<br>` : ''}
+                            ${client.address ? `<i class="fas fa-map-marker-alt"></i> ${client.address}` : ''}
+                        </p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Информация о клиенте</h6>
+                        <p>
+                            <strong>Тип:</strong> ${getTypeLabel(client.type)}<br>
+                            <strong>Статус:</strong> ${getStatusLabel(client.status)}<br>
+                            <strong>Источник:</strong> ${client.source || 'Не указан'}<br>
+                            <strong>Менеджер:</strong> ${client.manager?.username || 'Не назначен'}<br>
+                            <strong>Создан:</strong> ${formatDate(client.created_at)}
+                        </p>
+                    </div>
+                </div>
+                
+                ${client.inn || client.kpp || client.ogrn ? `
+                    <div class="mt-4">
+                        <h6>Реквизиты</h6>
+                        <p>
+                            ${client.inn ? `<strong>ИНН:</strong> ${client.inn}<br>` : ''}
+                            ${client.kpp ? `<strong>КПП:</strong> ${client.kpp}<br>` : ''}
+                            ${client.ogrn ? `<strong>ОГРН:</strong> ${client.ogrn}` : ''}
+                        </p>
+                    </div>
+                ` : ''}
+                
+                ${client.description ? `
+                    <div class="mt-4">
+                        <h6>Примечания</h6>
+                        <p>${client.description}</p>
+                    </div>
+                ` : ''}
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h6>Статистика</h6>
+                        <div class="mb-3">
+                            <small class="text-muted">Общий доход</small>
+                            <h4>${formatCurrency(client.statistics?.total_revenue || 0)}</h4>
+                        </div>
+                        <div class="mb-3">
+                            <small class="text-muted">Средний чек</small>
+                            <h5>${formatCurrency(client.statistics?.average_check || 0)}</h5>
+                        </div>
+                        <hr>
+                        <p>
+                            <strong>Лидов:</strong> ${client.statistics?.total_leads || 0}<br>
+                            <strong>Конвертировано:</strong> ${client.statistics?.converted_leads || 0}<br>
+                            <strong>Сделок:</strong> ${client.statistics?.total_deals || 0}<br>
+                            <strong>Активных:</strong> ${client.statistics?.active_deals || 0}<br>
+                            <strong>Завершенных:</strong> ${client.statistics?.completed_deals || 0}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <ul class="nav nav-tabs mt-4">
+            <li class="nav-item">
+                <a class="nav-link active" data-bs-toggle="tab" href="#deals">Сделки</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#leads">Лиды</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#documents">Документы</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link" data-bs-toggle="tab" href="#communications">Коммуникации</a>
+            </li>
+        </ul>
+        
+        <div class="tab-content mt-3">
+            <div class="tab-pane fade show active" id="deals">
+                ${renderDeals(client.deals || [])}
+            </div>
+            <div class="tab-pane fade" id="leads">
+                ${renderLeads(client.leads || [])}
+            </div>
+            <div class="tab-pane fade" id="documents">
+                ${renderDocuments(client.documents || [])}
+            </div>
+            <div class="tab-pane fade" id="communications">
+                ${renderCommunications(client.communication_history || [])}
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('clientDetails').innerHTML = detailsHtml;
+    const modal = new bootstrap.Modal(document.getElementById('viewClientModal'));
+    modal.show();
+}
+
+// Отображение сделок
+function renderDeals(deals) {
+    if (deals.length === 0) {
+        return '<p class="text-muted">Нет сделок</p>';
+    }
+    
+    return `
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Статус</th>
+                        <th>Сумма</th>
+                        <th>Создана</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${deals.map(deal => `
+                        <tr>
+                            <td>${deal.title}</td>
+                            <td>${deal.status}</td>
+                            <td>${formatCurrency(deal.amount)}</td>
+                            <td>${formatDate(deal.created_at)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// Отображение лидов
+function renderLeads(leads) {
+    if (leads.length === 0) {
+        return '<p class="text-muted">Нет лидов</p>';
+    }
+    
+    return `
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Статус</th>
+                        <th>Бюджет</th>
+                        <th>Создан</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${leads.map(lead => `
+                        <tr>
+                            <td>${lead.title}</td>
+                            <td>${lead.status}</td>
+                            <td>${lead.budget ? formatCurrency(lead.budget) : '-'}</td>
+                            <td>${formatDate(lead.created_at)}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+// Отображение документов
+function renderDocuments(documents) {
+    if (documents.length === 0) {
+        return '<p class="text-muted">Нет документов</p>';
+    }
+    
+    return `
+        <div class="list-group">
+            ${documents.map(doc => `
+                <div class="list-group-item">
+                    <i class="fas fa-file-alt me-2"></i>
+                    ${doc.name}
+                    <span class="badge bg-secondary ms-2">${doc.type}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// Отображение коммуникаций
+function renderCommunications(communications) {
+    if (communications.length === 0) {
+        return '<p class="text-muted">Нет записей о коммуникациях</p>';
+    }
+    
+    return `
+        <div class="timeline">
+            ${communications.map(comm => `
+                <div class="timeline-item">
+                    <div class="timeline-icon">
+                        <i class="fas fa-comment"></i>
+                    </div>
+                    <div>
+                        <strong>${comm.subject || 'Коммуникация'}</strong>
+                        <small class="text-muted ms-2">${formatDate(comm.date)}</small>
+                        <p class="mb-0">${comm.content}</p>
+                        <small class="text-muted">${comm.user_name || 'Система'}</small>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+// Удаление клиента
+async function deleteClient(clientId) {
+    if (!confirm('Вы уверены, что хотите удалить этого клиента?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/clients/api/${clientId}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showAlert('success', data.message);
+            loadClients(currentPage);
+        } else {
+            showAlert('danger', data.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка удаления клиента: ' + error.message);
+    }
+}
+
+// Вспомогательные функции
+function getTypeLabel(type) {
+    const labels = {
+        'individual': 'Физ. лицо',
+        'company': 'Компания',
+        'ip': 'ИП',
+        'self_employed': 'Самозанятый'
+    };
+    return labels[type] || type;
+}
+
+function getStatusLabel(status) {
+    const labels = {
+        'new': 'Новый',
+        'active': 'Активный',
+        'inactive': 'Неактивный',
+        'vip': 'VIP',
+        'blacklist': 'Черный список'
+    };
+    return labels[status] || status;
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('ru-RU', {
+        style: 'currency',
+        currency: 'RUB',
+        minimumFractionDigits: 0
+    }).format(amount);
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU');
+}
+
+function showAlert(type, message) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('.container-fluid');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) alert.remove();
+    }, 5000);
+}
+
+// Обработка изменения типа клиента
+document.querySelector('select[name="type"]').addEventListener('change', function() {
+    const companyFields = document.querySelector('.company-fields');
+    if (this.value === 'company' || this.value === 'ip') {
+        companyFields.style.display = 'block';
+    } else {
+        companyFields.style.display = 'none';
+    }
+});
+
+// Поиск по Enter
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        loadClients(1);
+    }
+});
+
+// Загрузка при старте
+document.addEventListener('DOMContentLoaded', () => {
+    loadClients();
+});
+</script>
+{% endblock %}

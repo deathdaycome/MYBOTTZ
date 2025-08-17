@@ -28,6 +28,7 @@ pdfplumber>=0.9.0
 python-docx>=0.8.11
 Pillow>=10.0.0
 pytesseract>=0.3.10
+pdfkit>=1.0.0
 
 # Authentication & Security
 python-jose[cryptography]>=3.3.0

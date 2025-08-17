@@ -219,6 +219,54 @@ except ImportError as e:
 if analytics_router:
     admin_router.include_router(analytics_router)
 
+# Импорт роутера клиентов CRM
+try:
+    from .routers.clients import router as clients_router
+    print("Роутер клиентов CRM подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера клиентов: {e}")
+    clients_router = None
+
+# Подключаем роутер клиентов
+if clients_router:
+    admin_router.include_router(clients_router)
+
+# Импорт роутера лидов
+try:
+    from .routers.leads import router as leads_router
+    print("Роутер лидов подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера лидов: {e}")
+    leads_router = None
+
+# Подключаем роутер лидов
+if leads_router:
+    admin_router.include_router(leads_router)
+
+# Импорт роутера сделок
+try:
+    from .routers.deals import router as deals_router
+    print("Роутер сделок подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера сделок: {e}")
+    deals_router = None
+
+# Подключаем роутер сделок
+if deals_router:
+    admin_router.include_router(deals_router)
+
+# Импорт роутера документов
+try:
+    from .routers.documents import router as documents_router
+    print("Роутер документов подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера документов: {e}")
+    documents_router = None
+
+# Подключаем роутер документов
+if documents_router:
+    admin_router.include_router(documents_router)
+
 # Настройка шаблонов
 templates = Jinja2Templates(directory="app/admin/templates")
 
@@ -1919,12 +1967,16 @@ def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
         # Владелец видит все разделы
         return [
             {"name": "Дашборд", "url": "/", "icon": "fas fa-tachometer-alt"},
+            {"name": "Клиенты", "url": "/clients", "icon": "fas fa-address-book"},
+            {"name": "Лиды", "url": "/leads", "icon": "fas fa-lightbulb"},
+            {"name": "Сделки", "url": "/deals", "icon": "fas fa-handshake"},
             {"name": "Проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
             {"name": "База проектов", "url": "/project-files", "icon": "fas fa-database"},
             {"name": "Портфолио", "url": "/portfolio", "icon": "fas fa-briefcase"},
             {"name": "Правки", "url": "/revisions", "icon": "fas fa-edit"},
             {"name": "Планировщик задач", "url": "/tasks/", "icon": "fas fa-tasks"},
             {"name": "Мои задачи", "url": "/tasks/user/my-tasks", "icon": "fas fa-clipboard-list"},
+            {"name": "Документы", "url": "/documents", "icon": "fas fa-file-alt"},
             {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"},
             {"name": "Пользователи", "url": "/users", "icon": "fas fa-users"},
             {"name": "Исполнители", "url": "/contractors", "icon": "fas fa-user-tie"},
@@ -1944,6 +1996,7 @@ def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
             {"name": "Мои файлы", "url": "/project-files", "icon": "fas fa-folder"},
             {"name": "Правки", "url": "/revisions", "icon": "fas fa-edit"},
             {"name": "Мои задачи", "url": "/tasks/user/my-tasks", "icon": "fas fa-clipboard-list"},
+            {"name": "Документы", "url": "/documents", "icon": "fas fa-file-alt"},
             {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"}
         ]
 @admin_router.post("/api/projects/{project_id}/assign-executor")
