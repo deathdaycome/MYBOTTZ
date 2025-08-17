@@ -9,6 +9,7 @@ import secrets
 from typing import Optional, Dict, Any, List
 import json
 import os
+import calendar
 
 from ..config.settings import settings
 from ..config.logging import get_logger
@@ -1589,6 +1590,223 @@ async def api_stats(username: str = Depends(authenticate)):
         return {"success": True, "data": stats}
     except Exception as e:
         logger.error(f"Ошибка в api_stats: {e}")
+        return {"success": False, "error": str(e)}
+
+@admin_router.get("/api/dashboard/crm")
+async def api_dashboard_crm(username: str = Depends(authenticate)):
+    """API для получения данных CRM дашборда"""
+    try:
+        with get_db_context() as db:
+            from ..services.reports_service import ReportsService
+            from ..database.crm_models import Client, Lead, Deal, DealStatus, LeadStatus
+            
+            reports_service = ReportsService(db)
+            
+            # Получаем основные метрики
+            now = datetime.utcnow()
+            month_start = now.replace(day=1, hour=0, minute=0, second=0)
+            last_month_start = (month_start - timedelta(days=1)).replace(day=1)
+            
+            # Клиенты
+            total_clients = db.query(func.count(Client.id)).scalar()
+            new_clients_month = db.query(func.count(Client.id)).filter(
+                Client.created_at >= month_start
+            ).scalar()
+            
+            # Сделки
+            active_deals = db.query(func.count(Deal.id)).filter(
+                Deal.status.notin_([DealStatus.COMPLETED, DealStatus.CANCELLED])
+            ).scalar()
+            
+            deals_amount = db.query(func.sum(Deal.amount)).filter(
+                Deal.status.notin_([DealStatus.COMPLETED, DealStatus.CANCELLED])
+            ).scalar() or 0
+            
+            # Выручка
+            month_revenue = db.query(func.sum(Deal.amount)).filter(
+                Deal.status == DealStatus.COMPLETED,
+                Deal.closed_at >= month_start
+            ).scalar() or 0
+            
+            last_month_revenue = db.query(func.sum(Deal.amount)).filter(
+                Deal.status == DealStatus.COMPLETED,
+                Deal.closed_at >= last_month_start,
+                Deal.closed_at < month_start
+            ).scalar() or 0
+            
+            revenue_change = 0
+            if last_month_revenue > 0:
+                revenue_change = ((month_revenue - last_month_revenue) / last_month_revenue) * 100
+            
+            # Проекты
+            active_projects = db.query(func.count(Project.id)).filter(
+                Project.status == 'in_progress'
+            ).scalar()
+            
+            completed_projects = db.query(func.count(Project.id)).filter(
+                Project.status == 'completed',
+                Project.actual_end_date >= month_start
+            ).scalar()
+            
+            total_projects = db.query(func.count(Project.id)).filter(
+                Project.status.in_(['in_progress', 'completed'])
+            ).scalar()
+            
+            projects_completion = (completed_projects / total_projects * 100) if total_projects > 0 else 0
+            
+            # Воронка продаж
+            leads_total = db.query(func.count(Lead.id)).filter(
+                Lead.created_at >= month_start
+            ).scalar()
+            
+            leads_qualified = db.query(func.count(Lead.id)).filter(
+                Lead.created_at >= month_start,
+                Lead.status.in_([LeadStatus.QUALIFICATION, LeadStatus.PROPOSAL_SENT, LeadStatus.NEGOTIATION, LeadStatus.WON])
+            ).scalar()
+            
+            leads_proposals = db.query(func.count(Lead.id)).filter(
+                Lead.created_at >= month_start,
+                Lead.status.in_([LeadStatus.PROPOSAL_SENT, LeadStatus.NEGOTIATION, LeadStatus.WON])
+            ).scalar()
+            
+            leads_won = db.query(func.count(Lead.id)).filter(
+                Lead.created_at >= month_start,
+                Lead.status == LeadStatus.WON
+            ).scalar()
+            
+            conversion_rate = (leads_won / leads_total * 100) if leads_total > 0 else 0
+            
+            # График доходов
+            revenue_chart = []
+            for i in range(5, -1, -1):
+                month_date = now - timedelta(days=30 * i)
+                m_start = month_date.replace(day=1)
+                m_end = (m_start + timedelta(days=32)).replace(day=1)
+                
+                m_revenue = db.query(func.sum(Deal.amount)).filter(
+                    Deal.status == DealStatus.COMPLETED,
+                    Deal.closed_at >= m_start,
+                    Deal.closed_at < m_end
+                ).scalar() or 0
+                
+                revenue_chart.append({
+                    "month": calendar.month_name[m_start.month][:3],
+                    "revenue": float(m_revenue)
+                })
+            
+            # Топ клиенты
+            top_clients = db.query(
+                Client.name,
+                func.count(Deal.id).label('deals_count'),
+                func.sum(Deal.amount).label('total_revenue')
+            ).join(
+                Deal, Deal.client_id == Client.id
+            ).filter(
+                Deal.status == DealStatus.COMPLETED
+            ).group_by(Client.id, Client.name).order_by(
+                func.sum(Deal.amount).desc()
+            ).limit(5).all()
+            
+            # Активные сделки
+            active_deals_list = db.query(Deal).filter(
+                Deal.status.notin_([DealStatus.COMPLETED, DealStatus.CANCELLED])
+            ).order_by(Deal.amount.desc()).limit(5).all()
+            
+            # Последняя активность
+            recent_activities = []
+            
+            # Последние сделки
+            recent_deals = db.query(Deal).order_by(Deal.created_at.desc()).limit(3).all()
+            for deal in recent_deals:
+                recent_activities.append({
+                    "type": "deal",
+                    "title": f"Новая сделка: {deal.title}",
+                    "amount": float(deal.amount or 0),
+                    "date": deal.created_at.isoformat()
+                })
+            
+            # Последние проекты
+            recent_projects = db.query(Project).order_by(Project.created_at.desc()).limit(3).all()
+            for project in recent_projects:
+                recent_activities.append({
+                    "type": "project",
+                    "title": f"Проект: {project.title}",
+                    "status": project.status,
+                    "date": project.created_at.isoformat()
+                })
+            
+            recent_activities.sort(key=lambda x: x['date'], reverse=True)
+            
+            # KPI менеджеров (упрощенная версия)
+            managers_kpi = db.query(
+                AdminUser.username.label('name'),
+                func.count(func.distinct(Lead.id)).label('leads_count'),
+                func.count(func.distinct(Deal.id)).label('deals_count'),
+                func.sum(Deal.amount).label('revenue')
+            ).outerjoin(
+                Lead, Lead.responsible_manager_id == AdminUser.id
+            ).outerjoin(
+                Deal, Deal.responsible_manager_id == AdminUser.id
+            ).filter(
+                AdminUser.role.in_(['owner', 'manager'])
+            ).group_by(AdminUser.id, AdminUser.username).all()
+            
+            return {
+                "success": True,
+                "metrics": {
+                    "total_clients": total_clients,
+                    "new_clients_month": new_clients_month,
+                    "active_deals": active_deals,
+                    "deals_amount": float(deals_amount),
+                    "month_revenue": float(month_revenue),
+                    "revenue_change": round(revenue_change, 1),
+                    "active_projects": active_projects,
+                    "projects_completion": round(projects_completion, 1)
+                },
+                "funnel": {
+                    "leads": leads_total,
+                    "qualified": leads_qualified,
+                    "proposals": leads_proposals,
+                    "won": leads_won,
+                    "conversion_rate": round(conversion_rate, 1)
+                },
+                "revenue_chart": revenue_chart,
+                "top_clients": [
+                    {
+                        "name": client.name,
+                        "deals_count": client.deals_count,
+                        "total_revenue": float(client.total_revenue or 0)
+                    }
+                    for client in top_clients
+                ],
+                "active_deals_list": [
+                    {
+                        "title": deal.title,
+                        "status": deal.status.value,
+                        "status_label": deal.status.value,
+                        "amount": float(deal.amount or 0)
+                    }
+                    for deal in active_deals_list
+                ],
+                "recent_activities": recent_activities[:6],
+                "managers_kpi": [
+                    {
+                        "name": row.name,
+                        "leads_count": row.leads_count or 0,
+                        "deals_count": row.deals_count or 0,
+                        "conversion_rate": round((row.deals_count / row.leads_count * 100) if row.leads_count > 0 else 0, 1),
+                        "revenue": float(row.revenue or 0),
+                        "avg_deal_size": float(row.revenue / row.deals_count) if row.deals_count > 0 else 0,
+                        "efficiency": min(100, round((row.deals_count / max(row.leads_count, 1)) * 100, 1))
+                    }
+                    for row in managers_kpi
+                ]
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка в api_dashboard_crm: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
 @admin_router.post("/api/project/{project_id}/status")

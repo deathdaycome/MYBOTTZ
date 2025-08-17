@@ -1,531 +1,483 @@
-# app/services/reports_service.py
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, case
-import pandas as pd
-from io import BytesIO
-import xlsxwriter
+"""
+Сервис для генерации отчетов и аналитики
+"""
 
-from ..database.models import Project, User, Transaction, AdminUser, Task
+from typing import List, Dict, Any, Optional, Tuple
+from datetime import datetime, timedelta, date
+from sqlalchemy.orm import Session
+from sqlalchemy import func, and_, or_, extract, case
+from decimal import Decimal
+import calendar
+import json
+
+from ..database.models import Project, AdminUser, ProjectFile
+from ..database.crm_models import Client, Lead, Deal, DealStatus, LeadStatus
+from ..database.finance_models import FinanceTransaction, FinanceCategory
+from ..database.rbac_models import AuditLog
 from ..config.logging import get_logger
 
 logger = get_logger(__name__)
 
 
 class ReportsService:
-    """Сервис для генерации отчетов и аналитики"""
+    """Сервис для работы с отчетами и аналитикой"""
     
     def __init__(self, db: Session):
         self.db = db
     
-    def get_projects_report(
-        self, 
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        status: Optional[str] = None,
-        executor_id: Optional[int] = None
-    ) -> Dict[str, Any]:
-        """Получить отчет по проектам"""
-        try:
-            query = self.db.query(Project)
-            
-            # Фильтры
-            if start_date:
-                query = query.filter(Project.created_at >= start_date)
-            if end_date:
-                query = query.filter(Project.created_at <= end_date)
-            if status:
-                query = query.filter(Project.status == status)
-            if executor_id:
-                query = query.filter(Project.assigned_executor_id == executor_id)
-            
-            projects = query.all()
-            
-            # Считаем статистику
-            total_projects = len(projects)
-            total_revenue = sum(p.estimated_cost or 0 for p in projects)
-            
-            # Получаем доходы по проектам
-            project_ids = [p.id for p in projects]
-            total_received = self.db.query(func.sum(Transaction.amount)).filter(
-                and_(
-                    Transaction.project_id.in_(project_ids),
-                    Transaction.transaction_type == 'income',
-                    Transaction.status == 'completed'
-                )
-            ).scalar() or 0
-            
-            # Получаем расходы по проектам
-            total_expenses = self.db.query(func.sum(Transaction.amount)).filter(
-                and_(
-                    Transaction.project_id.in_(project_ids),
-                    Transaction.transaction_type == 'expense',
-                    Transaction.status == 'completed'
-                )
-            ).scalar() or 0
-            
-            # Статистика по статусам
-            status_distribution = {}
-            for project in projects:
-                status_distribution[project.status] = status_distribution.get(project.status, 0) + 1
-            
-            # Средние показатели
-            avg_project_cost = total_revenue / total_projects if total_projects > 0 else 0
-            avg_completion_time = self._calculate_avg_completion_time(projects)
-            
-            # Топ клиентов
-            top_clients = self._get_top_clients(projects)
-            
-            # Топ исполнителей
-            top_executors = self._get_top_executors(projects)
-            
-            return {
-                'period': {
-                    'start': start_date.isoformat() if start_date else None,
-                    'end': end_date.isoformat() if end_date else None
-                },
-                'summary': {
-                    'total_projects': total_projects,
-                    'total_revenue': total_revenue,
-                    'total_received': total_received,
-                    'total_expenses': total_expenses,
-                    'profit': total_received - total_expenses,
-                    'profitability': ((total_received - total_expenses) / total_received * 100) if total_received > 0 else 0,
-                    'avg_project_cost': avg_project_cost,
-                    'avg_completion_time': avg_completion_time,
-                    'completion_rate': self._calculate_completion_rate(projects)
-                },
-                'status_distribution': status_distribution,
-                'top_clients': top_clients,
-                'top_executors': top_executors,
-                'projects': [self._project_to_dict(p) for p in projects]
-            }
-            
-        except Exception as e:
-            logger.error(f"Ошибка генерации отчета по проектам: {str(e)}")
-            raise
+    # === Отчеты по продажам ===
     
-    def get_financial_report(
-        self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
-    ) -> Dict[str, Any]:
-        """Получить финансовый отчет"""
-        try:
-            # Базовые запросы
-            income_query = self.db.query(Transaction).filter(
-                Transaction.transaction_type == 'income',
-                Transaction.status == 'completed'
-            )
-            expense_query = self.db.query(Transaction).filter(
-                Transaction.transaction_type == 'expense',
-                Transaction.status == 'completed'
-            )
-            
-            # Применяем фильтры дат
-            if start_date:
-                income_query = income_query.filter(Transaction.transaction_date >= start_date)
-                expense_query = expense_query.filter(Transaction.transaction_date >= start_date)
-            if end_date:
-                income_query = income_query.filter(Transaction.transaction_date <= end_date)
-                expense_query = expense_query.filter(Transaction.transaction_date <= end_date)
-            
-            incomes = income_query.all()
-            expenses = expense_query.all()
-            
-            # Считаем суммы
-            total_income = sum(t.amount for t in incomes)
-            total_expense = sum(t.amount for t in expenses)
-            profit = total_income - total_expense
-            
-            # Группировка по месяцам
-            monthly_data = self._group_transactions_by_month(incomes, expenses)
-            
-            # Топ категорий расходов
-            expense_categories = {}
-            for expense in expenses:
-                category = expense.category or 'Другое'
-                expense_categories[category] = expense_categories.get(category, 0) + expense.amount
-            
-            # Топ проектов по доходам
-            project_income = {}
-            for income in incomes:
-                if income.project_id:
-                    project = self.db.query(Project).filter(Project.id == income.project_id).first()
-                    if project:
-                        project_income[project.title] = project_income.get(project.title, 0) + income.amount
-            
-            top_projects = sorted(project_income.items(), key=lambda x: x[1], reverse=True)[:10]
-            
-            # Прогноз на следующий месяц
-            forecast = self._calculate_forecast(monthly_data)
-            
-            return {
-                'period': {
-                    'start': start_date.isoformat() if start_date else None,
-                    'end': end_date.isoformat() if end_date else None
-                },
-                'summary': {
-                    'total_income': total_income,
-                    'total_expense': total_expense,
-                    'profit': profit,
-                    'profit_margin': (profit / total_income * 100) if total_income > 0 else 0,
-                    'transactions_count': len(incomes) + len(expenses)
-                },
-                'monthly_data': monthly_data,
-                'expense_categories': expense_categories,
-                'top_projects_by_income': top_projects,
-                'forecast': forecast,
-                'cash_flow': self._calculate_cash_flow(incomes, expenses)
-            }
-            
-        except Exception as e:
-            logger.error(f"Ошибка генерации финансового отчета: {str(e)}")
-            raise
-    
-    def get_executor_report(self, executor_id: int) -> Dict[str, Any]:
-        """Получить отчет по исполнителю"""
-        try:
-            executor = self.db.query(AdminUser).filter(AdminUser.id == executor_id).first()
-            if not executor:
-                raise ValueError(f"Исполнитель с ID {executor_id} не найден")
-            
-            # Проекты исполнителя
-            projects = self.db.query(Project).filter(
-                Project.assigned_executor_id == executor_id
-            ).all()
-            
-            # Задачи исполнителя
-            tasks = self.db.query(Task).filter(
-                Task.assigned_to_id == executor_id
-            ).all() if Task else []
-            
-            # Финансовые показатели
-            total_earned = sum(p.executor_cost or 0 for p in projects if p.status == 'completed')
-            total_paid = self.db.query(func.sum(Transaction.amount)).filter(
-                and_(
-                    Transaction.contractor_id == executor_id,
-                    Transaction.transaction_type == 'expense',
-                    Transaction.status == 'completed'
-                )
-            ).scalar() or 0
-            
-            # Статистика по проектам
-            project_stats = {
-                'total': len(projects),
-                'completed': len([p for p in projects if p.status == 'completed']),
-                'in_progress': len([p for p in projects if p.status == 'in_progress']),
-                'overdue': len([p for p in projects if p.status == 'overdue'])
-            }
-            
-            # Эффективность
-            completion_rate = (project_stats['completed'] / project_stats['total'] * 100) if project_stats['total'] > 0 else 0
-            
-            # Средние показатели
-            avg_project_time = self._calculate_avg_completion_time(
-                [p for p in projects if p.status == 'completed']
-            )
-            
-            return {
-                'executor': {
-                    'id': executor.id,
-                    'username': executor.username,
-                    'full_name': f"{executor.first_name or ''} {executor.last_name or ''}".strip(),
-                    'email': executor.email,
-                    'role': executor.role
-                },
-                'financial': {
-                    'total_earned': total_earned,
-                    'total_paid': total_paid,
-                    'balance': total_earned - total_paid
-                },
-                'projects': project_stats,
-                'tasks': {
-                    'total': len(tasks),
-                    'completed': len([t for t in tasks if t.status == 'completed']),
-                    'in_progress': len([t for t in tasks if t.status == 'in_progress'])
-                },
-                'performance': {
-                    'completion_rate': completion_rate,
-                    'avg_project_time': avg_project_time,
-                    'projects_this_month': len([
-                        p for p in projects 
-                        if p.created_at >= datetime.now() - timedelta(days=30)
-                    ])
-                },
-                'recent_projects': [
-                    self._project_to_dict(p) for p in 
-                    sorted(projects, key=lambda x: x.created_at or datetime.min, reverse=True)[:5]
-                ]
-            }
-            
-        except Exception as e:
-            logger.error(f"Ошибка генерации отчета по исполнителю: {str(e)}")
-            raise
-    
-    def export_to_excel(self, report_data: Dict[str, Any], report_type: str) -> BytesIO:
-        """Экспорт отчета в Excel"""
-        try:
-            output = BytesIO()
-            
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                workbook = writer.book
-                
-                # Форматы
-                header_format = workbook.add_format({
-                    'bold': True,
-                    'bg_color': '#4472C4',
-                    'font_color': 'white',
-                    'align': 'center',
-                    'valign': 'vcenter'
-                })
-                
-                money_format = workbook.add_format({'num_format': '#,##0 ₽'})
-                percent_format = workbook.add_format({'num_format': '0.00%'})
-                
-                if report_type == 'projects':
-                    # Сводка
-                    summary_df = pd.DataFrame([report_data['summary']])
-                    summary_df.to_excel(writer, sheet_name='Сводка', index=False)
-                    
-                    # Проекты
-                    if report_data.get('projects'):
-                        projects_df = pd.DataFrame(report_data['projects'])
-                        projects_df.to_excel(writer, sheet_name='Проекты', index=False)
-                    
-                    # Распределение по статусам
-                    if report_data.get('status_distribution'):
-                        status_df = pd.DataFrame(
-                            list(report_data['status_distribution'].items()),
-                            columns=['Статус', 'Количество']
-                        )
-                        status_df.to_excel(writer, sheet_name='Статусы', index=False)
-                
-                elif report_type == 'financial':
-                    # Финансовая сводка
-                    summary_df = pd.DataFrame([report_data['summary']])
-                    summary_df.to_excel(writer, sheet_name='Сводка', index=False)
-                    
-                    # Месячные данные
-                    if report_data.get('monthly_data'):
-                        monthly_df = pd.DataFrame(report_data['monthly_data'])
-                        monthly_df.to_excel(writer, sheet_name='По месяцам', index=False)
-                    
-                    # Категории расходов
-                    if report_data.get('expense_categories'):
-                        categories_df = pd.DataFrame(
-                            list(report_data['expense_categories'].items()),
-                            columns=['Категория', 'Сумма']
-                        )
-                        categories_df.to_excel(writer, sheet_name='Категории расходов', index=False)
-                
-                elif report_type == 'executor':
-                    # Информация об исполнителе
-                    executor_df = pd.DataFrame([report_data['executor']])
-                    executor_df.to_excel(writer, sheet_name='Исполнитель', index=False)
-                    
-                    # Финансы
-                    financial_df = pd.DataFrame([report_data['financial']])
-                    financial_df.to_excel(writer, sheet_name='Финансы', index=False)
-                    
-                    # Показатели
-                    performance_df = pd.DataFrame([report_data['performance']])
-                    performance_df.to_excel(writer, sheet_name='Показатели', index=False)
-            
-            output.seek(0)
-            return output
-            
-        except Exception as e:
-            logger.error(f"Ошибка экспорта в Excel: {str(e)}")
-            raise
-    
-    def _calculate_avg_completion_time(self, projects: List[Project]) -> float:
-        """Рассчитать среднее время выполнения проектов"""
-        completion_times = []
-        for project in projects:
-            if project.status == 'completed' and project.created_at:
-                end_date = project.actual_end_date or project.updated_at
-                if end_date:
-                    days = (end_date - project.created_at).days
-                    completion_times.append(days)
+    def get_sales_report(self, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+        """Отчет по продажам за период"""
         
-        return sum(completion_times) / len(completion_times) if completion_times else 0
-    
-    def _calculate_completion_rate(self, projects: List[Project]) -> float:
-        """Рассчитать процент завершенных проектов"""
-        if not projects:
-            return 0
-        completed = len([p for p in projects if p.status == 'completed'])
-        return (completed / len(projects)) * 100
-    
-    def _get_top_clients(self, projects: List[Project], limit: int = 5) -> List[Dict[str, Any]]:
-        """Получить топ клиентов по проектам"""
-        client_stats = {}
+        # Статистика по лидам
+        total_leads = self.db.query(func.count(Lead.id)).filter(
+            Lead.created_at >= start_date,
+            Lead.created_at <= end_date
+        ).scalar()
         
-        for project in projects:
-            if project.user_id:
-                user = self.db.query(User).filter(User.id == project.user_id).first()
-                if user:
-                    key = user.id
-                    if key not in client_stats:
-                        client_stats[key] = {
-                            'id': user.id,
-                            'name': user.first_name or user.username or 'Неизвестный',
-                            'projects_count': 0,
-                            'total_revenue': 0
-                        }
-                    client_stats[key]['projects_count'] += 1
-                    client_stats[key]['total_revenue'] += project.estimated_cost or 0
+        converted_leads = self.db.query(func.count(Lead.id)).filter(
+            Lead.created_at >= start_date,
+            Lead.created_at <= end_date,
+            Lead.status == LeadStatus.WON
+        ).scalar()
         
-        # Сортируем по выручке
-        sorted_clients = sorted(
-            client_stats.values(), 
-            key=lambda x: x['total_revenue'], 
-            reverse=True
-        )
+        lead_conversion_rate = (converted_leads / total_leads * 100) if total_leads > 0 else 0
         
-        return sorted_clients[:limit]
-    
-    def _get_top_executors(self, projects: List[Project], limit: int = 5) -> List[Dict[str, Any]]:
-        """Получить топ исполнителей по проектам"""
-        executor_stats = {}
+        # Статистика по сделкам
+        total_deals = self.db.query(func.count(Deal.id)).filter(
+            Deal.created_at >= start_date,
+            Deal.created_at <= end_date
+        ).scalar()
         
-        for project in projects:
-            if project.assigned_executor_id:
-                executor = self.db.query(AdminUser).filter(
-                    AdminUser.id == project.assigned_executor_id
-                ).first()
-                if executor:
-                    key = executor.id
-                    if key not in executor_stats:
-                        executor_stats[key] = {
-                            'id': executor.id,
-                            'name': executor.username,
-                            'projects_count': 0,
-                            'completed_count': 0,
-                            'total_earned': 0
-                        }
-                    executor_stats[key]['projects_count'] += 1
-                    if project.status == 'completed':
-                        executor_stats[key]['completed_count'] += 1
-                        executor_stats[key]['total_earned'] += project.executor_cost or 0
+        completed_deals = self.db.query(func.count(Deal.id)).filter(
+            Deal.created_at >= start_date,
+            Deal.created_at <= end_date,
+            Deal.status == DealStatus.COMPLETED
+        ).scalar()
         
-        # Сортируем по количеству завершенных проектов
-        sorted_executors = sorted(
-            executor_stats.values(),
-            key=lambda x: x['completed_count'],
-            reverse=True
-        )
+        deal_success_rate = (completed_deals / total_deals * 100) if total_deals > 0 else 0
         
-        return sorted_executors[:limit]
-    
-    def _group_transactions_by_month(
-        self, 
-        incomes: List[Transaction], 
-        expenses: List[Transaction]
-    ) -> List[Dict[str, Any]]:
-        """Группировать транзакции по месяцам"""
-        monthly_data = {}
+        # Финансовые показатели
+        total_revenue = self.db.query(func.sum(Deal.amount)).filter(
+            Deal.created_at >= start_date,
+            Deal.created_at <= end_date,
+            Deal.status == DealStatus.COMPLETED
+        ).scalar() or 0
         
-        # Обрабатываем доходы
-        for income in incomes:
-            if income.transaction_date:
-                month_key = income.transaction_date.strftime('%Y-%m')
-                if month_key not in monthly_data:
-                    monthly_data[month_key] = {
-                        'month': month_key,
-                        'income': 0,
-                        'expense': 0,
-                        'profit': 0
-                    }
-                monthly_data[month_key]['income'] += income.amount
+        avg_deal_size = self.db.query(func.avg(Deal.amount)).filter(
+            Deal.created_at >= start_date,
+            Deal.created_at <= end_date,
+            Deal.status == DealStatus.COMPLETED
+        ).scalar() or 0
         
-        # Обрабатываем расходы
-        for expense in expenses:
-            if expense.transaction_date:
-                month_key = expense.transaction_date.strftime('%Y-%m')
-                if month_key not in monthly_data:
-                    monthly_data[month_key] = {
-                        'month': month_key,
-                        'income': 0,
-                        'expense': 0,
-                        'profit': 0
-                    }
-                monthly_data[month_key]['expense'] += expense.amount
+        # Продажи по менеджерам
+        sales_by_manager = self.db.query(
+            AdminUser.username,
+            func.count(Deal.id).label('deals_count'),
+            func.sum(Deal.amount).label('total_amount')
+        ).join(
+            Deal, Deal.responsible_manager_id == AdminUser.id
+        ).filter(
+            Deal.created_at >= start_date,
+            Deal.created_at <= end_date,
+            Deal.status == DealStatus.COMPLETED
+        ).group_by(AdminUser.username).all()
         
-        # Рассчитываем прибыль
-        for month_data in monthly_data.values():
-            month_data['profit'] = month_data['income'] - month_data['expense']
+        # Продажи по источникам
+        sales_by_source = self.db.query(
+            Lead.source,
+            func.count(Deal.id).label('deals_count'),
+            func.sum(Deal.amount).label('total_amount')
+        ).join(
+            Deal, Deal.lead_id == Lead.id
+        ).filter(
+            Deal.created_at >= start_date,
+            Deal.created_at <= end_date,
+            Deal.status == DealStatus.COMPLETED
+        ).group_by(Lead.source).all()
         
-        # Сортируем по месяцам
-        return sorted(monthly_data.values(), key=lambda x: x['month'])
-    
-    def _calculate_forecast(self, monthly_data: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Рассчитать прогноз на следующий месяц"""
-        if len(monthly_data) < 3:
-            return {
-                'income': 0,
-                'expense': 0,
-                'profit': 0,
-                'confidence': 'low'
-            }
+        # Динамика по месяцам
+        monthly_dynamics = self.db.query(
+            extract('year', Deal.created_at).label('year'),
+            extract('month', Deal.created_at).label('month'),
+            func.count(Deal.id).label('deals_count'),
+            func.sum(Deal.amount).label('total_amount')
+        ).filter(
+            Deal.created_at >= start_date,
+            Deal.created_at <= end_date,
+            Deal.status == DealStatus.COMPLETED
+        ).group_by(
+            extract('year', Deal.created_at),
+            extract('month', Deal.created_at)
+        ).order_by(
+            extract('year', Deal.created_at),
+            extract('month', Deal.created_at)
+        ).all()
         
-        # Простое скользящее среднее за последние 3 месяца
-        recent_months = monthly_data[-3:]
-        avg_income = sum(m['income'] for m in recent_months) / 3
-        avg_expense = sum(m['expense'] for m in recent_months) / 3
+        # Средний цикл сделки
+        avg_deal_cycle = self.db.query(
+            func.avg(func.julianday(Deal.closed_at) - func.julianday(Deal.created_at))
+        ).filter(
+            Deal.created_at >= start_date,
+            Deal.created_at <= end_date,
+            Deal.status == DealStatus.COMPLETED,
+            Deal.closed_at.isnot(None)
+        ).scalar() or 0
         
         return {
-            'income': avg_income,
-            'expense': avg_expense,
-            'profit': avg_income - avg_expense,
-            'confidence': 'medium' if len(monthly_data) >= 6 else 'low'
+            "period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat()
+            },
+            "leads": {
+                "total": total_leads,
+                "converted": converted_leads,
+                "conversion_rate": round(lead_conversion_rate, 1)
+            },
+            "deals": {
+                "total": total_deals,
+                "completed": completed_deals,
+                "success_rate": round(deal_success_rate, 1),
+                "avg_cycle_days": round(avg_deal_cycle, 1)
+            },
+            "revenue": {
+                "total": float(total_revenue),
+                "avg_deal_size": float(avg_deal_size)
+            },
+            "by_manager": [
+                {
+                    "manager": row.username,
+                    "deals_count": row.deals_count,
+                    "total_amount": float(row.total_amount or 0)
+                }
+                for row in sales_by_manager
+            ],
+            "by_source": [
+                {
+                    "source": row.source or "Не указан",
+                    "deals_count": row.deals_count,
+                    "total_amount": float(row.total_amount or 0)
+                }
+                for row in sales_by_source
+            ],
+            "monthly_dynamics": [
+                {
+                    "year": int(row.year),
+                    "month": int(row.month),
+                    "month_name": calendar.month_name[int(row.month)],
+                    "deals_count": row.deals_count,
+                    "total_amount": float(row.total_amount or 0)
+                }
+                for row in monthly_dynamics
+            ]
         }
     
-    def _calculate_cash_flow(
-        self, 
-        incomes: List[Transaction], 
-        expenses: List[Transaction]
-    ) -> List[Dict[str, Any]]:
-        """Рассчитать денежный поток"""
-        all_transactions = sorted(
-            incomes + expenses,
-            key=lambda x: x.transaction_date or datetime.min
-        )
+    # === Отчеты по клиентам ===
+    
+    def get_clients_report(self, filters: Dict[str, Any] = None) -> Dict[str, Any]:
+        """Отчет по клиентам"""
         
-        cash_flow = []
-        balance = 0
+        # Общая статистика
+        total_clients = self.db.query(func.count(Client.id)).scalar()
+        active_clients = self.db.query(func.count(Client.id)).filter(
+            Client.status == 'active'
+        ).scalar()
         
-        for transaction in all_transactions:
-            if transaction.transaction_type == 'income':
-                balance += transaction.amount
-                flow_type = 'in'
-            else:
-                balance -= transaction.amount
-                flow_type = 'out'
-            
-            cash_flow.append({
-                'date': transaction.transaction_date.isoformat() if transaction.transaction_date else None,
-                'type': flow_type,
-                'amount': transaction.amount,
-                'balance': balance,
-                'description': transaction.description
+        # Новые клиенты за последний месяц
+        last_month = datetime.utcnow() - timedelta(days=30)
+        new_clients = self.db.query(func.count(Client.id)).filter(
+            Client.created_at >= last_month
+        ).scalar()
+        
+        # Сегментация клиентов
+        segments = self.db.query(
+            Client.segment,
+            func.count(Client.id).label('count')
+        ).group_by(Client.segment).all()
+        
+        # Топ клиентов по выручке
+        top_clients = self.db.query(
+            Client.name,
+            Client.segment,
+            func.sum(Deal.amount).label('total_revenue'),
+            func.count(Deal.id).label('deals_count')
+        ).join(
+            Deal, Deal.client_id == Client.id
+        ).filter(
+            Deal.status == DealStatus.COMPLETED
+        ).group_by(
+            Client.id, Client.name, Client.segment
+        ).order_by(
+            func.sum(Deal.amount).desc()
+        ).limit(10).all()
+        
+        # LTV (Lifetime Value) по сегментам
+        ltv_by_segment = self.db.query(
+            Client.segment,
+            func.avg(
+                self.db.query(func.sum(Deal.amount)).filter(
+                    Deal.client_id == Client.id,
+                    Deal.status == DealStatus.COMPLETED
+                ).correlate(Client).as_scalar()
+            ).label('avg_ltv')
+        ).group_by(Client.segment).all()
+        
+        # Активность клиентов
+        client_activity = self.db.query(
+            case(
+                (Client.last_contact_date >= datetime.utcnow() - timedelta(days=30), 'active'),
+                (Client.last_contact_date >= datetime.utcnow() - timedelta(days=90), 'moderate'),
+                else_='inactive'
+            ).label('activity_level'),
+            func.count(Client.id).label('count')
+        ).group_by('activity_level').all()
+        
+        # География клиентов (если есть поле city/region)
+        geography = self.db.query(
+            Client.city,
+            func.count(Client.id).label('count')
+        ).filter(
+            Client.city.isnot(None)
+        ).group_by(Client.city).all()
+        
+        return {
+            "summary": {
+                "total": total_clients,
+                "active": active_clients,
+                "new_last_month": new_clients,
+                "churn_rate": round(((total_clients - active_clients) / total_clients * 100) if total_clients > 0 else 0, 1)
+            },
+            "segments": [
+                {
+                    "segment": row.segment or "Не указан",
+                    "count": row.count
+                }
+                for row in segments
+            ],
+            "top_clients": [
+                {
+                    "name": row.name,
+                    "segment": row.segment,
+                    "total_revenue": float(row.total_revenue or 0),
+                    "deals_count": row.deals_count
+                }
+                for row in top_clients
+            ],
+            "ltv_by_segment": [
+                {
+                    "segment": row.segment or "Не указан",
+                    "avg_ltv": float(row.avg_ltv or 0)
+                }
+                for row in ltv_by_segment
+            ],
+            "activity": [
+                {
+                    "level": row.activity_level,
+                    "count": row.count
+                }
+                for row in client_activity
+            ],
+            "geography": [
+                {
+                    "city": row.city,
+                    "count": row.count
+                }
+                for row in geography[:10]  # Топ-10 городов
+            ]
+        }
+    
+    # === Отчеты по проектам ===
+    
+    def get_projects_report(self, start_date: datetime = None, end_date: datetime = None) -> Dict[str, Any]:
+        """Отчет по проектам"""
+        
+        query = self.db.query(Project)
+        if start_date:
+            query = query.filter(Project.created_at >= start_date)
+        if end_date:
+            query = query.filter(Project.created_at <= end_date)
+        
+        # Статистика по статусам
+        status_stats = self.db.query(
+            Project.status,
+            func.count(Project.id).label('count'),
+            func.sum(Project.estimated_cost).label('total_cost')
+        ).group_by(Project.status).all()
+        
+        # Статистика по исполнителям
+        executor_stats = self.db.query(
+            AdminUser.username,
+            func.count(Project.id).label('projects_count'),
+            func.sum(Project.estimated_cost).label('total_cost'),
+            func.avg(
+                case(
+                    (Project.status == 'completed', 100),
+                    (Project.status == 'in_progress', 50),
+                    else_=0
+                )
+            ).label('avg_completion')
+        ).join(
+            Project, Project.assigned_executor_id == AdminUser.id
+        ).group_by(AdminUser.username).all()
+        
+        # Просроченные проекты
+        overdue_projects = self.db.query(Project).filter(
+            Project.planned_end_date < datetime.utcnow(),
+            Project.status.notin_(['completed', 'cancelled'])
+        ).all()
+        
+        # Средняя длительность проектов
+        avg_duration = self.db.query(
+            func.avg(
+                func.julianday(Project.actual_end_date) - func.julianday(Project.start_date)
+            )
+        ).filter(
+            Project.status == 'completed',
+            Project.actual_end_date.isnot(None),
+            Project.start_date.isnot(None)
+        ).scalar() or 0
+        
+        # Рентабельность проектов
+        profitability_data = self.db.query(
+            func.sum(Project.estimated_cost).label('revenue'),
+            func.sum(Project.executor_cost).label('costs')
+        ).filter(
+            Project.status == 'completed'
+        ).first()
+        
+        profit_margin = 0
+        if profitability_data and profitability_data.revenue:
+            profit = (profitability_data.revenue or 0) - (profitability_data.costs or 0)
+            profit_margin = (profit / profitability_data.revenue) * 100
+        
+        # Проекты по типам
+        project_types = self.db.query(
+            Project.type,
+            func.count(Project.id).label('count'),
+            func.avg(Project.estimated_cost).label('avg_cost')
+        ).group_by(Project.type).all()
+        
+        return {
+            "summary": {
+                "total": sum(row.count for row in status_stats),
+                "in_progress": next((row.count for row in status_stats if row.status == 'in_progress'), 0),
+                "completed": next((row.count for row in status_stats if row.status == 'completed'), 0),
+                "overdue": len(overdue_projects),
+                "avg_duration_days": round(avg_duration, 1),
+                "profit_margin": round(profit_margin, 1)
+            },
+            "by_status": [
+                {
+                    "status": row.status,
+                    "count": row.count,
+                    "total_cost": float(row.total_cost or 0)
+                }
+                for row in status_stats
+            ],
+            "by_executor": [
+                {
+                    "executor": row.username,
+                    "projects_count": row.projects_count,
+                    "total_cost": float(row.total_cost or 0),
+                    "avg_completion": round(row.avg_completion or 0, 1)
+                }
+                for row in executor_stats
+            ],
+            "by_type": [
+                {
+                    "type": row.type or "Не указан",
+                    "count": row.count,
+                    "avg_cost": float(row.avg_cost or 0)
+                }
+                for row in project_types
+            ],
+            "overdue_projects": [
+                {
+                    "id": p.id,
+                    "title": p.title,
+                    "status": p.status,
+                    "planned_end_date": p.planned_end_date.isoformat() if p.planned_end_date else None,
+                    "days_overdue": (datetime.utcnow() - p.planned_end_date).days if p.planned_end_date else 0
+                }
+                for p in overdue_projects[:10]  # Топ-10 просроченных
+            ]
+        }
+    
+    # === Сводный дашборд ===
+    
+    def get_dashboard_data(self) -> Dict[str, Any]:
+        """Данные для главного дашборда"""
+        
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0)
+        
+        # Ключевые метрики
+        total_clients = self.db.query(func.count(Client.id)).scalar()
+        active_deals = self.db.query(func.count(Deal.id)).filter(
+            Deal.status.notin_([DealStatus.COMPLETED, DealStatus.CANCELLED])
+        ).scalar()
+        
+        month_revenue = self.db.query(func.sum(Deal.amount)).filter(
+            Deal.status == DealStatus.COMPLETED,
+            Deal.closed_at >= month_start
+        ).scalar() or 0
+        
+        active_projects = self.db.query(func.count(Project.id)).filter(
+            Project.status == 'in_progress'
+        ).scalar()
+        
+        # Последние активности
+        recent_activities = []
+        
+        # Последние сделки
+        recent_deals = self.db.query(Deal).order_by(Deal.created_at.desc()).limit(5).all()
+        for deal in recent_deals:
+            recent_activities.append({
+                "type": "deal",
+                "title": f"Новая сделка: {deal.title}",
+                "amount": float(deal.amount or 0),
+                "date": deal.created_at.isoformat()
             })
         
-        return cash_flow[-50:]  # Последние 50 транзакций
-    
-    def _project_to_dict(self, project: Project) -> Dict[str, Any]:
-        """Преобразовать проект в словарь для отчета"""
+        # Последние проекты
+        recent_projects = self.db.query(Project).order_by(Project.created_at.desc()).limit(5).all()
+        for project in recent_projects:
+            recent_activities.append({
+                "type": "project",
+                "title": f"Новый проект: {project.title}",
+                "status": project.status,
+                "date": project.created_at.isoformat()
+            })
+        
+        # Сортируем активности по дате
+        recent_activities.sort(key=lambda x: x['date'], reverse=True)
+        
+        # График доходов за последние 6 месяцев
+        revenue_chart = []
+        for i in range(5, -1, -1):
+            month_date = now - timedelta(days=30 * i)
+            month_start = month_date.replace(day=1)
+            month_end = (month_start + timedelta(days=32)).replace(day=1)
+            
+            month_revenue = self.db.query(func.sum(Deal.amount)).filter(
+                Deal.status == DealStatus.COMPLETED,
+                Deal.closed_at >= month_start,
+                Deal.closed_at < month_end
+            ).scalar() or 0
+            
+            revenue_chart.append({
+                "month": calendar.month_name[month_start.month][:3],
+                "revenue": float(month_revenue)
+            })
+        
         return {
-            'id': project.id,
-            'title': project.title,
-            'status': project.status,
-            'priority': project.priority,
-            'estimated_cost': project.estimated_cost,
-            'client': project.user.first_name if project.user else 'Неизвестный',
-            'executor': project.assigned_executor.username if project.assigned_executor else None,
-            'created_at': project.created_at.isoformat() if project.created_at else None,
-            'deadline': project.planned_end_date.isoformat() if project.planned_end_date else None,
-            'completion_percentage': project.completion_percentage or 0
+            "metrics": {
+                "total_clients": total_clients,
+                "active_deals": active_deals,
+                "month_revenue": float(month_revenue),
+                "active_projects": active_projects
+            },
+            "recent_activities": recent_activities[:10],
+            "revenue_chart": revenue_chart
         }
