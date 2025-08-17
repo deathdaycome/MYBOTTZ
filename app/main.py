@@ -417,8 +417,9 @@ async def webhook(request: Request):
 
 @app.get("/")
 async def root():
-    """Корневой эндпоинт для проверки работы."""
-    return {"message": "Сервер админ-панели работает. Перейдите на /admin для входа."}
+    """Корневой эндпоинт - редирект на админку."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/admin/", status_code=302)
 
 @app.get("/test")
 async def test():
