@@ -369,7 +369,7 @@
     // Load financial metrics
     async function loadFinancialMetrics() {
         try {
-            const response = await fetch('/admin/api/reports/dashboard-metrics', {
+            const response = await fetch('/admin/reports/dashboard-metrics', {
                 headers: {
                     'Authorization': 'Basic ' + btoa('admin:qwerty123')
                 }
