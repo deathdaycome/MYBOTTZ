@@ -1,15 +1,15 @@
 module.exports = {
   apps: [{
     name: 'bot-business-card',
-    script: '/root/bot_business_card/venv/bin/python3',
+    script: '/var/www/bot_business_card/venv/bin/python3',
     args: '-m app.main',
-    cwd: '/root/bot_business_card',
+    cwd: '/var/www/bot_business_card',
     interpreter: 'none',
     instances: 1,
     autorestart: true,
     watch: false,
     max_memory_restart: '500M',
-    env_file: '/root/bot_business_card/.env',
+    env_file: '/var/www/bot_business_card/.env',
     env: {
       NODE_ENV: 'production'
     },

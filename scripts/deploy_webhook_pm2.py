@@ -17,7 +17,7 @@ app = Flask(__name__)
 
 # Настройки
 WEBHOOK_SECRET = "your-webhook-secret-key-2024"  # Измени на свой секрет
-REPO_PATH = "/root/bot_business_card"
+REPO_PATH = "/var/www/bot_business_card"
 BRANCH = "main"
 
 # Логирование
