@@ -49,15 +49,27 @@ async def log_requests(request: Request, call_next):
     import time
     start_time = time.time()
     
-    # Логируем входящий запрос
+    # Логируем входящий запрос с большей детализацией
     logger.info(f"HTTP {request.method} {request.url.path} - {request.client.host}")
+    logger.debug(f"Query params: {request.query_params}")
+    logger.debug(f"Headers: {dict(request.headers)}")
     
     response = await call_next(request)
     
-    # Логируем время выполнения
+    # Логируем время выполнения и статус
     process_time = time.time() - start_time
     logger.info(f"HTTP {request.method} {request.url.path} - {response.status_code} - {process_time:.2f}s")
     
+    if response.status_code == 404:
+        logger.warning(f"404 Not Found: {request.url.path}")
+    
+    return response
+
+# Middleware для добавления templates в request.state
+@app.middleware("http")
+async def add_templates(request: Request, call_next):
+    request.state.templates = templates
+    response = await call_next(request)
     return response
 
 # Подключаем роутер админки
@@ -429,19 +441,39 @@ async def test():
 @app.get("/admin-test")
 async def admin_test():
     """Тестовый эндпоинт для проверки админки."""
-    return {"status": "ok", "message": "Админка доступна", "routes": "admin routes working"}
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'path'):
+            routes.append(route.path)
+    return {"status": "ok", "message": "Админка доступна", "routes": routes}
 
 @app.get("/admin-debug")
 async def admin_debug():
     """Отладочный эндпоинт для проверки админки без аутентификации."""
-    from app.config.settings import get_settings
-    settings = get_settings()
+    routes_info = []
+    for route in app.routes:
+        if hasattr(route, 'path'):
+            route_info = {
+                "path": route.path,
+                "name": route.name if hasattr(route, 'name') else None
+            }
+            if hasattr(route, 'methods'):
+                route_info["methods"] = list(route.methods) if route.methods else []
+            routes_info.append(route_info)
+    
+    # Сортируем роуты для удобства
+    routes_info.sort(key=lambda x: x['path'])
+    
+    # Фильтруем только админские роуты для быстрого анализа
+    admin_routes = [r for r in routes_info if r['path'].startswith('/admin')]
+    
     return {
         "status": "ok", 
         "message": "Админка работает без аутентификации",
-        "admin_username": settings.ADMIN_USERNAME,
-        "admin_port": settings.ADMIN_PORT,
-        "database_status": "connected"
+        "total_routes": len(routes_info),
+        "admin_routes_count": len(admin_routes),
+        "admin_routes": admin_routes[:20],  # Первые 20 для краткости
+        "all_routes": routes_info[:50]  # Первые 50 для краткости
     }
 
 if __name__ == "__main__":

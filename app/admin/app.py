@@ -347,6 +347,10 @@ def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
         headers={"WWW-Authenticate": "Basic"},
     )
 
+@admin_router.get("/test-simple")
+async def test_simple():
+    """Простой тестовый эндпоинт без аутентификации"""
+    return {"status": "ok", "message": "Admin router работает!"}
 
 @admin_router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
