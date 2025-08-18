@@ -22,6 +22,19 @@ html, body {
     transition: background-color 0.3s ease;
 }
 
+/* Минимальная ширина для колонки действий */
+#projectsTable th:last-child,
+#projectsTable td:last-child {
+    min-width: 250px !important;
+    white-space: nowrap;
+}
+
+/* Убедимся что кнопки видны */
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
 /* Новый проект */
 #projectsTable tbody tr[data-status="new"] {
     background-color: #e3f2fd !important;
