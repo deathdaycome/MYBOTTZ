@@ -75,6 +75,10 @@ async def add_templates(request: Request, call_next):
 # Подключаем роутер админки
 app.include_router(admin_router, prefix="/admin")
 
+# ВАЖНО: Дублируем все роуты админки без префикса /admin для совместимости
+# Это позволит работать как с /admin/projects, так и с /projects
+app.include_router(admin_router)
+
 # Подключаем статические файлы
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/admin/static", StaticFiles(directory="app/admin/static"), name="admin_static")
@@ -432,11 +436,7 @@ async def ping():
     """Самый простой эндпоинт для проверки."""
     return {"message": "pong"}
 
-@app.get("/")
-async def root():
-    """Корневой эндпоинт - редирект на админку."""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/admin/", status_code=302)
+# Корневой роут теперь обрабатывается admin_router (дашборд)
 
 @app.get("/test")
 async def test():
