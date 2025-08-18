@@ -427,6 +427,11 @@ async def webhook(request: Request):
     await bot_instance.application.process_update(update)
     return {"status": "ok"}
 
+@app.get("/ping")
+async def ping():
+    """Самый простой эндпоинт для проверки."""
+    return {"message": "pong"}
+
 @app.get("/")
 async def root():
     """Корневой эндпоинт - редирект на админку."""
@@ -436,45 +441,66 @@ async def root():
 @app.get("/test")
 async def test():
     """Тестовый эндпоинт для проверки работы."""
-    return {"status": "ok", "message": "Сервер работает"}
+    try:
+        import sys
+        return {
+            "status": "ok", 
+            "message": "Сервер работает",
+            "python_version": sys.version,
+            "app_name": app.title
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
 @app.get("/admin-test")
 async def admin_test():
     """Тестовый эндпоинт для проверки админки."""
-    routes = []
-    for route in app.routes:
-        if hasattr(route, 'path'):
-            routes.append(route.path)
-    return {"status": "ok", "message": "Админка доступна", "routes": routes}
+    try:
+        routes = []
+        for route in app.routes:
+            if hasattr(route, 'path'):
+                routes.append(route.path)
+        return {"status": "ok", "message": "Админка доступна", "routes": routes}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "message": "Ошибка в admin-test"}
 
 @app.get("/admin-debug")
 async def admin_debug():
     """Отладочный эндпоинт для проверки админки без аутентификации."""
-    routes_info = []
-    for route in app.routes:
-        if hasattr(route, 'path'):
-            route_info = {
-                "path": route.path,
-                "name": route.name if hasattr(route, 'name') else None
-            }
-            if hasattr(route, 'methods'):
-                route_info["methods"] = list(route.methods) if route.methods else []
-            routes_info.append(route_info)
-    
-    # Сортируем роуты для удобства
-    routes_info.sort(key=lambda x: x['path'])
-    
-    # Фильтруем только админские роуты для быстрого анализа
-    admin_routes = [r for r in routes_info if r['path'].startswith('/admin')]
-    
-    return {
-        "status": "ok", 
-        "message": "Админка работает без аутентификации",
-        "total_routes": len(routes_info),
-        "admin_routes_count": len(admin_routes),
-        "admin_routes": admin_routes[:20],  # Первые 20 для краткости
-        "all_routes": routes_info[:50]  # Первые 50 для краткости
-    }
+    try:
+        routes_info = []
+        for route in app.routes:
+            if hasattr(route, 'path'):
+                route_info = {
+                    "path": route.path,
+                    "name": route.name if hasattr(route, 'name') else None
+                }
+                if hasattr(route, 'methods'):
+                    route_info["methods"] = list(route.methods) if route.methods else []
+                routes_info.append(route_info)
+        
+        # Сортируем роуты для удобства
+        routes_info.sort(key=lambda x: x['path'])
+        
+        # Фильтруем только админские роуты для быстрого анализа
+        admin_routes = [r for r in routes_info if r['path'].startswith('/admin')]
+        
+        return {
+            "status": "ok", 
+            "message": "Админка работает без аутентификации",
+            "total_routes": len(routes_info),
+            "admin_routes_count": len(admin_routes),
+            "admin_routes": admin_routes[:20],  # Первые 20 для краткости
+            "all_routes": routes_info[:50]  # Первые 50 для краткости
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "status": "error",
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "message": "Ошибка в admin-debug"
+        }
 
 if __name__ == "__main__":
     import uvicorn

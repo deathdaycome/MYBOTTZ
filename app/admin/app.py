@@ -350,7 +350,10 @@ def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
 @admin_router.get("/test-simple")
 async def test_simple():
     """Простой тестовый эндпоинт без аутентификации"""
-    return {"status": "ok", "message": "Admin router работает!"}
+    try:
+        return {"status": "ok", "message": "Admin router работает!", "python_version": "3.x"}
+    except Exception as e:
+        return {"status": "error", "error": str(e), "message": "Ошибка в test-simple"}
 
 @admin_router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
