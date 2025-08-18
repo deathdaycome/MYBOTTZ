@@ -504,11 +504,18 @@ class ReportsService:
         
         # Прибыль
         profit = income - expense
+        profit_margin = (profit / income * 100) if income > 0 else 0
         
         return {
             "period": {
                 "start": start_date.isoformat(),
                 "end": end_date.isoformat()
+            },
+            "summary": {
+                "total_income": float(income),
+                "total_expense": float(expense),
+                "profit": float(profit),
+                "profit_margin": round(profit_margin, 2)
             },
             "income": float(income),
             "expense": float(expense),
@@ -524,5 +531,8 @@ class ReportsService:
                     FinanceTransaction.created_at >= start_date,
                     FinanceTransaction.created_at <= end_date
                 ).scalar() or 0
-            }
+            },
+            "forecast": {},
+            "top_projects_by_income": [],
+            "expense_categories": {}
         }
