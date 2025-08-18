@@ -12,7 +12,7 @@ def get_navigation_items(role_or_path=None, db=None) -> list:
     """
     
     navigation = [
-        {"name": "Дашборд", "url": "/admin/dashboard", "icon": "fas fa-chart-line"},
+        {"name": "Дашборд", "url": "/admin/", "icon": "fas fa-chart-line"},
         {"name": "Клиенты", "url": "/admin/clients", "icon": "fas fa-address-book"},
         {"name": "Лиды", "url": "/admin/leads", "icon": "fas fa-user-check"},
         {"name": "Сделки", "url": "/admin/deals", "icon": "fas fa-handshake"},
