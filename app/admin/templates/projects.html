@@ -25,7 +25,7 @@ html, body {
 /* Минимальная ширина для колонки действий */
 #projectsTable th:last-child,
 #projectsTable td:last-child {
-    min-width: 250px !important;
+    min-width: 350px !important;
     white-space: nowrap;
 }
 
@@ -33,6 +33,20 @@ html, body {
 .btn-group-sm > .btn {
     padding: 0.25rem 0.5rem;
     font-size: 0.875rem;
+}
+
+/* Исправление для table-responsive чтобы не обрезало кнопки действий */
+.table-responsive {
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+}
+
+/* На мобильных устройствах включаем горизонтальную прокрутку */
+@media (max-width: 1200px) {
+    .table-responsive {
+        overflow-x: auto !important;
+        overflow-y: visible !important;
+    }
 }
 
 /* Новый проект */
@@ -150,7 +164,7 @@ html, body {
 #projectsTable th:nth-child(5) { width: 120px; } /* Сложность */
 #projectsTable th:nth-child(6) { width: 120px; } /* Стоимость */
 #projectsTable th:nth-child(7) { width: 120px; } /* Дата */
-#projectsTable th:nth-child(8) { min-width: 250px; } /* Действия - увеличена для всех кнопок */
+#projectsTable th:nth-child(8) { min-width: 350px; } /* Действия - увеличена для всех кнопок */
 
 #projectsTable td {
     padding: 8px;
