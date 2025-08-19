@@ -705,6 +705,7 @@ class FinanceTransaction(Base):
     category_id = Column(Integer, ForeignKey("finance_categories.id"), nullable=False)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # Связь с проектом (если есть)
     contractor_name = Column(String(255), nullable=True)  # Имя исполнителя/поставщика
+    account = Column(String(50), nullable=True, default="card")  # Счет: cash, card, bank
     receipt_url = Column(String(500), nullable=True)  # Ссылка на чек/документ
     notes = Column(Text, nullable=True)  # Дополнительные заметки
     is_recurring = Column(Boolean, default=False)  # Повторяющаяся транзакция
@@ -730,6 +731,7 @@ class FinanceTransaction(Base):
             "category": self.category.to_dict() if self.category else None,
             "project": {"id": self.project.id, "title": self.project.title} if self.project else None,
             "contractor_name": self.contractor_name,
+            "account": self.account,
             "receipt_url": self.receipt_url,
             "notes": self.notes,
             "is_recurring": self.is_recurring,

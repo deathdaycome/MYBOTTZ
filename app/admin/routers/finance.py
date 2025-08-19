@@ -36,6 +36,7 @@ class FinanceTransactionCreateModel(BaseModel):
     category_id: int
     project_id: Optional[int] = None
     contractor_name: Optional[str] = None
+    account: Optional[str] = "card"  # cash, card, bank
     receipt_url: Optional[str] = None
     notes: Optional[str] = None
     is_recurring: bool = False
@@ -210,6 +211,7 @@ async def create_finance_transaction(
             category_id=transaction_data.category_id,
             project_id=transaction_data.project_id,
             contractor_name=transaction_data.contractor_name,
+            account=transaction_data.account,
             receipt_url=transaction_data.receipt_url,
             notes=transaction_data.notes,
             is_recurring=transaction_data.is_recurring,
