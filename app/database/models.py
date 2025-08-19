@@ -515,7 +515,7 @@ class AdminUser(Base):
     email = Column(String(255), nullable=True)
     first_name = Column(String(255), nullable=True)
     last_name = Column(String(255), nullable=True)
-    role = Column(String(50), nullable=False, default='executor')  # 'owner' или 'executor'
+    role = Column(String(50), nullable=False, default='executor')  # 'owner', 'admin', 'sales', 'executor'
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

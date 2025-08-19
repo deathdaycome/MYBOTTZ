@@ -57,7 +57,8 @@
     </div>
 </div>
 
-<!-- Quick Transaction Widget -->
+<!-- Quick Transaction Widget (только для owner и admin) -->
+{% if user_role in ['owner', 'admin'] %}
 <div class="row mb-4">
     <div class="col-lg-12">
         <div class="card bg-light">
@@ -119,6 +120,7 @@
         </div>
     </div>
 </div>
+{% endif %}
 
 <!-- Statistics Cards -->
 <div class="row mb-4">
