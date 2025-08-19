@@ -65,7 +65,7 @@ async def leads_page(
     if (won_this_month + lost_this_month) > 0:
         conversion_rate = round((won_this_month / (won_this_month + lost_this_month)) * 100, 1)
     
-    return templates.TemplateResponse("leads.html", {
+    return templates.TemplateResponse("leads_improved.html", {
         "request": request,
         "user": current_user,
         "username": current_user.get("username") if isinstance(current_user, dict) else current_user.username,

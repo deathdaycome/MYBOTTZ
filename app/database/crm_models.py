@@ -175,6 +175,14 @@ class Lead(Base):
     title = Column(String(500), nullable=False)
     status = Column(Enum(LeadStatus), default=LeadStatus.NEW, nullable=False, index=True)
     source = Column(String(100), nullable=True)  # Источник лида
+    source_type = Column(String(50), nullable=True)  # hot/cold - горячий/холодный
+    
+    # Информация о компании (для холодных лидов)
+    company_name = Column(String(500), nullable=True)
+    company_sphere = Column(String(200), nullable=True)  # Сфера деятельности
+    company_website = Column(String(500), nullable=True)
+    company_address = Column(Text, nullable=True)
+    company_size = Column(String(50), nullable=True)  # 1-10, 10-50, 50-100, 100+
     
     # Клиент
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
@@ -197,6 +205,9 @@ class Lead(Base):
     
     # История взаимодействий
     interactions = Column(JSON, default=list)  # История взаимодействий
+    call_history = Column(JSON, default=list)  # История звонков
+    email_history = Column(JSON, default=list)  # История писем
+    tags = Column(JSON, default=list)  # Теги (#холодный #2гис #ресторан)
     notes = Column(Text, nullable=True)  # Примечания
     
     # Причина отказа/отложения
