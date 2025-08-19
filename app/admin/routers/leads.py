@@ -356,8 +356,13 @@ async def convert_lead_to_deal(
         data = await request.json()
         
         # Используем IntegrationService для конвертации
-        from ...services.integration_service import IntegrationService
-        integration_service = IntegrationService(db)
+        try:
+            from ...services.integration_service import IntegrationService
+            integration_service = IntegrationService(db)
+        except ImportError as e:
+            logger.error(f"Ошибка импорта IntegrationService: {e}")
+            # Fallback к старой логике
+            return await convert_lead_to_deal_fallback(lead_id, data, user_id, db)
         
         user_id = current_user.id if hasattr(current_user, 'id') else current_user.get('id')
         result = integration_service.convert_lead_to_deal(

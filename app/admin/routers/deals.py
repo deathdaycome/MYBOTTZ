@@ -484,8 +484,12 @@ async def convert_deal_to_project(
         data = await request.json()
         
         # Используем IntegrationService для конвертации
-        from ...services.integration_service import IntegrationService
-        integration_service = IntegrationService(db)
+        try:
+            from ...services.integration_service import IntegrationService
+            integration_service = IntegrationService(db)
+        except ImportError as e:
+            logger.error(f"Ошибка импорта IntegrationService: {e}")
+            return {"success": False, "message": "Сервис интеграции временно недоступен"}
         
         user_id = current_user.id if hasattr(current_user, 'id') else current_user.get('id')
         result = integration_service.convert_deal_to_project(

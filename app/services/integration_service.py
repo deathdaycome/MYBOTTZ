@@ -7,8 +7,13 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from ..database.models import Project, FinanceTransaction, FinanceCategory
-from ..database.crm_models import Lead, Client, Deal, LeadStatus, DealStatus, ClientStatus
+try:
+    from ..database.models import Project, FinanceTransaction, FinanceCategory
+    from ..database.crm_models import Lead, Client, Deal, LeadStatus, DealStatus, ClientStatus
+except ImportError as e:
+    # Логируем ошибку, но не падаем
+    import logging
+    logging.error(f"IntegrationService: Ошибка импорта моделей: {e}")
 from ..config.logging import get_logger
 
 logger = get_logger(__name__)
