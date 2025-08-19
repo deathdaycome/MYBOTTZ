@@ -323,7 +323,8 @@ class Deal(Base):
     
     # Связи
     client = relationship("Client", back_populates="deals")
-    project = relationship("Project", backref="deal")
+    project = relationship("Project", foreign_keys=[project_id], backref="deal_original")
+    converted_project = relationship("Project", foreign_keys=[converted_to_project_id], backref="source_deal")
     manager = relationship("AdminUser", foreign_keys=[manager_id], backref="managed_deals")
     executor = relationship("AdminUser", foreign_keys=[executor_id], backref="executed_deals")
     created_by = relationship("AdminUser", foreign_keys=[created_by_id])
