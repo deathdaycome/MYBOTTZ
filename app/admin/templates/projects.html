@@ -35,17 +35,22 @@ html, body {
     font-size: 0.875rem;
 }
 
-/* Исправление для table-responsive чтобы не обрезало кнопки действий */
+/* Исправление для table-responsive - включаем горизонтальную прокрутку */
 .table-responsive {
-    overflow-x: visible !important;
+    overflow-x: auto !important;
     overflow-y: visible !important;
+    min-height: 400px;
 }
 
-/* На мобильных устройствах включаем горизонтальную прокрутку */
-@media (max-width: 1200px) {
+/* Убедимся что таблица достаточно широкая для всех колонок */
+#projectsTable {
+    min-width: 1400px !important;
+}
+
+/* На больших экранах показываем всю таблицу */
+@media (min-width: 1600px) {
     .table-responsive {
-        overflow-x: auto !important;
-        overflow-y: visible !important;
+        overflow-x: visible !important;
     }
 }
 
