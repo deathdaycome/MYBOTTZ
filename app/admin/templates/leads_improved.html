@@ -832,6 +832,7 @@ async function viewLead(leadId) {
         const data = await response.json();
         if (data.success) {
             const lead = data.data;
+            currentLeadId = leadId; // Сохраняем ID текущего лида
             document.getElementById('viewLeadTitle').textContent = lead.title;
             
             // Формируем содержимое
@@ -934,9 +935,81 @@ function callLead(leadId) {
     console.log('Call lead:', leadId);
 }
 
-function convertToDeal() {
-    // Здесь будет логика конвертации в сделку
-    console.log('Convert to deal');
+let currentLeadId = null;
+
+async function convertToDeal() {
+    if (!currentLeadId) {
+        showNotification('Ошибка: не выбран лид для конвертации', 'danger');
+        return;
+    }
+    
+    // Получаем данные лида для предзаполнения формы
+    try {
+        const response = await fetch(`/admin/leads/api/${currentLeadId}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa('{{ username }}:{{ password }}')
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            const lead = data.data;
+            
+            // Предзаполняем форму
+            document.getElementById('dealTitle').value = lead.title || '';
+            document.getElementById('dealDescription').value = lead.description || '';
+            document.getElementById('dealAmount').value = lead.budget || '';
+            
+            // Показываем модальное окно конвертации
+            const convertModal = new bootstrap.Modal(document.getElementById('convertToDealModal'));
+            convertModal.show();
+        }
+    } catch (error) {
+        console.error('Error loading lead data:', error);
+        // Показываем модальное окно даже если не удалось загрузить данные
+        const convertModal = new bootstrap.Modal(document.getElementById('convertToDealModal'));
+        convertModal.show();
+    }
+}
+
+async function executeConvertToDeal() {
+    if (!currentLeadId) return;
+    
+    const dealData = {
+        title: document.getElementById('dealTitle').value || 'Сделка из лида',
+        description: document.getElementById('dealDescription').value || '',
+        amount: parseFloat(document.getElementById('dealAmount').value) || 0,
+        prepayment_percent: parseFloat(document.getElementById('dealPrepayment').value) || 50,
+        priority: document.getElementById('dealPriority').value || 'normal'
+    };
+    
+    try {
+        const response = await fetch(`/admin/leads/api/${currentLeadId}/convert`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa('{{ username }}:{{ password }}')
+            },
+            body: JSON.stringify(dealData)
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            // Закрываем модальные окна
+            bootstrap.Modal.getInstance(document.getElementById('convertToDealModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('viewLeadModal')).hide();
+            
+            // Перезагружаем лиды
+            loadLeads();
+            
+            showNotification(`Лид успешно конвертирован в сделку! ID сделки: ${data.data.deal_id}`, 'success');
+        } else {
+            showNotification('Ошибка конвертации: ' + (data.message || 'Неизвестная ошибка'), 'danger');
+        }
+    } catch (error) {
+        console.error('Convert error:', error);
+        showNotification('Ошибка при конвертации лида', 'danger');
+    }
 }
 
 function editLead() {
@@ -944,4 +1017,60 @@ function editLead() {
     console.log('Edit lead');
 }
 </script>
+
+<!-- Модальное окно конвертации лида в сделку -->
+<div class="modal fade" id="convertToDealModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-exchange-alt me-2"></i>
+                    Конвертация лида в сделку
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form>
+                    <div class="mb-3">
+                        <label for="dealTitle" class="form-label">Название сделки</label>
+                        <input type="text" class="form-control" id="dealTitle" placeholder="Название сделки">
+                    </div>
+                    <div class="mb-3">
+                        <label for="dealDescription" class="form-label">Описание</label>
+                        <textarea class="form-control" id="dealDescription" rows="3" placeholder="Описание сделки"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dealAmount" class="form-label">Сумма сделки (₽)</label>
+                                <input type="number" class="form-control" id="dealAmount" min="0" step="1000">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="dealPrepayment" class="form-label">Предоплата (%)</label>
+                                <input type="number" class="form-control" id="dealPrepayment" value="50" min="0" max="100">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dealPriority" class="form-label">Приоритет</label>
+                        <select class="form-select" id="dealPriority">
+                            <option value="low">Низкий</option>
+                            <option value="normal" selected>Нормальный</option>
+                            <option value="high">Высокий</option>
+                            <option value="urgent">Срочный</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" onclick="executeConvertToDeal()">
+                    <i class="fas fa-check me-2"></i>Создать сделку
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

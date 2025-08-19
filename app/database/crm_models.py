@@ -304,6 +304,7 @@ class Deal(Base):
     
     # Связь с проектом
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    converted_to_project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # ID проекта, созданного из сделки
     
     # Ответственные
     manager_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
@@ -355,6 +356,7 @@ class Deal(Base):
             "act_number": self.act_number,
             "act_date": self.act_date.isoformat() if self.act_date else None,
             "project_id": self.project_id,
+            "converted_to_project_id": self.converted_to_project_id,
             "manager_id": self.manager_id,
             "executor_id": self.executor_id,
             "priority": self.priority,

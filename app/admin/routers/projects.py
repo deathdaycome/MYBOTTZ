@@ -1451,3 +1451,131 @@ async def delete_project(
             "success": False,
             "message": f"Ошибка удаления проекта: {str(e)}"
         }
+
+
+@router.post("/api/{project_id}/create-income", response_class=JSONResponse)
+async def create_project_income(
+    project_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Создать финансовую транзакцию дохода от проекта через IntegrationService"""
+    try:
+        # Получаем данные из запроса
+        data = await request.json()
+        
+        # Валидация
+        amount = data.get("amount")
+        if not amount or amount <= 0:
+            return {
+                "success": False,
+                "message": "Сумма должна быть больше 0"
+            }
+        
+        description = data.get("description")
+        if not description:
+            return {
+                "success": False,
+                "message": "Описание обязательно"
+            }
+        
+        # Аутентификация (базовая)
+        credentials = request.headers.get('authorization', '')
+        if not credentials.startswith('Basic '):
+            return {
+                "success": False,
+                "message": "Требуется аутентификация"
+            }
+        
+        # Извлекаем учетные данные
+        import base64
+        encoded_credentials = credentials.split(' ')[1]
+        decoded_credentials = base64.b64decode(encoded_credentials).decode('utf-8')
+        username, password = decoded_credentials.split(':', 1)
+        
+        # Проверяем пользователя
+        current_user = db.query(AdminUser).filter(AdminUser.username == username).first()
+        if not current_user or not current_user.check_password(password):
+            return {
+                "success": False,
+                "message": "Неверные учетные данные"
+            }
+        
+        # Используем IntegrationService для создания транзакции
+        from ...services.integration_service import IntegrationService
+        integration_service = IntegrationService(db)
+        
+        result = integration_service.create_project_income_transaction(
+            project_id=project_id,
+            amount=float(amount),
+            description=description,
+            current_user_id=current_user.id,
+            account=data.get("account", "card"),
+            payment_date=datetime.fromisoformat(data["payment_date"]) if data.get("payment_date") else None
+        )
+        
+        if result["success"]:
+            logger.info(f"Создана транзакция дохода {amount}₽ для проекта {project_id}")
+        
+        return {
+            "success": result["success"],
+            "message": "Транзакция дохода создана успешно" if result["success"] else result.get("error", "Ошибка создания транзакции"),
+            "data": result.get("data")
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка создания транзакции дохода от проекта: {str(e)}")
+        db.rollback()
+        return {
+            "success": False,
+            "message": str(e)
+        }
+
+
+@router.get("/api/{project_id}/integration-chain", response_class=JSONResponse)
+async def get_project_integration_chain(
+    project_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Получить цепочку интеграции для проекта (Лид → Сделка → Проект → Транзакции)"""
+    try:
+        # Аутентификация (базовая)
+        credentials = request.headers.get('authorization', '')
+        if not credentials.startswith('Basic '):
+            return {
+                "success": False,
+                "message": "Требуется аутентификация"
+            }
+        
+        # Извлекаем учетные данные
+        import base64
+        encoded_credentials = credentials.split(' ')[1]
+        decoded_credentials = base64.b64decode(encoded_credentials).decode('utf-8')
+        username, password = decoded_credentials.split(':', 1)
+        
+        # Проверяем пользователя
+        current_user = db.query(AdminUser).filter(AdminUser.username == username).first()
+        if not current_user or not current_user.check_password(password):
+            return {
+                "success": False,
+                "message": "Неверные учетные данные"
+            }
+        
+        # Используем IntegrationService для получения цепочки
+        from ...services.integration_service import IntegrationService
+        integration_service = IntegrationService(db)
+        
+        result = integration_service.get_integration_chain(
+            entity_type="project",
+            entity_id=project_id
+        )
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения цепочки интеграции для проекта: {str(e)}")
+        return {
+            "success": False,
+            "message": str(e)
+        }

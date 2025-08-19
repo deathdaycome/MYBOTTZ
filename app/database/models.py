@@ -107,6 +107,10 @@ class Project(Base):
     assigned_executor_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
     assigned_at = Column(DateTime, nullable=True)  # Когда назначен исполнитель
     
+    # Связь с CRM
+    source_deal_id = Column(Integer, nullable=True)  # ID сделки, из которой создан проект
+    paid_amount = Column(Float, default=0.0)  # Сумма поступлений по проекту
+    
     # Связи
     user = relationship("User", back_populates="projects")
     messages = relationship("Message", back_populates="project")

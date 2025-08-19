@@ -474,86 +474,44 @@ async def convert_deal_to_project(
     current_user: AdminUser = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """Конвертировать сделку в проект"""
+    """Конвертировать сделку в проект через IntegrationService"""
     try:
         # Проверяем права
         rbac = RBACService(db)
         if not rbac.check_permission(current_user, "projects.create"):
             return {"success": False, "message": "Недостаточно прав для создания проектов"}
         
-        deal = db.query(Deal).filter(Deal.id == deal_id).first()
-        if not deal:
-            return {"success": False, "message": "Сделка не найдена"}
-        
-        # Проверяем, не создан ли уже проект
-        if deal.project_id:
-            return {"success": False, "message": "Для этой сделки уже создан проект"}
-        
-        # Проверяем статус сделки
-        if deal.status not in [DealStatus.CONTRACT_SIGNED, DealStatus.PREPAYMENT, DealStatus.IN_WORK]:
-            return {"success": False, "message": "Сделка должна быть в статусе 'Договор подписан' или позже"}
-        
         data = await request.json()
         
-        # Создаем проект на основе сделки
-        project = Project(
-            title=data.get("title") or deal.title,
-            description=data.get("description") or deal.description,
-            user_id=deal.client.telegram_user_id if deal.client and deal.client.telegram_user_id else None,
-            status="in_progress",
-            priority=deal.priority or "normal",
-            project_type=data.get("project_type", "telegram_bot"),
-            complexity=data.get("complexity", "medium"),
-            estimated_cost=deal.amount,
-            executor_cost=deal.cost,
-            prepayment_amount=deal.prepayment_amount,
-            client_paid_total=deal.paid_amount,
-            estimated_hours=data.get("estimated_hours", 0),
-            start_date=deal.actual_start_date or deal.start_date or datetime.utcnow(),
-            planned_end_date=deal.end_date or (datetime.utcnow() + timedelta(days=30)),
-            responsible_manager_id=deal.manager_id,
-            assigned_executor_id=deal.executor_id,
-            assigned_at=datetime.utcnow() if deal.executor_id else None,
-            structured_tz=deal.technical_requirements or {},
-            project_metadata={
-                "deal_id": deal.id,
-                "client_id": deal.client_id,
-                "contract_number": deal.contract_number
-            }
+        # Используем IntegrationService для конвертации
+        from ...services.integration_service import IntegrationService
+        integration_service = IntegrationService(db)
+        
+        user_id = current_user.id if hasattr(current_user, 'id') else current_user.get('id')
+        result = integration_service.convert_deal_to_project(
+            deal_id=deal_id,
+            project_data=data,
+            current_user_id=user_id
         )
         
-        db.add(project)
-        db.flush()
-        
-        # Связываем сделку с проектом
-        deal.project_id = project.id
-        deal.status = DealStatus.IN_WORK
-        deal.updated_at = datetime.utcnow()
-        
-        db.commit()
-        
-        # Логируем действие
-        audit_log = AuditLog(
-            action="convert_to_project",
-            entity_type="deal",
-            entity_id=deal.id,
-            new_data={"project_id": project.id, "project_title": project.title},
-            description=f"Сделка '{deal.title}' конвертирована в проект '{project.title}'",
-            user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
-        )
-        db.add(audit_log)
-        db.commit()
+        if result["success"]:
+            # Логируем действие
+            audit_log = AuditLog(
+                action="convert_to_project",
+                entity_type="deal",
+                entity_id=deal_id,
+                new_data=result["data"],
+                description=f"Сделка конвертирована в проект через IntegrationService",
+                user_id=user_id,
+                user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            )
+            db.add(audit_log)
+            db.commit()
         
         return {
-            "success": True,
-            "message": "Сделка успешно конвертирована в проект",
-            "project": {
-                "id": project.id,
-                "title": project.title,
-                "status": project.status
-            },
-            "deal": deal.to_dict()
+            "success": result["success"],
+            "message": "Сделка успешно конвертирована в проект" if result["success"] else result.get("error", "Ошибка конвертации"),
+            "data": result.get("data")
         }
         
     except Exception as e:

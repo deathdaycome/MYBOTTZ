@@ -346,102 +346,44 @@ async def convert_lead_to_deal(
     current_user: AdminUser = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """Конвертировать лид в сделку"""
+    """Конвертировать лид в сделку через IntegrationService"""
     try:
         # Проверяем права
         rbac = RBACService(db)
         if not rbac.check_permission(current_user, "leads.convert"):
             return {"success": False, "message": "Недостаточно прав для конвертации лидов"}
         
-        lead = db.query(Lead).filter(Lead.id == lead_id).first()
-        if not lead:
-            return {"success": False, "message": "Лид не найден"}
-        
-        # Проверяем, не конвертирован ли уже
-        if lead.converted_to_deal_id:
-            return {"success": False, "message": "Лид уже конвертирован в сделку"}
-        
         data = await request.json()
         
-        # Если нет клиента, создаем его из контактных данных лида
-        if not lead.client_id and (lead.contact_name or lead.contact_phone or lead.contact_email):
-            client = Client(
-                name=lead.contact_name or "Новый клиент",
-                phone=lead.contact_phone,
-                email=lead.contact_email,
-                telegram=lead.contact_telegram,
-                source=lead.source,
-                manager_id=lead.manager_id,
-                created_by_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id')
+        # Используем IntegrationService для конвертации
+        from ...services.integration_service import IntegrationService
+        integration_service = IntegrationService(db)
+        
+        user_id = current_user.id if hasattr(current_user, 'id') else current_user.get('id')
+        result = integration_service.convert_lead_to_deal(
+            lead_id=lead_id,
+            deal_data=data,
+            current_user_id=user_id
+        )
+        
+        if result["success"]:
+            # Логируем действие
+            audit_log = AuditLog(
+                action="convert",
+                entity_type="lead",
+                entity_id=lead_id,
+                new_data=result["data"],
+                description=f"Лид конвертирован в сделку через IntegrationService",
+                user_id=user_id,
+                user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
             )
-            db.add(client)
-            db.flush()  # Получаем ID нового клиента
-            lead.client_id = client.id
-        
-        if not lead.client_id:
-            return {"success": False, "message": "Для конвертации необходим клиент"}
-        
-        # Создаем сделку
-        deal = Deal(
-            title=data.get("title") or lead.title,
-            status=DealStatus.NEW,
-            client_id=lead.client_id,
-            description=data.get("description") or lead.description,
-            amount=data.get("amount") or lead.budget or 0,
-            prepayment_percent=data.get("prepayment_percent", 50),
-            start_date=datetime.fromisoformat(data["start_date"]) if data.get("start_date") else None,
-            end_date=datetime.fromisoformat(data["end_date"]) if data.get("end_date") else None,
-            manager_id=lead.manager_id,
-            priority=data.get("priority", "normal"),
-            created_by_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id')
-        )
-        
-        # Рассчитываем предоплату
-        if deal.amount and deal.prepayment_percent:
-            deal.prepayment_amount = deal.amount * deal.prepayment_percent / 100
-        
-        db.add(deal)
-        db.flush()
-        
-        # Обновляем лид
-        lead.status = LeadStatus.WON
-        lead.converted_to_deal_id = deal.id
-        lead.converted_at = datetime.utcnow()
-        lead.updated_at = datetime.utcnow()
-        
-        # Добавляем в историю взаимодействий
-        interaction = {
-            "date": datetime.utcnow().isoformat(),
-            "type": "converted_to_deal",
-            "deal_id": deal.id,
-            "user_id": current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            "user_name": current_user.username if hasattr(current_user, 'username') else current_user.get('username')
-        }
-        
-        if not lead.interactions:
-            lead.interactions = []
-        lead.interactions.append(interaction)
-        
-        db.commit()
-        
-        # Логируем действие
-        audit_log = AuditLog(
-            action="convert",
-            entity_type="lead",
-            entity_id=lead.id,
-            new_data={"deal_id": deal.id, "deal_title": deal.title},
-            description=f"Лид '{lead.title}' конвертирован в сделку '{deal.title}'",
-            user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
-        )
-        db.add(audit_log)
-        db.commit()
+            db.add(audit_log)
+            db.commit()
         
         return {
-            "success": True,
-            "message": "Лид успешно конвертирован в сделку",
-            "deal": deal.to_dict(),
-            "lead": lead.to_dict()
+            "success": result["success"],
+            "message": "Лид успешно конвертирован в сделку" if result["success"] else result.get("error", "Ошибка конвертации"),
+            "data": result.get("data")
         }
         
     except Exception as e:
