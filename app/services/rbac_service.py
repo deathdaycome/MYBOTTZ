@@ -307,7 +307,14 @@ class RBACService:
         permissions = set()
         
         # Разрешения через роли
-        for role in user.roles:
+        user_roles = []
+        if isinstance(user, dict):
+            # Dict пользователь не имеет ролей в БД
+            pass
+        elif hasattr(user, 'roles'):
+            user_roles = user.roles
+        
+        for role in user_roles:
             if role.is_active:
                 for perm in role.permissions:
                     permissions.add(perm.name)
@@ -325,8 +332,21 @@ class RBACService:
         if not user:
             return False
         
+        # Обработка dict пользователя (для совместимости)
+        if isinstance(user, dict):
+            # Админ с ролью owner имеет все права
+            if user.get('role') == 'owner':
+                return True
+            user_id = user.get('id')
+            if not user_id:
+                return False
+            user_permissions = self.get_user_permissions(user_id)
+            return permission_name in user_permissions
+        
         # Админ с ролью owner имеет все права
-        if any(role.name == 'owner' for role in user.roles):
+        if hasattr(user, 'roles') and any(role.name == 'owner' for role in user.roles):
+            return True
+        elif hasattr(user, 'role') and user.role == 'owner':
             return True
         
         user_permissions = self.get_user_permissions(user.id)
@@ -338,19 +358,43 @@ class RBACService:
         if not user:
             return False
         
-        # Владелец имеет доступ ко всему
-        if any(role.name == 'owner' for role in user.roles):
-            return True
+        # Обработка dict пользователя (для совместимости)
+        if isinstance(user, dict):
+            # Владелец имеет доступ ко всему
+            if user.get('role') == 'owner':
+                return True
+            user_id = user.get('id')
+            if not user_id:
+                return False
+        else:
+            # Владелец имеет доступ ко всему
+            if hasattr(user, 'roles') and any(role.name == 'owner' for role in user.roles):
+                return True
+            elif hasattr(user, 'role') and user.role == 'owner':
+                return True
+            user_id = user.id
         
         # Получаем правила доступа для пользователя
+        filter_conditions = [
+            DataAccessRule.is_active == True,
+            DataAccessRule.entity_type == entity_type,
+            DataAccessRule.user_id == user_id
+        ]
+        
+        # Добавляем фильтр по ролям если они есть
+        if isinstance(user, dict):
+            # Для dict пользователя ролей нет, только user_id
+            pass
+        elif hasattr(user, 'roles') and user.roles:
+            filter_conditions.append(
+                DataAccessRule.role_id.in_([role.id for role in user.roles])
+            )
+        
         rules = self.db.query(DataAccessRule).filter(
             and_(
                 DataAccessRule.is_active == True,
                 DataAccessRule.entity_type == entity_type,
-                or_(
-                    DataAccessRule.user_id == user.id,
-                    DataAccessRule.role_id.in_([role.id for role in user.roles])
-                )
+                or_(*filter_conditions[2:])  # Пропускаем первые два условия
             )
         ).order_by(DataAccessRule.priority.desc()).all()
         
@@ -602,7 +646,19 @@ def require_role(role_name: str):
                 raise HTTPException(status_code=403, detail="Пользователь не авторизован")
             
             # Проверяем роль
-            if not any(role.name == role_name for role in user.roles):
+            user_roles = []
+            if isinstance(user, dict):
+                # Dict пользователь - проверяем текстовую роль
+                if user.get('role') != role_name:
+                    raise HTTPException(
+                        status_code=403,
+                        detail=f"Доступ запрещен. Требуется роль {role_name}"
+                    )
+                return user
+            elif hasattr(user, 'roles'):
+                user_roles = user.roles
+            
+            if not any(role.name == role_name for role in user_roles):
                 raise HTTPException(
                     status_code=403,
                     detail=f"Недостаточно прав. Требуется роль: {role_name}"

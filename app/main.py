@@ -36,6 +36,17 @@ logger = get_logger(__name__)
 # Создаем таблицы при запуске
 init_db()
 
+# Проверяем и исправляем структуру БД
+try:
+    import sys
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from startup_db_fix import ensure_db_columns
+    ensure_db_columns()
+    logger.info("Проверка структуры БД выполнена")
+except Exception as e:
+    logger.warning(f"Не удалось выполнить проверку БД: {e}")
+
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="Bot Business Card Admin",
