@@ -14,10 +14,11 @@ def ensure_db_columns():
     """Убеждаемся что все необходимые колонки существуют"""
     # Проверяем несколько возможных путей к БД
     possible_paths = [
-        "admin_panel.db",
-        "/var/www/bot_business_card/admin_panel.db",
-        "/root/bot_business_card/admin_panel.db",
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "admin_panel.db")
+        "data/bot.db",
+        "/var/www/bot_business_card/data/bot.db",
+        "/root/bot_business_card/data/bot.db",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "bot.db"),
+        "./data/bot.db"
     ]
     
     db_path = None

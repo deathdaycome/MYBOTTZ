@@ -19,7 +19,13 @@ class Settings:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./data/bot.db")
+    # Определяем путь к БД в зависимости от окружения
+    if os.path.exists("/var/www/bot_business_card/data/bot.db"):
+        # Продакшен сервер
+        DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:////var/www/bot_business_card/data/bot.db")
+    else:
+        # Локальная разработка
+        DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./data/bot.db")
     DATABASE_ECHO: bool = os.getenv("DATABASE_ECHO", "False").lower() == "true"
     
     # Admin Panel
