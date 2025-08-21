@@ -12,10 +12,23 @@ logger = logging.getLogger(__name__)
 
 def ensure_db_columns():
     """Убеждаемся что все необходимые колонки существуют"""
-    db_path = "admin_panel.db"
+    # Проверяем несколько возможных путей к БД
+    possible_paths = [
+        "admin_panel.db",
+        "/var/www/bot_business_card/admin_panel.db",
+        "/root/bot_business_card/admin_panel.db",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "admin_panel.db")
+    ]
     
-    if not os.path.exists(db_path):
-        logger.warning(f"База данных не найдена: {db_path}")
+    db_path = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            db_path = path
+            logger.info(f"Найдена база данных: {db_path}")
+            break
+    
+    if not db_path:
+        logger.warning(f"База данных не найдена ни по одному из путей: {possible_paths}")
         return False
     
     try:
