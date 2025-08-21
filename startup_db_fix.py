@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def ensure_db_columns():
     """Убеждаемся что все необходимые колонки существуют"""
-    db_path = "db.sqlite"
+    db_path = "admin_panel.db"
     
     if not os.path.exists(db_path):
         logger.warning(f"База данных не найдена: {db_path}")
