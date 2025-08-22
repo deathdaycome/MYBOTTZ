@@ -18,6 +18,7 @@ from ..database.models import User, Project, ConsultantSession, Portfolio, Setti
 from ..services.analytics_service import analytics_service, get_dashboard_data
 from ..services.auth_service import AuthService
 from .middleware.roles import RoleMiddleware
+from .navigation import get_navigation_items
 
 def get_image_url(image_path: str, request: Request = None) -> str:
     """Формирует правильный URL для изображения"""
@@ -2221,45 +2222,6 @@ async def update_project_status_direct(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def get_navigation_items(user_role: str) -> List[Dict[str, Any]]:
-    """Получение элементов навигации в зависимости от роли"""
-    
-    if user_role == "owner":
-        # Владелец видит все разделы
-        return [
-            {"name": "Дашборд", "url": "/", "icon": "fas fa-tachometer-alt"},
-            {"name": "Клиенты", "url": "/clients", "icon": "fas fa-address-book"},
-            {"name": "Лиды", "url": "/leads", "icon": "fas fa-lightbulb"},
-            {"name": "Сделки", "url": "/deals", "icon": "fas fa-handshake"},
-            {"name": "Проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
-            {"name": "База проектов", "url": "/project-files", "icon": "fas fa-database"},
-            {"name": "Портфолио", "url": "/portfolio", "icon": "fas fa-briefcase"},
-            {"name": "Правки", "url": "/revisions", "icon": "fas fa-edit"},
-            {"name": "Планировщик задач", "url": "/tasks/", "icon": "fas fa-tasks"},
-            {"name": "Мои задачи", "url": "/tasks/user/my-tasks", "icon": "fas fa-clipboard-list"},
-            {"name": "Документы", "url": "/documents", "icon": "fas fa-file-alt"},
-            {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"},
-            {"name": "Пользователи", "url": "/users", "icon": "fas fa-users"},
-            {"name": "Исполнители", "url": "/contractors", "icon": "fas fa-user-tie"},
-            # {"name": "Активность", "url": "/activity", "icon": "fas fa-history"},  # TODO: Добавить миграцию
-            {"name": "Сервисы", "url": "/services", "icon": "fas fa-server"},
-            {"name": "Аналитика", "url": "/analytics", "icon": "fas fa-chart-line"},
-            {"name": "Отчеты", "url": "/reports", "icon": "fas fa-file-chart-line"},
-            {"name": "Автоматизация", "url": "/automation", "icon": "fas fa-robot"},
-            {"name": "Уведомления", "url": "/notifications", "icon": "fas fa-bell"},
-            {"name": "Настройки", "url": "/settings", "icon": "fas fa-cog"}
-        ]
-    else:
-        # Исполнитель видит ограниченный набор
-        return [
-            {"name": "Дашборд", "url": "/", "icon": "fas fa-tachometer-alt"},
-            {"name": "Мои проекты", "url": "/projects", "icon": "fas fa-project-diagram"},
-            {"name": "Мои файлы", "url": "/project-files", "icon": "fas fa-folder"},
-            {"name": "Правки", "url": "/revisions", "icon": "fas fa-edit"},
-            {"name": "Мои задачи", "url": "/tasks/user/my-tasks", "icon": "fas fa-clipboard-list"},
-            {"name": "Документы", "url": "/documents", "icon": "fas fa-file-alt"},
-            {"name": "Финансы", "url": "/finance", "icon": "fas fa-money-bill-wave"}
-        ]
 @admin_router.post("/api/projects/{project_id}/assign-executor")
 async def assign_executor_to_project(
     project_id: int,

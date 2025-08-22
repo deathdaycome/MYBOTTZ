@@ -284,9 +284,30 @@ let chatsData = {};
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    loadChats();
+    checkConfiguration();
     setInterval(loadChats, 30000); // Обновление каждые 30 секунд
 });
+
+// Проверка конфигурации при загрузке
+async function checkConfiguration() {
+    try {
+        // Сначала пробуем загрузить чаты
+        const response = await fetch('/avito/chats');
+        if (response.ok) {
+            // Если успешно - конфигурация есть
+            loadChats();
+        } else if (response.status === 400) {
+            // Если 400 - нужна конфигурация
+            const errorData = await response.json();
+            if (errorData.detail && errorData.detail.includes('not configured')) {
+                showSettings();
+            }
+        }
+    } catch (error) {
+        console.error('Configuration check failed:', error);
+        loadChats(); // Пытаемся загрузить в любом случае
+    }
+}
 
 // Загрузка списка чатов
 async function loadChats() {

@@ -21,6 +21,8 @@ from ...services.avito_service import get_avito_service, init_avito_service, Avi
 from ...services.openai_service import generate_conversation_summary
 from ..navigation import get_navigation_items
 from ...config.settings import settings
+# Импортируем функции аутентификации из middleware.auth
+from ..middleware.auth import authenticate, get_current_admin_user
 import secrets
 
 logger = logging.getLogger(__name__)
@@ -28,31 +30,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/avito", tags=["avito"])
 templates = Jinja2Templates(directory="app/admin/templates")
 
-# Локальная аутентификация для избежания циклического импорта
-security = HTTPBasic()
-
-def authenticate(credentials: HTTPBasicCredentials = Depends(security)) -> str:
-    """Аутентификация пользователя"""
-    correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
-    correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
-    
-    if not (correct_username and correct_password):
-        # Проверяем других пользователей в БД
-        with get_db_context() as db:
-            admin_user = db.query(AdminUser).filter(AdminUser.username == credentials.username).first()
-            if admin_user and admin_user.check_password(credentials.password) and admin_user.is_active:
-                return credentials.username
-        
-        raise HTTPException(
-            status_code=401,
-            detail="Неверные учетные данные",
-            headers={"WWW-Authenticate": "Basic"}
-        )
-    
-    return credentials.username
-
 def get_current_user(username: str):
-    """Получение текущего пользователя"""
+    """Получение текущего пользователя по имени"""
     if username == settings.ADMIN_USERNAME:
         return {"username": username, "role": "owner", "id": 1}
     else:
@@ -72,7 +51,8 @@ def get_current_user(username: str):
 # Инициализация сервиса Авито
 AVITO_CLIENT_ID = os.getenv("AVITO_CLIENT_ID", "fakHmzyCUJTM56AEQv8i")
 AVITO_CLIENT_SECRET = os.getenv("AVITO_CLIENT_SECRET", "tMJVVuzTkNUP3Dh2c08V_f7OZG1xNKUrPLzl9xJd")
-AVITO_USER_ID = os.getenv("AVITO_USER_ID")
+# Попробуем получить User ID из разных источников
+AVITO_USER_ID = os.getenv("AVITO_USER_ID") or os.getenv("AVITO_USER_ID_DEFAULT", "272604359")
 
 # WebSocket connections storage
 websocket_connections = {}
@@ -82,8 +62,11 @@ async def startup_event():
     """Инициализация сервиса при старте"""
     if AVITO_USER_ID:
         try:
-            init_avito_service(AVITO_CLIENT_ID, AVITO_CLIENT_SECRET, int(AVITO_USER_ID))
-            logger.info("Avito service initialized successfully")
+            # Пробуем преобразовать в число, если это строка
+            user_id = int(AVITO_USER_ID) if AVITO_USER_ID else None
+            if user_id:
+                init_avito_service(AVITO_CLIENT_ID, AVITO_CLIENT_SECRET, user_id)
+                logger.info(f"Avito service initialized successfully with User ID: {user_id}")
         except Exception as e:
             logger.error(f"Failed to initialize Avito service: {e}")
 
@@ -108,7 +91,7 @@ async def configure_avito(
 ):
     """Конфигурация подключения к Авито"""
     current_user = get_current_user(username)
-    if current_user.get('role') not in ["owner", "admin"]:
+    if current_user and current_user.get('role') not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     data = await request.json()
@@ -284,6 +267,7 @@ async def create_client_from_chat(
 ):
     """Создание клиента из чата Авито с AI-сводкой"""
     try:
+        current_user = get_current_user(username)
         with get_db_context() as db:
             service = get_avito_service()
             
@@ -363,8 +347,8 @@ async def create_client_from_chat(
                     "summary": summary,
                     "chat_id": chat_id
                 }],
-                created_by_id=get_current_user(username).get('id', 1),
-                manager_id=get_current_user(username).get('id', 1)
+                created_by_id=current_user.get('id', 1) if current_user else 1,
+                manager_id=current_user.get('id', 1) if current_user else 1
             )
             
             db.add(new_client)
