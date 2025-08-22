@@ -57,18 +57,30 @@ AVITO_USER_ID = os.getenv("AVITO_USER_ID") or os.getenv("AVITO_USER_ID_DEFAULT",
 # WebSocket connections storage
 websocket_connections = {}
 
+# Инициализация сервиса сразу при импорте, если есть User ID
+if AVITO_USER_ID:
+    try:
+        user_id = int(AVITO_USER_ID)
+        init_avito_service(AVITO_CLIENT_ID, AVITO_CLIENT_SECRET, user_id)
+        logger.info(f"Avito service initialized with User ID: {user_id}")
+    except Exception as e:
+        logger.error(f"Failed to initialize Avito service on import: {e}")
+
 @router.on_event("startup")
 async def startup_event():
-    """Инициализация сервиса при старте"""
-    if AVITO_USER_ID:
-        try:
-            # Пробуем преобразовать в число, если это строка
-            user_id = int(AVITO_USER_ID) if AVITO_USER_ID else None
-            if user_id:
+    """Инициализация сервиса при старте (fallback)"""
+    # Пробуем инициализировать еще раз при старте, если не было инициализировано
+    try:
+        service = get_avito_service()
+        logger.info("Avito service already initialized")
+    except:
+        if AVITO_USER_ID:
+            try:
+                user_id = int(AVITO_USER_ID)
                 init_avito_service(AVITO_CLIENT_ID, AVITO_CLIENT_SECRET, user_id)
-                logger.info(f"Avito service initialized successfully with User ID: {user_id}")
-        except Exception as e:
-            logger.error(f"Failed to initialize Avito service: {e}")
+                logger.info(f"Avito service initialized in startup event with User ID: {user_id}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Avito service in startup: {e}")
 
 @router.get("/", response_class=HTMLResponse)
 async def avito_messenger(
