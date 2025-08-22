@@ -3,6 +3,7 @@
 """
 
 from fastapi import APIRouter, Depends, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
@@ -19,14 +20,54 @@ from ...database.models import AdminUser
 from ...services.avito_service import get_avito_service, init_avito_service, AvitoService
 from ...services.openai_service import generate_conversation_summary
 from ..navigation import get_navigation_items
-from fastapi import Depends
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from ..app import authenticate, get_current_user
+from ...config.settings import settings
+import secrets
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/avito", tags=["avito"])
 templates = Jinja2Templates(directory="app/admin/templates")
+
+# Локальная аутентификация для избежания циклического импорта
+security = HTTPBasic()
+
+def authenticate(credentials: HTTPBasicCredentials = Depends(security)) -> str:
+    """Аутентификация пользователя"""
+    correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
+    
+    if not (correct_username and correct_password):
+        # Проверяем других пользователей в БД
+        with get_db_context() as db:
+            admin_user = db.query(AdminUser).filter(AdminUser.username == credentials.username).first()
+            if admin_user and admin_user.check_password(credentials.password) and admin_user.is_active:
+                return credentials.username
+        
+        raise HTTPException(
+            status_code=401,
+            detail="Неверные учетные данные",
+            headers={"WWW-Authenticate": "Basic"}
+        )
+    
+    return credentials.username
+
+def get_current_user(username: str):
+    """Получение текущего пользователя"""
+    if username == settings.ADMIN_USERNAME:
+        return {"username": username, "role": "owner", "id": 1}
+    else:
+        with get_db_context() as db:
+            admin_user = db.query(AdminUser).filter(AdminUser.username == username).first()
+            if admin_user:
+                return {
+                    "username": admin_user.username,
+                    "role": admin_user.role,
+                    "id": admin_user.id,
+                    "first_name": admin_user.first_name,
+                    "last_name": admin_user.last_name,
+                    "email": admin_user.email
+                }
+    return None
 
 # Инициализация сервиса Авито
 AVITO_CLIENT_ID = os.getenv("AVITO_CLIENT_ID", "fakHmzyCUJTM56AEQv8i")
