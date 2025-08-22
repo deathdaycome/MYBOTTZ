@@ -876,9 +876,9 @@ async function handleDrop(e) {
     }
     
     try {
-        // Отправляем запрос на изменение исполнителя
-        console.log('📤 Отправляем запрос на изменение исполнителя...');
-        const response = await fetch(`/admin/api/tasks/${draggedTask.id}`, {
+        // Отправляем запрос на переназначение задачи (используем новый endpoint)
+        console.log('📤 Отправляем запрос на переназначение задачи...');
+        const response = await fetch(`/admin/tasks/api/tasks/${draggedTask.id}/reassign`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -911,7 +911,9 @@ async function handleDrop(e) {
                 // Обновляем статистику
                 updateEmployeeStats();
                 
-                showNotification('Исполнитель задачи изменен!', 'success');
+                // Показываем сообщение с деталями
+                const employeeName = document.querySelector(`[data-employee-id="${targetEmployeeId}"] .employee-info h4`).textContent;
+                showNotification(`Задача переназначена на ${employeeName}`, 'success');
             } else {
                 showNotification('Ошибка при изменении исполнителя: ' + (result.message || 'Неизвестная ошибка'), 'error');
             }
