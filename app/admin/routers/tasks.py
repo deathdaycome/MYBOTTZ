@@ -55,6 +55,34 @@ def get_current_user_from_request(request: Request):
         logger.error(f"Ошибка получения пользователя: {e}")
         raise HTTPException(status_code=401, detail="Не авторизован")
 
+@router.get("/kanban", response_class=HTMLResponse)
+async def kanban_board_page(request: Request, current_user: dict = Depends(get_current_admin_user)):
+    """Страница канбан-доски с исполнителями (только для владельца)"""
+    try:
+        # Проверяем, что пользователь - владелец
+        if current_user["role"] != "owner":
+            raise HTTPException(status_code=403, detail="Доступ запрещен")
+        
+        with get_db_context() as db:
+            # Получаем элементы навигации
+            from app.admin.app import get_navigation_items
+            navigation_items = get_navigation_items(current_user['role'])
+            
+            return templates.TemplateResponse("tasks_kanban.html", {
+                "request": request,
+                "current_user": current_user,
+                "current_user_id": current_user['id'],
+                "username": current_user['username'],
+                "user_role": current_user['role'],
+                "navigation_items": navigation_items
+            })
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке канбан-доски: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка при загрузке канбан-доски")
+
 @router.get("/user/my-tasks", response_class=HTMLResponse)
 async def my_tasks_page(request: Request, current_user: dict = Depends(get_current_admin_user)):
     """Страница 'Мои задачи' для всех пользователей с канбан-доской"""
@@ -962,6 +990,140 @@ async def get_executors(
     except Exception as e:
         logger.error(f"Ошибка получения списка исполнителей: {e}")
         return []
+
+@router.put("/api/tasks/{task_id}/reassign")
+async def reassign_task(
+    task_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Переназначить задачу другому исполнителю (для drag-and-drop)"""
+    try:
+        # Только владелец может переназначать задачи
+        if current_user["role"] != "owner":
+            return {"success": False, "error": "Только администратор может переназначать задачи"}
+        
+        body = await request.json()
+        new_assignee_id = body.get("assigned_to_id")
+        
+        if not new_assignee_id:
+            return {"success": False, "error": "Не указан новый исполнитель"}
+        
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            
+            if not task:
+                return {"success": False, "error": "Задача не найдена"}
+            
+            # Проверяем существование нового исполнителя
+            new_assignee = db.query(AdminUser).filter(
+                AdminUser.id == new_assignee_id,
+                AdminUser.is_active == True
+            ).first()
+            
+            if not new_assignee:
+                return {"success": False, "error": "Исполнитель не найден"}
+            
+            # Получаем старого исполнителя для логирования
+            old_assignee = db.query(AdminUser).filter(AdminUser.id == task.assigned_to_id).first()
+            old_name = f"{old_assignee.first_name} {old_assignee.last_name}" if old_assignee else "Не назначен"
+            new_name = f"{new_assignee.first_name} {new_assignee.last_name}"
+            
+            # Обновляем исполнителя
+            task.assigned_to_id = new_assignee_id
+            task.updated_at = datetime.utcnow()
+            
+            # Добавляем комментарий об изменении
+            reassign_comment = TaskComment(
+                task_id=task_id,
+                author_id=current_user["id"],
+                comment=f"Задача переназначена: {old_name} → {new_name}",
+                comment_type="reassignment"
+            )
+            db.add(reassign_comment)
+            
+            db.commit()
+            
+            logger.info(f"Задача {task_id} переназначена с {old_name} на {new_name}")
+            
+            return {
+                "success": True,
+                "message": f"Задача переназначена на {new_name}"
+            }
+        
+    except Exception as e:
+        logger.error(f"Ошибка переназначения задачи {task_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.delete("/api/users/executor/{executor_id}")
+async def delete_executor(
+    executor_id: int,
+    reassign_to_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Удалить исполнителя и переназначить его задачи"""
+    try:
+        # Только владелец может удалять исполнителей
+        if current_user["role"] != "owner":
+            return {"success": False, "error": "Недостаточно прав"}
+        
+        with get_db_context() as db:
+            # Проверяем существование исполнителя
+            executor = db.query(AdminUser).filter(
+                AdminUser.id == executor_id,
+                AdminUser.role == "executor"
+            ).first()
+            
+            if not executor:
+                return {"success": False, "error": "Исполнитель не найден"}
+            
+            # Если указан новый исполнитель для переназначения
+            if reassign_to_id:
+                new_executor = db.query(AdminUser).filter(
+                    AdminUser.id == reassign_to_id,
+                    AdminUser.is_active == True
+                ).first()
+                
+                if not new_executor:
+                    return {"success": False, "error": "Новый исполнитель не найден"}
+                
+                # Переназначаем все задачи
+                tasks_to_reassign = db.query(Task).filter(
+                    Task.assigned_to_id == executor_id
+                ).all()
+                
+                for task in tasks_to_reassign:
+                    task.assigned_to_id = reassign_to_id
+                    task.updated_at = datetime.utcnow()
+                
+                logger.info(f"Переназначено {len(tasks_to_reassign)} задач с исполнителя {executor_id} на {reassign_to_id}")
+            else:
+                # Удаляем все задачи исполнителя
+                tasks_to_delete = db.query(Task).filter(
+                    Task.assigned_to_id == executor_id
+                ).all()
+                
+                for task in tasks_to_delete:
+                    # Удаляем комментарии к задаче
+                    db.query(TaskComment).filter(TaskComment.task_id == task.id).delete()
+                    db.delete(task)
+                
+                logger.info(f"Удалено {len(tasks_to_delete)} задач исполнителя {executor_id}")
+            
+            # Деактивируем исполнителя (не удаляем полностью для сохранения истории)
+            executor.is_active = False
+            executor.updated_at = datetime.utcnow()
+            
+            db.commit()
+            
+            return {
+                "success": True,
+                "message": f"Исполнитель {executor.first_name} {executor.last_name} удален"
+            }
+        
+    except Exception as e:
+        logger.error(f"Ошибка удаления исполнителя {executor_id}: {e}")
+        return {"success": False, "error": str(e)}
 
 @router.post("/api/import-projects")
 async def import_projects_as_tasks(
