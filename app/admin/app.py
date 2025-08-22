@@ -292,6 +292,18 @@ except ImportError as e:
 if documents_router:
     admin_router.include_router(documents_router)
 
+# Импорт роутера Авито
+try:
+    from .routers.avito import router as avito_router
+    print("Роутер Авито подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера Авито: {e}")
+    avito_router = None
+
+# Подключаем роутер Авито
+if avito_router:
+    admin_router.include_router(avito_router)
+
 # Настройка шаблонов
 templates = Jinja2Templates(directory="app/admin/templates")
 

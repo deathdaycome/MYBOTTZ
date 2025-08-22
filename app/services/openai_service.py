@@ -840,5 +840,48 @@ class OpenAIService:
             "optional_features": template['functions'][4:] + ["Мультиязычность", "Интеграция с CRM"]
         }
 
+async def generate_conversation_summary(conversation: str, max_tokens: int = 500) -> str:
+    """
+    Генерация краткой сводки диалога с помощью AI для интеграции с Авито
+    
+    Args:
+        conversation: Текст диалога
+        max_tokens: Максимальное количество токенов в ответе
+        
+    Returns:
+        Краткая сводка диалога
+    """
+    
+    try:
+        service = OpenAIService()
+        
+        prompt = f"""Проанализируй следующий диалог между клиентом и продавцом на Авито и создай краткую сводку.
+
+Диалог:
+{conversation}
+
+Создай структурированную сводку, включающую:
+1. О чем спрашивал клиент
+2. Какие услуги/товары интересуют
+3. Бюджет (если упоминался)
+4. Готовность к покупке
+5. Ключевые договоренности
+6. Следующие шаги
+
+Сводка должна быть краткой и информативной, не более 5-7 предложений."""
+
+        system_prompt = "Ты - помощник по анализу диалогов с клиентами. Создавай краткие и информативные сводки."
+        
+        response = await service.generate_response(prompt, system_prompt=system_prompt)
+        
+        if response:
+            return response.strip()
+        else:
+            return "Автоматическая сводка недоступна"
+            
+    except Exception as e:
+        logger.error(f"Error generating conversation summary: {e}")
+        return f"Ошибка при генерации сводки: {str(e)}"
+
 # Создаем глобальный экземпляр сервиса
 ai_service = OpenAIService()
