@@ -182,16 +182,13 @@ class AvitoService:
         
         logger.info(f"Getting chats for user_id: {self.user_id} with params: {params}")
         
-        try:
-            result = await self._make_request(
-                "GET",
-                f"/messenger/v2/accounts/{self.user_id}/chats",
-                params=params
-            )
-        except Exception as e:
-            logger.error(f"Failed to get chats: {e}")
-            # Возвращаем пустой список вместо исключения для более graceful обработки
-            return []
+        result = await self._make_request(
+            "GET",
+            f"/messenger/v2/accounts/{self.user_id}/chats",
+            params=params
+        )
+        
+        logger.info(f"Received {len(result.get('chats', []))} chats from API")
         
         chats = []
         for chat_data in result.get("chats", []):
@@ -233,13 +230,16 @@ class AvitoService:
             "offset": offset
         }
         
-        messages_data = await self._make_request(
+        result = await self._make_request(
             "GET",
             f"/messenger/v3/accounts/{self.user_id}/chats/{chat_id}/messages/",
             params=params
         )
         
         messages = []
+        messages_data = result.get("messages", [])
+        logger.info(f"Retrieved {len(messages_data)} messages for chat {chat_id}")
+        
         for msg in messages_data:
             message = AvitoMessage(
                 id=msg["id"],
@@ -248,7 +248,7 @@ class AvitoService:
                 created=msg.get("created", 0),
                 direction=msg.get("direction", "in"),
                 type=MessageType(msg.get("type", "text")),
-                is_read=msg.get("is_read", False)
+                is_read=msg.get("isRead", msg.get("is_read", False))
             )
             messages.append(message)
         

@@ -285,6 +285,7 @@ let chatsData = {};
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
     checkConfiguration();
+    loadChats(); // Загружаем чаты сразу
     setInterval(loadChats, 30000); // Обновление каждые 30 секунд
 });
 
@@ -292,7 +293,7 @@ document.addEventListener('DOMContentLoaded', function() {
 async function checkConfiguration() {
     try {
         // Сначала пробуем загрузить чаты
-        const response = await fetch('/avito/chats');
+        const response = await fetch('/admin/avito/chats');
         if (response.ok) {
             // Если успешно - конфигурация есть
             loadChats();
@@ -313,7 +314,7 @@ async function checkConfiguration() {
 async function loadChats() {
     try {
         const showUnreadOnly = document.getElementById('showUnreadOnly').checked;
-        const response = await fetch(`/avito/chats?unread_only=${showUnreadOnly}`);
+        const response = await fetch(`/admin/avito/chats?unread_only=${showUnreadOnly}`);
         
         if (!response.ok) {
             const errorData = await response.json();
@@ -353,7 +354,7 @@ function showAuthorizationMessage() {
             <i class="fas fa-lock fa-3x mb-3 text-warning"></i>
             <h5>Требуется авторизация</h5>
             <p class="text-muted">Для доступа к чатам Avito необходимо авторизоваться</p>
-            <a href="/avito/oauth/login" class="btn btn-primary mt-3">
+            <a href="/admin/avito/oauth/login" class="btn btn-primary mt-3">
                 <i class="fas fa-sign-in-alt me-2"></i>Авторизоваться в Avito
             </a>
         </div>
@@ -370,7 +371,7 @@ function displayChats(chats) {
                 <i class="fas fa-inbox fa-3x mb-3"></i>
                 <p>Нет доступных чатов</p>
                 <small>Возможно, у вас действительно нет активных чатов в Avito</small>
-                <a href="/avito/oauth/login" class="btn btn-sm btn-outline-primary mt-3">
+                <a href="/admin/avito/oauth/login" class="btn btn-sm btn-outline-primary mt-3">
                     <i class="fas fa-sync-alt me-2"></i>Переавторизоваться
                 </a>
             </div>
@@ -387,7 +388,8 @@ function displayChats(chats) {
         chatItem.className = `chat-item ${chat.unread_count > 0 ? 'unread' : ''} ${chat.id === currentChatId ? 'active' : ''}`;
         chatItem.onclick = () => selectChat(chat.id);
         
-        const userName = chat.users.find(u => u.id !== parseInt(localStorage.getItem('avitoUserId') || '0'))?.name || 'Неизвестный';
+        const currentUserId = 216012096; // ID текущего пользователя
+        const userName = chat.users.find(u => u.id !== currentUserId)?.name || 'Неизвестный';
         const lastMessageText = chat.last_message?.content?.text || 'Нет сообщений';
         const lastMessageTime = chat.last_message ? formatTime(chat.last_message.created) : '';
         
@@ -433,7 +435,8 @@ async function selectChat(chatId) {
     // Загружаем информацию о чате
     const chat = chatsData[chatId];
     if (chat) {
-        const userName = chat.users.find(u => u.id !== parseInt(localStorage.getItem('avitoUserId') || '0'))?.name || 'Неизвестный';
+        const currentUserId = 216012096; // ID текущего пользователя
+        const userName = chat.users.find(u => u.id !== currentUserId)?.name || 'Неизвестный';
         document.getElementById('chatUserName').textContent = userName;
         document.getElementById('chatAvatar').textContent = userName.charAt(0).toUpperCase();
         
@@ -456,13 +459,13 @@ async function loadMessages(chatId) {
     container.innerHTML = '<div class="text-center p-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
     
     try {
-        const response = await fetch(`/avito/chats/${chatId}/messages`);
+        const response = await fetch(`/admin/avito/chats/${chatId}/messages`);
         const data = await response.json();
         
         displayMessages(data.messages);
         
         // Отмечаем чат как прочитанный
-        await fetch(`/avito/chats/${chatId}/read`, { method: 'POST' });
+        await fetch(`/admin/avito/chats/${chatId}/read`, { method: 'POST' });
         
     } catch (error) {
         console.error('Error loading messages:', error);
@@ -531,7 +534,7 @@ async function sendMessage(event) {
     if (!text || !currentChatId) return;
     
     try {
-        const response = await fetch(`/avito/chats/${currentChatId}/messages`, {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/messages`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -567,7 +570,7 @@ async function uploadImage(input) {
     formData.append('file', file);
     
     try {
-        const response = await fetch(`/avito/chats/${currentChatId}/images`, {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/images`, {
             method: 'POST',
             body: formData
         });
@@ -599,7 +602,7 @@ function connectWebSocket(chatId) {
     }
     
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${window.location.host}/avito/ws/${chatId}`);
+    ws = new WebSocket(`${protocol}//${window.location.host}/admin/avito/ws/${chatId}`);
     
     ws.onopen = () => {
         console.log('WebSocket connected');
@@ -636,7 +639,7 @@ async function createClientFromChat() {
     if (!confirm('Добавить собеседника в базу клиентов?')) return;
     
     try {
-        const response = await fetch(`/avito/chats/${currentChatId}/create-client`, {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/create-client`, {
             method: 'POST'
         });
         
@@ -675,7 +678,7 @@ async function saveSettings() {
     }
     
     try {
-        const response = await fetch('/avito/configure', {
+        const response = await fetch('/admin/avito/configure', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -712,7 +715,7 @@ async function showChatInfo() {
     if (!currentChatId) return;
     
     try {
-        const response = await fetch(`/avito/chats/${currentChatId}`);
+        const response = await fetch(`/admin/avito/chats/${currentChatId}`);
         const chat = await response.json();
         
         const content = document.getElementById('chatInfoContent');

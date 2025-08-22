@@ -136,14 +136,17 @@ async def get_chats(
     """Получение списка чатов"""
     try:
         service = get_avito_service()
+        logger.info(f"Getting chats with params: unread_only={unread_only}, limit={limit}, offset={offset}")
+        
         chats = await service.get_chats(unread_only=unread_only, limit=limit, offset=offset)
         
         # Преобразуем в словари для JSON
         chats_data = [chat.to_dict() for chat in chats]
         
+        logger.info(f"Returning {len(chats_data)} chats to frontend")
         return JSONResponse({"chats": chats_data, "total": len(chats_data)})
     except Exception as e:
-        logger.error(f"Failed to get chats: {e}")
+        logger.error(f"Failed to get chats: {e}", exc_info=True)
         if "not initialized" in str(e):
             # Возвращаем более информативное сообщение об ошибке
             return JSONResponse(
