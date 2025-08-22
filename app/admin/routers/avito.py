@@ -18,8 +18,10 @@ from ...database.crm_models import Client, ClientStatus, ClientType
 from ...database.models import AdminUser
 from ...services.avito_service import get_avito_service, init_avito_service, AvitoService
 from ...services.openai_service import generate_conversation_summary
-from ..middleware.auth import get_current_user
 from ..navigation import get_navigation_items
+from fastapi import Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from ..app import authenticate, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -47,23 +49,25 @@ async def startup_event():
 @router.get("/", response_class=HTMLResponse)
 async def avito_messenger(
     request: Request,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Страница мессенджера Авито"""
+    current_user = get_current_user(username)
     return templates.TemplateResponse("avito_messenger.html", {
         "request": request,
         "user": current_user,
-        "navigation": get_navigation_items("/avito", user_role=current_user.role if current_user else None),
+        "navigation": get_navigation_items("/avito", user_role=current_user.get('role') if current_user else None),
         "title": "Авито Мессенджер"
     })
 
 @router.post("/configure")
 async def configure_avito(
     request: Request,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Конфигурация подключения к Авито"""
-    if current_user.role not in ["owner", "admin"]:
+    current_user = get_current_user(username)
+    if current_user.get('role') not in ["owner", "admin"]:
         raise HTTPException(status_code=403, detail="Access denied")
     
     data = await request.json()
@@ -89,7 +93,7 @@ async def get_chats(
     unread_only: bool = False,
     limit: int = 50,
     offset: int = 0,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Получение списка чатов"""
     try:
@@ -109,7 +113,7 @@ async def get_chats(
 @router.get("/chats/{chat_id}")
 async def get_chat_info(
     chat_id: str,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Получение информации о чате"""
     try:
@@ -126,7 +130,7 @@ async def get_messages(
     chat_id: str,
     limit: int = 100,
     offset: int = 0,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Получение сообщений чата"""
     try:
@@ -148,7 +152,7 @@ async def get_messages(
 async def send_message(
     chat_id: str,
     request: Request,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Отправка сообщения"""
     try:
@@ -173,7 +177,7 @@ async def send_message(
 async def delete_message(
     chat_id: str,
     message_id: str,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Удаление сообщения"""
     try:
@@ -189,7 +193,7 @@ async def delete_message(
 async def upload_and_send_image(
     chat_id: str,
     file: UploadFile = File(...),
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Загрузка и отправка изображения"""
     try:
@@ -219,7 +223,7 @@ async def upload_and_send_image(
 @router.post("/chats/{chat_id}/read")
 async def mark_as_read(
     chat_id: str,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Отметить чат как прочитанный"""
     try:
@@ -235,7 +239,7 @@ async def mark_as_read(
 async def create_client_from_chat(
     chat_id: str,
     request: Request,
-    current_user: AdminUser = Depends(get_current_user)
+    username: str = Depends(authenticate)
 ):
     """Создание клиента из чата Авито с AI-сводкой"""
     try:
@@ -318,8 +322,8 @@ async def create_client_from_chat(
                     "summary": summary,
                     "chat_id": chat_id
                 }],
-                created_by_id=current_user.id,
-                manager_id=current_user.id
+                created_by_id=get_current_user(username).get('id', 1),
+                manager_id=get_current_user(username).get('id', 1)
             )
             
             db.add(new_client)
