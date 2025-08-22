@@ -194,17 +194,54 @@ async def get_messages(
     """Получение сообщений чата"""
     try:
         service = get_avito_service()
+        logger.info(f"Getting messages for chat {chat_id} with params: limit={limit}, offset={offset}")
+        
         messages = await service.get_chat_messages(chat_id, limit=limit, offset=offset)
         
         # Отмечаем чат как прочитанный
-        await service.mark_chat_as_read(chat_id)
+        try:
+            await service.mark_chat_as_read(chat_id)
+        except Exception as read_error:
+            logger.warning(f"Failed to mark chat as read: {read_error}")
         
         # Преобразуем в словари для JSON
         messages_data = [msg.to_dict() for msg in messages]
         
+        logger.info(f"Returning {len(messages_data)} messages for chat {chat_id}")
         return JSONResponse({"messages": messages_data, "total": len(messages_data)})
+        
     except Exception as e:
-        logger.error(f"Failed to get messages: {e}")
+        logger.error(f"Failed to get messages for chat {chat_id}: {e}", exc_info=True)
+        
+        # Проверяем тип ошибки для более детального ответа
+        if "not initialized" in str(e):
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "not_configured", 
+                    "message": "Avito service is not initialized",
+                    "details": "Требуется авторизация через OAuth. Перейдите в настройки Avito."
+                }
+            )
+        elif "403" in str(e) or "permission denied" in str(e):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": "access_denied",
+                    "message": "Access denied to Avito API",
+                    "details": f"Chat ID: {chat_id}"
+                }
+            )
+        elif "404" in str(e) or "not found" in str(e):
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": "chat_not_found",
+                    "message": "Chat not found or no longer accessible",
+                    "details": f"Chat ID: {chat_id}"
+                }
+            )
+        
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/chats/{chat_id}/messages")
