@@ -281,6 +281,8 @@ let currentFilter = {
     priority: '',
     sort: 'created_desc'
 };
+const currentUserRole = '{{ current_user.role }}';
+console.log('👤 Текущая роль пользователя:', currentUserRole);
 
 // Инициализация доски
 document.addEventListener('DOMContentLoaded', function() {
@@ -796,9 +798,12 @@ function initializeDragDropZones() {
 
 // Обработчик начала перетаскивания
 function handleDragStart(e) {
+    const taskId = this.dataset.taskId;
+    const employeeId = this.dataset.employeeId;
+    
     draggedTask = {
-        id: this.dataset.taskId,
-        employeeId: this.dataset.employeeId,
+        id: taskId,
+        employeeId: employeeId,
         element: this
     };
     draggedElement = this;
@@ -808,9 +813,9 @@ function handleDragStart(e) {
     // Настраиваем данные для передачи
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', this.outerHTML);
-    e.dataTransfer.setData('text/plain', this.dataset.taskId);
+    e.dataTransfer.setData('text/plain', taskId);
     
-    console.log('🏷️ Начинаем перетаскивание задачи:', draggedTask.id);
+    console.log('🏷️ Начинаем перетаскивание задачи:', taskId, 'от исполнителя:', employeeId);
 }
 
 // Обработчик окончания перетаскивания
@@ -859,19 +864,36 @@ async function handleDrop(e) {
         e.stopPropagation(); // Останавливаем некоторые браузеры от перенаправления
     }
     
+    e.preventDefault();
+    
     if (!draggedTask) {
+        console.log('⚠️ Нет перетаскиваемой задачи');
         return false;
     }
     
-    const targetEmployeeId = this.parentElement.dataset.employeeId;
-    console.log('📦 Drop в контейнер сотрудника:', targetEmployeeId);
+    // Получаем ID целевого исполнителя из колонки
+    const targetColumn = this.closest('.kanban-column');
+    if (!targetColumn) {
+        console.log('⚠️ Не найдена целевая колонка');
+        return false;
+    }
+    
+    const targetEmployeeId = targetColumn.dataset.employeeId;
+    console.log('📦 Drop в контейнер сотрудника:', targetEmployeeId, 'от исполнителя:', draggedTask.employeeId);
     
     // Убираем визуальные эффекты
-    this.closest('.kanban-column').classList.remove('drag-over');
+    targetColumn.classList.remove('drag-over');
     
     // Проверяем, изменился ли исполнитель
     if (draggedTask.employeeId === targetEmployeeId) {
         console.log('ℹ️ Задача осталась у того же исполнителя');
+        return false;
+    }
+    
+    // Проверяем права пользователя
+    if (currentUserRole !== 'owner') {
+        console.log('⛔ Только администратор может переназначать задачи');
+        showNotification('Только администратор может переназначать задачи между исполнителями', 'warning');
         return false;
     }
     
@@ -904,8 +926,16 @@ async function handleDrop(e) {
                     // Обновляем данные элемента
                     draggedElement.dataset.employeeId = targetEmployeeId;
                     
-                    // Перемещаем элемент в новый контейнер
-                    this.appendChild(draggedElement);
+                    // Находим целевой контейнер для задач
+                    const targetContainer = document.getElementById(`tasks-${targetEmployeeId}`);
+                    if (targetContainer) {
+                        targetContainer.appendChild(draggedElement);
+                        console.log('✅ Задача визуально перемещена в новую колонку');
+                    } else {
+                        console.log('⚠️ Не найден контейнер для задач исполнителя:', targetEmployeeId);
+                        // Перезагружаем доску для обновления
+                        loadTasksToBoard();
+                    }
                 }
                 
                 // Обновляем статистику
