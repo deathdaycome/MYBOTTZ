@@ -146,6 +146,17 @@ class AvitoService:
                 response_text = await response.text()
                 logger.debug(f"API response status: {response.status}, body length: {len(response_text)}")
                 
+                if response.status == 403:
+                    logger.error(f"Access denied (403): {response_text}")
+                    error_msg = "Permission denied. Check User ID and app permissions."
+                    try:
+                        error_data = await response.json()
+                        if error_data.get("error", {}).get("message"):
+                            error_msg = error_data["error"]["message"]
+                    except:
+                        pass
+                    raise Exception(f"403 Forbidden: {error_msg}")
+                    
                 if response.status not in [200, 201]:
                     logger.error(f"API request failed: {response_text}")
                     raise Exception(f"API request failed with status {response.status}: {response_text}")

@@ -145,7 +145,25 @@ async def get_chats(
     except Exception as e:
         logger.error(f"Failed to get chats: {e}")
         if "not initialized" in str(e):
-            raise HTTPException(status_code=400, detail="Avito service not configured. Please set User ID.")
+            # Возвращаем более информативное сообщение об ошибке
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "error": "not_configured", 
+                    "message": "Avito service is not initialized. Call init_avito_service first.",
+                    "details": "Требуется авторизация через OAuth. Перейдите в настройки Avito."
+                }
+            )
+        # Если ошибка 403 - проблема с доступом
+        if "403" in str(e) or "permission denied" in str(e):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": "access_denied",
+                    "message": "Access denied to Avito API. Invalid User ID or insufficient permissions.",
+                    "details": f"User ID: {service.user_id if service else 'Not set'}"
+                }
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/chats/{chat_id}")
