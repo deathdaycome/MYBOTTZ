@@ -237,8 +237,14 @@ class AvitoService:
         )
         
         messages = []
-        messages_data = result.get("messages", [])
+        # API может возвращать массив напрямую или объект с ключом messages
+        if isinstance(result, list):
+            messages_data = result
+        else:
+            messages_data = result.get("messages", [])
+        
         logger.info(f"Retrieved {len(messages_data)} messages for chat {chat_id}")
+        logger.debug(f"API result structure: {type(result)}, is_list: {isinstance(result, list)}")
         
         for msg in messages_data:
             message = AvitoMessage(
