@@ -101,7 +101,8 @@ class AvitoService:
             data = {
                 "grant_type": "client_credentials",
                 "client_id": self.client_id,
-                "client_secret": self.client_secret
+                "client_secret": self.client_secret,
+                "scope": "messenger:read messenger:write"
             }
             
             headers = {
@@ -121,7 +122,7 @@ class AvitoService:
                 result = await response.json()
                 self.access_token = result["access_token"]
                 expires_in = result.get("expires_in", 3600)
-                self.token_expires_at = datetime.now().timestamp() + expires_in - 60
+                self.token_expires_at = datetime.now() + timedelta(seconds=expires_in - 60)
                 
                 logger.info(f"Access token received, expires in {expires_in} seconds")
                 return self.access_token

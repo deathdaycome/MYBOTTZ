@@ -301,9 +301,21 @@ except ImportError as e:
     print(f"Ошибка импорта роутера Авито: {e}")
     avito_router = None
 
+# Импорт OAuth роутера Авито
+try:
+    from .routers.avito_oauth import router as avito_oauth_router
+    print("OAuth роутер Авито подключен")
+except ImportError as e:
+    print(f"Ошибка импорта OAuth роутера Авито: {e}")
+    avito_oauth_router = None
+
 # Подключаем роутер Авито
 if avito_router:
     admin_router.include_router(avito_router)
+
+# Подключаем OAuth роутер Авито
+if avito_oauth_router:
+    admin_router.include_router(avito_oauth_router)
 
 # Настройка шаблонов
 templates = Jinja2Templates(directory="app/admin/templates")

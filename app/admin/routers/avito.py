@@ -2,6 +2,9 @@
 Роутер для интеграции с Авито мессенджером
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import APIRouter, Depends, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
@@ -49,10 +52,9 @@ def get_current_user(username: str):
     return None
 
 # Инициализация сервиса Авито
-AVITO_CLIENT_ID = os.getenv("AVITO_CLIENT_ID", "fakHmzyCUJTM56AEQv8i")
-AVITO_CLIENT_SECRET = os.getenv("AVITO_CLIENT_SECRET", "tMJVVuzTkNUP3Dh2c08V_f7OZG1xNKUrPLzl9xJd")
-# Попробуем получить User ID из разных источников
-AVITO_USER_ID = os.getenv("AVITO_USER_ID") or os.getenv("AVITO_USER_ID_DEFAULT", "272604359")
+AVITO_CLIENT_ID = os.getenv("AVITO_CLIENT_ID")
+AVITO_CLIENT_SECRET = os.getenv("AVITO_CLIENT_SECRET")
+AVITO_USER_ID = os.getenv("AVITO_USER_ID")
 
 # WebSocket connections storage
 websocket_connections = {}

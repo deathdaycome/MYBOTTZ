@@ -316,8 +316,20 @@ async function loadChats() {
         const response = await fetch(`/avito/chats?unread_only=${showUnreadOnly}`);
         
         if (!response.ok) {
+            const errorData = await response.json();
+            
             if (response.status === 400) {
-                showSettings();
+                // Проблема с конфигурацией
+                if (errorData.detail && errorData.detail.includes('not configured')) {
+                    showSettings();
+                } else {
+                    // Показываем сообщение об авторизации
+                    showAuthorizationMessage();
+                }
+                return;
+            } else if (response.status === 403 || response.status === 401) {
+                // Проблема с авторизацией
+                showAuthorizationMessage();
                 return;
             }
             throw new Error('Failed to load chats');
@@ -328,8 +340,24 @@ async function loadChats() {
         updateUnreadCount(data.chats);
     } catch (error) {
         console.error('Error loading chats:', error);
-        showNotification('Ошибка загрузки чатов', 'error');
+        showNotification('Ошибка загрузки чатов. Возможно, требуется авторизация.', 'error');
+        showAuthorizationMessage();
     }
+}
+
+// Показать сообщение об авторизации
+function showAuthorizationMessage() {
+    const chatList = document.getElementById('chatList');
+    chatList.innerHTML = `
+        <div class="text-center p-4">
+            <i class="fas fa-lock fa-3x mb-3 text-warning"></i>
+            <h5>Требуется авторизация</h5>
+            <p class="text-muted">Для доступа к чатам Avito необходимо авторизоваться</p>
+            <a href="/avito/oauth/login" class="btn btn-primary mt-3">
+                <i class="fas fa-sign-in-alt me-2"></i>Авторизоваться в Avito
+            </a>
+        </div>
+    `;
 }
 
 // Отображение списка чатов
@@ -341,6 +369,10 @@ function displayChats(chats) {
             <div class="text-center p-4 text-muted">
                 <i class="fas fa-inbox fa-3x mb-3"></i>
                 <p>Нет доступных чатов</p>
+                <small>Возможно, у вас действительно нет активных чатов в Avito</small>
+                <a href="/avito/oauth/login" class="btn btn-sm btn-outline-primary mt-3">
+                    <i class="fas fa-sync-alt me-2"></i>Переавторизоваться
+                </a>
             </div>
         `;
         return;
