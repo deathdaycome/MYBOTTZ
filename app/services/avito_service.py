@@ -11,6 +11,7 @@ import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
+from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -103,41 +104,63 @@ class AvitoService:
                 "client_secret": self.client_secret
             }
             
-            async with session.post(self.auth_url, data=data) as response:
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded"
+            }
+            
+            logger.info(f"Getting access token for client_id: {self.client_id[:10]}...")
+            
+            async with session.post(self.auth_url, data=data, headers=headers) as response:
+                response_text = await response.text()
+                logger.info(f"Token response status: {response.status}")
+                
                 if response.status != 200:
-                    error_text = await response.text()
-                    logger.error(f"Failed to get access token: {error_text}")
-                    raise Exception(f"Failed to get access token: {error_text}")
+                    logger.error(f"Failed to get access token: {response_text}")
+                    raise Exception(f"Failed to get access token (status {response.status}): {response_text}")
                     
                 result = await response.json()
                 self.access_token = result["access_token"]
                 expires_in = result.get("expires_in", 3600)
                 self.token_expires_at = datetime.now().timestamp() + expires_in - 60
                 
+                logger.info(f"Access token received, expires in {expires_in} seconds")
                 return self.access_token
     
     async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict:
         """Выполнение запроса к API Авито"""
         token = await self._get_access_token()
         
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+        headers = kwargs.pop("headers", {})
+        headers["Authorization"] = f"Bearer {token}"
+        headers["Accept"] = "application/json"
+        if method in ["POST", "PUT", "PATCH"]:
+            headers["Content-Type"] = "application/json"
         
         url = f"{self.base_url}{endpoint}"
         
+        logger.info(f"Making API request: {method} {endpoint}")
+        
         async with aiohttp.ClientSession() as session:
             async with session.request(method, url, headers=headers, **kwargs) as response:
+                response_text = await response.text()
+                logger.debug(f"API response status: {response.status}, body length: {len(response_text)}")
+                
                 if response.status not in [200, 201]:
-                    error_text = await response.text()
-                    logger.error(f"API request failed: {error_text}")
-                    raise Exception(f"API request failed: {error_text}")
+                    logger.error(f"API request failed: {response_text}")
+                    raise Exception(f"API request failed with status {response.status}: {response_text}")
                     
-                return await response.json()
+                try:
+                    return await response.json()
+                except:
+                    logger.error(f"Failed to parse JSON response: {response_text[:500]}")
+                    return {}
     
     async def get_chats(self, unread_only: bool = False, limit: int = 100, offset: int = 0) -> List[AvitoChat]:
         """Получение списка чатов"""
+        if not self.user_id:
+            logger.error("User ID is not set. Please configure Avito service with user_id.")
+            raise Exception("User ID is not set. Please configure Avito service with user_id.")
+            
         params = {
             "limit": limit,
             "offset": offset,
@@ -145,38 +168,50 @@ class AvitoService:
             "chat_types": "u2i,u2u"  # чаты по объявлениям и между пользователями
         }
         
-        result = await self._make_request(
-            "GET",
-            f"/messenger/v2/accounts/{self.user_id}/chats",
-            params=params
-        )
+        logger.info(f"Getting chats for user_id: {self.user_id} with params: {params}")
+        
+        try:
+            result = await self._make_request(
+                "GET",
+                f"/messenger/v2/accounts/{self.user_id}/chats",
+                params=params
+            )
+        except Exception as e:
+            logger.error(f"Failed to get chats: {e}")
+            # Возвращаем пустой список вместо исключения для более graceful обработки
+            return []
         
         chats = []
         for chat_data in result.get("chats", []):
-            last_message = None
-            if chat_data.get("last_message"):
-                msg = chat_data["last_message"]
-                last_message = AvitoMessage(
-                    id=msg["id"],
-                    author_id=msg.get("author_id", 0),
-                    content=msg.get("content", {}),
-                    created=msg.get("created", 0),
-                    direction=msg.get("direction", "in"),
-                    type=MessageType(msg.get("type", "text")),
-                    is_read=msg.get("is_read", False)
+            try:
+                last_message = None
+                if chat_data.get("last_message"):
+                    msg = chat_data["last_message"]
+                    last_message = AvitoMessage(
+                        id=msg.get("id", ""),
+                        author_id=msg.get("author_id", 0),
+                        content=msg.get("content", {}),
+                        created=msg.get("created", 0),
+                        direction=msg.get("direction", "in"),
+                        type=MessageType(msg.get("type", "text")),
+                        is_read=msg.get("is_read", False)
+                    )
+                
+                chat = AvitoChat(
+                    id=chat_data.get("id", ""),
+                    users=chat_data.get("users", []),
+                    context=chat_data.get("context"),
+                    created=chat_data.get("created", 0),
+                    updated=chat_data.get("updated", 0),
+                    last_message=last_message,
+                    unread_count=chat_data.get("unread_count", 0)
                 )
-            
-            chat = AvitoChat(
-                id=chat_data["id"],
-                users=chat_data.get("users", []),
-                context=chat_data.get("context"),
-                created=chat_data.get("created", 0),
-                updated=chat_data.get("updated", 0),
-                last_message=last_message,
-                unread_count=chat_data.get("unread_count", 0)
-            )
-            chats.append(chat)
+                chats.append(chat)
+            except Exception as e:
+                logger.error(f"Error processing chat data: {e}")
+                continue
         
+        logger.info(f"Retrieved {len(chats)} chats")
         return chats
     
     async def get_chat_messages(self, chat_id: str, limit: int = 100, offset: int = 0) -> List[AvitoMessage]:
