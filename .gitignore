@@ -179,6 +179,10 @@ config.ini
 secrets.json
 local_config.py
 
+# Environment files with secrets
+.env.local
+.env.production
+
 # Backup files
 *.bak
 *.backup

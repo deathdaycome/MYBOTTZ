@@ -5,10 +5,14 @@
 
 import requests
 import json
+import os
+from dotenv import load_dotenv
 
-# Новый ключ
-API_KEY = "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"
-BASE_URL = "https://openrouter.ai/api/v1"
+# Загружаем переменные окружения из .env
+load_dotenv()
+
+API_KEY = os.getenv("OPENROUTER_API_KEY")
+BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
 def test_openrouter_key():
     """Тестируем ключ OpenRouter"""
