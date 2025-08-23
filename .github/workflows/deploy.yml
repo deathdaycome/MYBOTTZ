@@ -47,6 +47,16 @@ jobs:
           # Получаем последние изменения
           git pull origin main
           
+          # Обновляем .env с новым OpenRouter ключом
+          echo "🔑 Обновляем OpenRouter ключ в .env..."
+          if [ -f ".env" ]; then
+            # Заменяем старый ключ на новый
+            sed -i 's/OPENROUTER_API_KEY=.*/OPENROUTER_API_KEY=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/' .env
+            echo "✅ OpenRouter ключ обновлен в .env"
+          else
+            echo "❌ .env файл не найден!"
+          fi
+          
           # Восстанавливаем локальные изменения
           git stash pop || true
           
@@ -146,8 +156,11 @@ jobs:
           pm2 stop bot-business-card || true
           pm2 delete bot-business-card || true
           
-          # Создаем ecosystem.config.js с переменными окружения
-          cat > ecosystem.config.js << 'EOF'
+          # Создаем ecosystem.config.js из .env переменных
+          echo "🔧 Создаем ecosystem.config.js из .env..."
+          source .env
+          
+          cat > ecosystem.config.js << EOF
           module.exports = {
             apps: [{
               name: 'bot-business-card',
@@ -160,35 +173,40 @@ jobs:
               watch: false,
               max_memory_restart: '500M',
               env: {
-                BOT_TOKEN: '${{ secrets.BOT_TOKEN }}',
-                TELEGRAM_BOT_TOKEN: '${{ secrets.BOT_TOKEN }}',
-                BOT_USERNAME: 'ivan_dev_bot',
-                OPENROUTER_API_KEY: '${{ secrets.OPENROUTER_API_KEY }}',
-                OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
-                DEFAULT_MODEL: 'openai/gpt-4o-mini',
-                DATABASE_URL: 'sqlite:///./data/bot.db',
-                DATABASE_ECHO: 'False',
-                ADMIN_SECRET_KEY: '${{ secrets.ADMIN_SECRET_KEY }}',
-                ADMIN_USERNAME: '${{ secrets.ADMIN_USERNAME }}',
-                ADMIN_PASSWORD: '${{ secrets.ADMIN_PASSWORD }}',
-                ADMIN_PORT: '8001',
-                MAX_FILE_SIZE: '10485760',
-                UPLOAD_PATH: './uploads',
-                LOG_LEVEL: 'INFO',
-                LOG_FILE: './logs/bot.log',
-                NOTIFICATION_CHAT_ID: '501613334',
-                ADMIN_CHAT_ID: '501613334',
-                ADMIN_IDS: '501613334',
-                BASE_HOURLY_RATE: '1000',
-                URGENT_MULTIPLIER: '1.3',
-                REDIS_URL: 'redis://localhost:6379/0',
-                CONSULTANT_SYSTEM_PROMPT: 'Ты - эксперт-консультант по разработке Telegram-ботов и чат-ботов.',
-                CONSULTANT_MAX_TOKENS: '1000',
-                CONSULTANT_TEMPERATURE: '0.7'
+                BOT_TOKEN: '${BOT_TOKEN}',
+                TELEGRAM_BOT_TOKEN: '${TELEGRAM_BOT_TOKEN}',
+                BOT_USERNAME: '${BOT_USERNAME}',
+                OPENROUTER_API_KEY: '${OPENROUTER_API_KEY}',
+                OPENROUTER_BASE_URL: '${OPENROUTER_BASE_URL}',
+                DEFAULT_MODEL: '${DEFAULT_MODEL}',
+                DATABASE_URL: '${DATABASE_URL}',
+                DATABASE_ECHO: '${DATABASE_ECHO}',
+                ADMIN_SECRET_KEY: '${ADMIN_SECRET_KEY}',
+                ADMIN_USERNAME: '${ADMIN_USERNAME}',
+                ADMIN_PASSWORD: '${ADMIN_PASSWORD}',
+                ADMIN_PORT: '${ADMIN_PORT}',
+                MAX_FILE_SIZE: '${MAX_FILE_SIZE}',
+                UPLOAD_PATH: '${UPLOAD_PATH}',
+                LOG_LEVEL: '${LOG_LEVEL}',
+                LOG_FILE: '${LOG_FILE}',
+                NOTIFICATION_CHAT_ID: '${NOTIFICATION_CHAT_ID}',
+                ADMIN_CHAT_ID: '${ADMIN_CHAT_ID}',
+                ADMIN_IDS: '${ADMIN_IDS}',
+                BASE_HOURLY_RATE: '${BASE_HOURLY_RATE}',
+                URGENT_MULTIPLIER: '${URGENT_MULTIPLIER}',
+                REDIS_URL: '${REDIS_URL}',
+                CONSULTANT_SYSTEM_PROMPT: '${CONSULTANT_SYSTEM_PROMPT}',
+                CONSULTANT_MAX_TOKENS: '${CONSULTANT_MAX_TOKENS}',
+                CONSULTANT_TEMPERATURE: '${CONSULTANT_TEMPERATURE}',
+                AVITO_CLIENT_ID: '${AVITO_CLIENT_ID}',
+                AVITO_CLIENT_SECRET: '${AVITO_CLIENT_SECRET}',
+                AVITO_USER_ID: '${AVITO_USER_ID}'
               }
             }]
           };
           EOF
+          
+          echo "✅ ecosystem.config.js создан из .env переменных"
           
           # Запускаем PM2 с новой конфигурацией
           pm2 start ecosystem.config.js
@@ -225,6 +243,14 @@ jobs:
           # Финальная проверка OpenRouter переменных
           echo "🔍 ФИНАЛЬНАЯ ПРОВЕРКА OpenRouter переменных:"
           pm2 env 0 | grep -E "(OPENROUTER)" || echo "❌ КРИТИЧЕСКАЯ ОШИБКА: OpenRouter переменные НЕ ЗАГРУЖЕНЫ!"
+          
+          # Проверяем что новый ключ загрузился
+          echo "🔑 Проверяем новый OpenRouter ключ:"
+          if pm2 env 0 | grep "OPENROUTER_API_KEY" | grep -q "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"; then
+            echo "✅✅✅ НОВЫЙ OPENROUTER КЛЮЧ УСПЕШНО ЗАГРУЖЕН!"
+          else
+            echo "❌❌❌ ВНИМАНИЕ: Новый ключ не найден, проверьте .env файл"
+          fi
           
           # Показываем финальные логи
           echo "📋 Финальные логи после перезапуска:"
