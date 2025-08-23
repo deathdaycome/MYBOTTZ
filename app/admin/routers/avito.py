@@ -18,6 +18,8 @@ import logging
 import os
 
 from ...database.database import get_db_context, get_db
+from ...services.notification_service import NotificationService
+from ...services.avito_polling_service import polling_service
 from ...database.crm_models import Client, ClientStatus, ClientType
 from ...database.models import AdminUser
 from ...services.avito_service import get_avito_service, init_avito_service, AvitoService
@@ -743,3 +745,58 @@ async def analyze_client_from_chat(
     except Exception as e:
         logger.error(f"Error analyzing client from chat {chat_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка анализа диалога: {str(e)}")
+
+@router.post("/polling/start")
+async def start_polling(current_user: AdminUser = Depends(get_current_admin_user)):
+    """Запуск мониторинга новых сообщений"""
+    try:
+        if not polling_service.polling_active:
+            # Запускаем polling в фоне
+            import asyncio
+            asyncio.create_task(polling_service.start_polling())
+            
+        return JSONResponse({"status": "success", "message": "Мониторинг запущен"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@router.post("/polling/stop")
+async def stop_polling(current_user: AdminUser = Depends(get_current_admin_user)):
+    """Остановка мониторинга"""
+    try:
+        polling_service.stop_polling()
+        return JSONResponse({"status": "success", "message": "Мониторинг остановлен"})
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@router.post("/auto-response/toggle")
+async def toggle_auto_response(
+    request: Request,
+    current_user: AdminUser = Depends(get_current_admin_user)
+):
+    """Переключение автоответов"""
+    try:
+        data = await request.json()
+        enabled = data.get('enabled', False)
+        
+        polling_service.set_auto_response(enabled)
+        
+        # Если включаем автоответы, убеждаемся что polling запущен
+        if enabled and not polling_service.polling_active:
+            import asyncio
+            asyncio.create_task(polling_service.start_polling())
+        
+        return JSONResponse({
+            "status": "success", 
+            "message": f"Автоответы {'включены' if enabled else 'выключены'}",
+            "enabled": enabled
+        })
+    except Exception as e:
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@router.get("/polling/status")
+async def get_polling_status(current_user: AdminUser = Depends(get_current_admin_user)):
+    """Статус мониторинга и автоответов"""
+    return JSONResponse({
+        "polling_active": polling_service.polling_active,
+        "auto_response_enabled": polling_service.auto_response_enabled
+    })

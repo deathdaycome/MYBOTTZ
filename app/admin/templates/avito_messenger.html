@@ -1296,36 +1296,82 @@ async function saveClient() {
 let autoResponseEnabled = false;
 
 // Переключение режима автоответов
-function toggleAutoResponseMode() {
+async function toggleAutoResponseMode() {
     const checkbox = document.getElementById('mainAutoResponseMode');
     const statusBadge = document.getElementById('mainAutoResponseStatus');
     
     if (!checkbox || !statusBadge) return;
     
-    autoResponseEnabled = checkbox.checked;
-    
-    const statusText = autoResponseEnabled ? 'ВКЛ' : 'ВЫКЛ';
-    const statusClass = autoResponseEnabled ? 'bg-success' : 'bg-secondary';
-    
-    statusBadge.textContent = statusText;
-    statusBadge.className = `badge ${statusClass} ms-2`;
-    
-    if (autoResponseEnabled) {
-        showNotification('✅ Автоматические ответы AI включены', 'success');
-        localStorage.setItem('avito_auto_response', 'true');
-    } else {
-        showNotification('❌ Автоматические ответы AI выключены', 'info');
-        localStorage.setItem('avito_auto_response', 'false');
+    try {
+        // Отправляем запрос на сервер
+        const response = await fetch('/admin/avito/auto-response/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ enabled: checkbox.checked })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            autoResponseEnabled = result.enabled;
+            
+            const statusText = autoResponseEnabled ? 'ВКЛ' : 'ВЫКЛ';
+            const statusClass = autoResponseEnabled ? 'bg-success' : 'bg-secondary';
+            
+            statusBadge.textContent = statusText;
+            statusBadge.className = `badge ${statusClass} ms-2`;
+            
+            showNotification(result.message, 'success');
+            localStorage.setItem('avito_auto_response', autoResponseEnabled.toString());
+        } else {
+            showNotification('Ошибка переключения автоответов: ' + result.message, 'error');
+            // Возвращаем checkbox в исходное состояние
+            checkbox.checked = !checkbox.checked;
+        }
+    } catch (error) {
+        console.error('Error toggling auto response:', error);
+        showNotification('Ошибка соединения с сервером', 'error');
+        // Возвращаем checkbox в исходное состояние
+        checkbox.checked = !checkbox.checked;
     }
 }
 
 // Загрузка состояния автоответов при инициализации
-function loadAutoResponseState() {
-    const saved = localStorage.getItem('avito_auto_response');
-    const checkbox = document.getElementById('mainAutoResponseMode');
-    if (saved === 'true' && checkbox) {
-        checkbox.checked = true;
-        toggleAutoResponseMode();
+async function loadAutoResponseState() {
+    try {
+        // Загружаем актуальное состояние с сервера
+        const response = await fetch('/admin/avito/polling/status');
+        const status = await response.json();
+        
+        const checkbox = document.getElementById('mainAutoResponseMode');
+        const statusBadge = document.getElementById('mainAutoResponseStatus');
+        
+        if (checkbox && statusBadge) {
+            checkbox.checked = status.auto_response_enabled;
+            autoResponseEnabled = status.auto_response_enabled;
+            
+            const statusText = autoResponseEnabled ? 'ВКЛ' : 'ВЫКЛ';
+            const statusClass = autoResponseEnabled ? 'bg-success' : 'bg-secondary';
+            
+            statusBadge.textContent = statusText;
+            statusBadge.className = `badge ${statusClass} ms-2`;
+        }
+        
+        // Показываем статус мониторинга
+        if (status.polling_active) {
+            showNotification('🔄 Мониторинг новых сообщений активен', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Error loading auto response state:', error);
+        // Fallback к localStorage
+        const saved = localStorage.getItem('avito_auto_response');
+        const checkbox = document.getElementById('mainAutoResponseMode');
+        if (saved === 'true' && checkbox) {
+            checkbox.checked = true;
+        }
     }
 }
 
@@ -1399,9 +1445,31 @@ async function processAutoResponse(chatId, message) {
     }
 }
 
-// Инициализация автоответов при загрузке страницы
+// Автообновление чатов каждые 30 секунд
+let autoRefreshInterval;
+
+function startAutoRefresh() {
+    // Обновляем чаты каждые 30 секунд
+    autoRefreshInterval = setInterval(() => {
+        console.log('Автообновление чатов...');
+        loadChats();
+    }, 30000);
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+// Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
     loadAutoResponseState();
+    startAutoRefresh(); // Запускаем автообновление
+    
+    // Останавливаем автообновление при закрытии страницы
+    window.addEventListener('beforeunload', stopAutoRefresh);
 });
 </script>
 {% endblock %}

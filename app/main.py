@@ -29,6 +29,7 @@ from app.bot.routing import get_callback_router
 from app.admin.app import admin_router, templates
 from app.database.database import get_db, SessionLocal, init_db
 from app.utils.helpers import format_datetime, format_currency, time_ago
+from app.services.avito_polling_service import polling_service
 
 # Логгер для main
 logger = get_logger(__name__)
@@ -512,6 +513,17 @@ async def admin_debug():
             "traceback": traceback.format_exc(),
             "message": "Ошибка в admin-debug"
         }
+
+@app.on_event("startup")
+async def startup_event():
+    """Инициализация при запуске приложения"""
+    try:
+        # Запускаем Avito polling сервис
+        logger.info("🔄 Запускаем Avito polling service...")
+        asyncio.create_task(polling_service.start_polling())
+        logger.info("✅ Avito polling service запущен")
+    except Exception as e:
+        logger.error(f"Ошибка запуска Avito polling: {e}")
 
 if __name__ == "__main__":
     import uvicorn
