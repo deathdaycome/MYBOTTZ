@@ -163,8 +163,12 @@ class AvitoService:
                     
                 try:
                     return await response.json()
-                except:
-                    logger.error(f"Failed to parse JSON response: {response_text[:500]}")
+                except Exception as e:
+                    logger.error(f"Failed to parse JSON response: {e}")
+                    logger.error(f"Response text: {response_text[:500]}")
+                    if response.status == 200:
+                        # Если статус 200, но JSON не парсится, возвращаем None для индикации ошибки
+                        return None
                     return {}
     
     async def get_chats(self, unread_only: bool = False, limit: int = 100, offset: int = 0) -> List[AvitoChat]:
@@ -187,6 +191,11 @@ class AvitoService:
             f"/messenger/v2/accounts/{self.user_id}/chats",
             params=params
         )
+        
+        # Проверяем что result не None и содержит ожидаемые данные
+        if not result or not isinstance(result, dict):
+            logger.error(f"Invalid API response: {result}")
+            return []
         
         logger.info(f"Received {len(result.get('chats', []))} chats from API")
         
@@ -236,12 +245,20 @@ class AvitoService:
             params=params
         )
         
+        # Проверяем что result не None
+        if not result:
+            logger.error(f"Invalid API response for messages: {result}")
+            return []
+        
         messages = []
         # API может возвращать массив напрямую или объект с ключом messages
         if isinstance(result, list):
             messages_data = result
-        else:
+        elif isinstance(result, dict):
             messages_data = result.get("messages", [])
+        else:
+            logger.error(f"Unexpected API response type for messages: {type(result)}")
+            return []
         
         logger.info(f"Retrieved {len(messages_data)} messages for chat {chat_id}")
         logger.debug(f"API result structure: {type(result)}, is_list: {isinstance(result, list)}")
