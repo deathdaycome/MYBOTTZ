@@ -147,9 +147,22 @@
                                 <button class="btn btn-outline-info" type="button" onclick="showAiAssistant()" title="AI Ассистент">
                                     <i class="fas fa-robot"></i>
                                 </button>
-                                <button class="btn btn-outline-success" type="button" onclick="showAddClientModal()" title="Добавить клиента">
-                                    <i class="fas fa-user-plus"></i>
-                                </button>
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown" title="CRM действия">
+                                        <i class="fas fa-user-plus"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="createClientFromChat()">
+                                            <i class="fas fa-user-plus me-2 text-success"></i>Создать клиента
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="showStatusModal()">
+                                            <i class="fas fa-tag me-2 text-primary"></i>Статус клиента
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="exportChatDialog()">
+                                            <i class="fas fa-download me-2 text-info"></i>Экспорт чата
+                                        </a></li>
+                                    </ul>
+                                </div>
                                 <button class="btn btn-primary" type="submit">
                                     <i class="fas fa-paper-plane"></i> Отправить
                                 </button>
@@ -1471,5 +1484,208 @@ document.addEventListener('DOMContentLoaded', function() {
     // Останавливаем автообновление при закрытии страницы
     window.addEventListener('beforeunload', stopAutoRefresh);
 });
+
+// CRM Integration Functions
+async function createClientFromChat(chatId) {
+    if (!chatId) {
+        chatId = currentChatId;
+    }
+    
+    if (!chatId) {
+        showNotification('Выберите чат для создания клиента', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${chatId}/create-client`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка создания клиента');
+        }
+        
+        const client = await response.json();
+        showNotification(`✅ Клиент "${client.name}" создан успешно`, 'success');
+        
+        // Обновляем dropdown для показа новых действий
+        updateCrmDropdown(chatId, client.id);
+        
+    } catch (error) {
+        console.error('Error creating client:', error);
+        showNotification('Ошибка создания клиента: ' + error.message, 'error');
+    }
+}
+
+function showStatusModal(clientId, chatId) {
+    if (!clientId || !chatId) {
+        showNotification('Ошибка: не удалось определить клиента или чат', 'error');
+        return;
+    }
+    
+    // Устанавливаем данные модального окна
+    document.getElementById('modalClientId').value = clientId;
+    document.getElementById('modalChatId').value = chatId;
+    
+    // Показываем модальное окно
+    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+    modal.show();
+}
+
+async function updateClientStatus() {
+    const clientId = document.getElementById('modalClientId').value;
+    const chatId = document.getElementById('modalChatId').value;
+    const newStatus = document.getElementById('newStatus').value;
+    const notes = document.getElementById('statusNotes').value;
+    
+    if (!clientId || !newStatus) {
+        showNotification('Выберите статус для обновления', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/avito/clients/${clientId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                status: newStatus,
+                notes: notes
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка обновления статуса');
+        }
+        
+        showNotification('✅ Статус клиента обновлен', 'success');
+        
+        // Закрываем модальное окно
+        const modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+        modal.hide();
+        
+        // Обновляем dropdown
+        updateCrmDropdown(chatId, clientId);
+        
+    } catch (error) {
+        console.error('Error updating status:', error);
+        showNotification('Ошибка обновления статуса: ' + error.message, 'error');
+    }
+}
+
+async function exportChatDialog(chatId) {
+    if (!chatId) {
+        chatId = currentChatId;
+    }
+    
+    if (!chatId) {
+        showNotification('Выберите чат для экспорта', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${chatId}/export`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка экспорта');
+        }
+        
+        const result = await response.json();
+        
+        // Скачиваем файл
+        if (result.download_url) {
+            const link = document.createElement('a');
+            link.href = result.download_url;
+            link.download = result.filename || 'chat_export.txt';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        showNotification('✅ Переписка экспортирована', 'success');
+        
+    } catch (error) {
+        console.error('Error exporting chat:', error);
+        showNotification('Ошибка экспорта: ' + error.message, 'error');
+    }
+}
+
+function updateCrmDropdown(chatId, clientId) {
+    // Обновляем CRM dropdown после изменений
+    const dropdown = document.querySelector(`[data-chat-id="${chatId}"] .dropdown-menu`);
+    if (dropdown && clientId) {
+        // Заменяем "Создать клиента" на действия с существующим клиентом
+        dropdown.innerHTML = `
+            <li><a class="dropdown-item" href="#" onclick="showStatusModal('${clientId}', '${chatId}')">
+                <i class="fas fa-edit me-2"></i>Изменить статус
+            </a></li>
+            <li><a class="dropdown-item" href="#" onclick="exportChatDialog('${chatId}')">
+                <i class="fas fa-download me-2"></i>Экспорт переписки
+            </a></li>
+        `;
+    }
+}
+</script>
+
+<!-- Модальное окно для изменения статуса клиента -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusModalLabel">
+                    <i class="fas fa-user-edit me-2"></i>Изменить статус клиента
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modalClientId" />
+                <input type="hidden" id="modalChatId" />
+                
+                <div class="mb-3">
+                    <label for="newStatus" class="form-label">
+                        <i class="fas fa-flag me-2"></i>Новый статус
+                    </label>
+                    <select class="form-select" id="newStatus" required>
+                        <option value="">Выберите статус...</option>
+                        <option value="hot_lead">🔥 Горячий лид</option>
+                        <option value="warm_contact">🟡 Теплый контакт</option>
+                        <option value="cold_contact">🔵 Холодный контакт</option>
+                        <option value="deal_closed">✅ Завершенная сделка</option>
+                        <option value="rejected">❌ Отклонен</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="statusNotes" class="form-label">
+                        <i class="fas fa-sticky-note me-2"></i>Заметки
+                    </label>
+                    <textarea class="form-control" id="statusNotes" rows="3" 
+                              placeholder="Добавьте заметки о клиенте..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Отмена
+                </button>
+                <button type="button" class="btn btn-primary" onclick="updateClientStatus()">
+                    <i class="fas fa-save me-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 </script>
 {% endblock %}

@@ -27,6 +27,20 @@ async def run_admin_panel():
     # Создаем FastAPI приложение
     app = FastAPI(title="Bot Admin Panel", description="Админ панель для Telegram бота")
     
+    # Запускаем Avito polling сервис в фоне
+    async def start_avito_polling():
+        try:
+            from app.services.avito_polling_service import polling_service
+            print("🔔 Запускаем Avito polling сервис для уведомлений...")
+            # Запускаем polling в background task
+            asyncio.create_task(polling_service.start_polling(interval=30))
+        except Exception as e:
+            print(f"⚠️  Ошибка запуска Avito polling: {e}")
+    
+    @app.on_event("startup")
+    async def startup_event():
+        await start_avito_polling()
+    
     # Подключаем статические файлы
     try:
         app.mount("/static", StaticFiles(directory="app/admin/static"), name="static")

@@ -40,6 +40,15 @@ class ClientStatus(enum.Enum):
     BLACKLIST = "blacklist"  # Черный список
 
 
+class AvitoClientStatus(enum.Enum):
+    """Специальные статусы для клиентов Avito"""
+    HOT_LEAD = "hot_lead"  # Горячий лид 🔥
+    WARM_CONTACT = "warm_contact"  # Теплый контакт 🟡
+    COLD_CONTACT = "cold_contact"  # Холодный контакт 🔵
+    DEAL_CLOSED = "deal_closed"  # Завершенная сделка ✅
+    REJECTED = "rejected"  # Отклонен ❌
+
+
 class LeadStatus(enum.Enum):
     """Статусы лидов"""
     NEW = "new"  # Новый
@@ -112,6 +121,14 @@ class Client(Base):
     
     # Ответственные
     manager_id = Column(Integer, ForeignKey("admin_users.id"), nullable=True)
+    
+    # Avito-специфичные поля
+    avito_chat_id = Column(String(100), nullable=True, index=True)  # ID чата в Avito
+    avito_user_id = Column(String(100), nullable=True, index=True)  # ID пользователя в Avito
+    avito_status = Column(Enum(AvitoClientStatus), nullable=True)  # Статус в Avito
+    avito_dialog_history = Column(JSON, default=list)  # История диалога в Avito
+    avito_notes = Column(Text, nullable=True)  # Заметки по Avito клиенту
+    avito_follow_up = Column(DateTime, nullable=True)  # Напоминание о следующем контакте
     
     # Связь с пользователем телеграм (если есть)
     telegram_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

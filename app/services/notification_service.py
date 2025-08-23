@@ -17,6 +17,8 @@ class NotificationService:
     def __init__(self, bot: Bot = None):
         self.bot = bot
         self.admin_chat_id = settings.ADMIN_CHAT_ID
+        logger.info(f"NotificationService: admin_chat_id = {self.admin_chat_id}")
+        logger.info(f"NotificationService: bot_token = {'***' + settings.BOT_TOKEN[-4:] if settings.BOT_TOKEN else 'НЕ ЗАДАН'}")
         
     def set_bot(self, bot: Bot):
         """Установка бота для отправки уведомлений"""
@@ -24,8 +26,14 @@ class NotificationService:
     
     async def send_admin_notification(self, message: str, parse_mode: str = 'HTML') -> bool:
         """Отправка уведомления администратору"""
-        if not self.admin_chat_id or not self.bot:
-            logger.warning("Админ чат ID или бот не настроены")
+        logger.info(f"Попытка отправить админ уведомление: admin_chat_id={self.admin_chat_id}, bot={self.bot is not None}")
+        
+        if not self.admin_chat_id:
+            logger.warning("ADMIN_CHAT_ID не установлен в переменных окружения")
+            return False
+            
+        if not self.bot:
+            logger.warning("Telegram бот не инициализирован")
             return False
         
         try:

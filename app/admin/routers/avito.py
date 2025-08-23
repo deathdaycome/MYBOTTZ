@@ -20,7 +20,7 @@ import os
 from ...database.database import get_db_context, get_db
 from ...services.notification_service import NotificationService
 from ...services.avito_polling_service import polling_service
-from ...database.crm_models import Client, ClientStatus, ClientType
+from ...database.crm_models import Client, ClientStatus, ClientType, AvitoClientStatus
 from ...database.models import AdminUser
 from ...services.avito_service import get_avito_service, init_avito_service, AvitoService
 from ...services.openai_service import generate_conversation_summary
@@ -651,13 +651,13 @@ async def avito_webhook(request: Request):
         logger.error(f"Webhook processing error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
 
-@router.post("/chats/{chat_id}/analyze-client")
-async def analyze_client_from_chat(
+@router.post("/chats/{chat_id}/create-client")
+async def create_client_from_chat(
     chat_id: str,
     current_user: AdminUser = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """AI анализ диалога для создания карточки клиента"""
+    """Создание полноценного клиента из Avito чата с AI анализом"""
     try:
         # Получаем сообщения чата
         avito_service = AvitoService()
@@ -739,12 +739,75 @@ async def analyze_client_from_chat(
                 "requirements": ""
             }
         
-        logger.info(f"Client analysis completed for chat {chat_id}: {analysis_data}")
-        return analysis_data
+        # Создаём клиента в базе данных
+        client_name = analysis_data.get("name") or "Клиент Avito"
+        
+        # Проверяем, не существует ли уже клиент с таким chat_id
+        existing_client = db.query(Client).filter(Client.avito_chat_id == chat_id).first()
+        
+        if existing_client:
+            # Обновляем существующего клиента
+            client = existing_client
+            client.name = client_name
+            if analysis_data.get("phone"):
+                client.phone = analysis_data["phone"]
+            if analysis_data.get("email"):
+                client.email = analysis_data["email"]
+            if analysis_data.get("telegram"):
+                client.telegram = analysis_data["telegram"]
+        else:
+            # Создаём нового клиента
+            client = Client(
+                name=client_name,
+                phone=analysis_data.get("phone"),
+                email=analysis_data.get("email"), 
+                telegram=analysis_data.get("telegram"),
+                source="Avito",
+                type=ClientType.INDIVIDUAL,
+                status=ClientStatus.NEW,
+                avito_chat_id=chat_id,
+                avito_status=AvitoClientStatus.WARM_CONTACT,
+                avito_notes=f"Требования: {analysis_data.get('requirements', 'Не указаны')}",
+                description=analysis_data.get("requirements", "")
+            )
+            db.add(client)
+        
+        # Сохраняем историю диалога в клиенте
+        dialog_history = []
+        for message in messages[-10:]:  # Последние 10 сообщений
+            dialog_history.append({
+                "timestamp": message.get("created", ""),
+                "author_id": message.get("author", {}).get("id"),
+                "author_name": message.get("author", {}).get("name", ""),
+                "text": message.get("content", {}).get("text", ""),
+                "is_client": message.get("author", {}).get("id") != 216012096
+            })
+        
+        client.avito_dialog_history = dialog_history
+        client.communication_history = dialog_history  # Дублируем в общую историю
+        
+        db.commit()
+        
+        logger.info(f"Client created/updated from chat {chat_id}: {client.id}")
+        
+        return JSONResponse({
+            "status": "success",
+            "message": "Клиент успешно создан/обновлен",
+            "client_id": client.id,
+            "client_data": {
+                "name": client.name,
+                "phone": client.phone,
+                "email": client.email,
+                "telegram": client.telegram,
+                "avito_status": client.avito_status.value if client.avito_status else None,
+                "requirements": analysis_data.get("requirements", "")
+            }
+        })
         
     except Exception as e:
-        logger.error(f"Error analyzing client from chat {chat_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Ошибка анализа диалога: {str(e)}")
+        logger.error(f"Error creating client from chat {chat_id}: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Ошибка создания клиента: {str(e)}")
 
 @router.post("/polling/start")
 async def start_polling(current_user: AdminUser = Depends(get_current_admin_user)):
@@ -800,3 +863,88 @@ async def get_polling_status(current_user: AdminUser = Depends(get_current_admin
         "polling_active": polling_service.polling_active,
         "auto_response_enabled": polling_service.auto_response_enabled
     })
+
+@router.post("/chats/{chat_id}/status")
+async def update_client_avito_status(
+    chat_id: str,
+    request: Request,
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Обновление статуса клиента в Avito"""
+    try:
+        data = await request.json()
+        new_status = data.get('status')
+        notes = data.get('notes', '')
+        
+        if not new_status or new_status not in [s.value for s in AvitoClientStatus]:
+            return JSONResponse({"status": "error", "message": "Неверный статус"}, status_code=400)
+        
+        # Находим клиента по chat_id
+        client = db.query(Client).filter(Client.avito_chat_id == chat_id).first()
+        
+        if not client:
+            return JSONResponse({"status": "error", "message": "Клиент не найден"}, status_code=404)
+        
+        # Обновляем статус
+        client.avito_status = AvitoClientStatus(new_status)
+        if notes:
+            current_notes = client.avito_notes or ""
+            client.avito_notes = f"{current_notes}\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] {notes}"
+        
+        db.commit()
+        
+        return JSONResponse({
+            "status": "success",
+            "message": f"Статус клиента обновлен на {new_status}"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating client status: {e}")
+        db.rollback()
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@router.get("/chats/{chat_id}/export")
+async def export_chat_dialog(
+    chat_id: str,
+    current_user: AdminUser = Depends(get_current_admin_user)
+):
+    """Экспорт переписки в текстовый файл"""
+    try:
+        avito_service = AvitoService()
+        messages = await avito_service.get_chat_messages(chat_id)
+        
+        if not messages:
+            return JSONResponse({"status": "error", "message": "Сообщения не найдены"}, status_code=404)
+        
+        # Формируем текстовый файл
+        export_text = f"Экспорт переписки Avito\nЧат ID: {chat_id}\nДата экспорта: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+        export_text += "="*50 + "\n\n"
+        
+        current_user_id = 216012096
+        
+        for message in messages:
+            timestamp = message.get("created", "")
+            author = message.get("author", {})
+            author_name = author.get("name", "Неизвестный")
+            author_id = author.get("id")
+            content = message.get("content", {}).get("text", "")
+            
+            if content:
+                role = "МЕНЕДЖЕР" if author_id == current_user_id else "КЛИЕНТ"
+                export_text += f"[{timestamp}] {role} ({author_name}):\n{content}\n\n"
+        
+        # Возвращаем файл
+        from fastapi.responses import Response
+        
+        filename = f"avito_chat_{chat_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        
+        return Response(
+            content=export_text.encode('utf-8'),
+            media_type='text/plain; charset=utf-8',
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Error exporting chat: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
