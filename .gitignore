@@ -183,6 +183,9 @@ local_config.py
 .env.local
 .env.production
 
+# Scripts with secrets
+create_ecosystem_from_env.sh
+
 # Backup files
 *.bak
 *.backup
