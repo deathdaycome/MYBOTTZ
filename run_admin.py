@@ -27,13 +27,21 @@ async def run_admin_panel():
     # Создаем FastAPI приложение
     app = FastAPI(title="Bot Admin Panel", description="Админ панель для Telegram бота")
     
-    # Запускаем Avito polling сервис в фоне
+    # Запускаем Avito polling сервис в фоне (только если webhook не настроен)
     async def start_avito_polling():
         try:
             from app.services.avito_polling_service import polling_service
             from app.config.settings import settings
+            import os
             
-            print("🔔 Проверяем настройки для Avito polling...")
+            print("🔔 Проверяем настройки для Avito...")
+            
+            # Проверяем есть ли файл с webhook URL (значит webhook настроен)
+            webhook_file = os.path.join(os.getcwd(), "WEBHOOK_URL.txt")
+            if os.path.exists(webhook_file):
+                print("🔗 Webhook уже настроен - polling отключен")
+                print("📡 Система использует real-time обновления через webhook")
+                return
             
             if not settings.BOT_TOKEN:
                 print("⚠️  BOT_TOKEN не установлен - уведомления недоступны")
