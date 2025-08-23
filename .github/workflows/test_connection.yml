@@ -1,0 +1,73 @@
+name: Test SSH Connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ssh:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Test SSH connection and secrets
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT }}
+        script: |
+          echo "🔍 ТЕСТ ПОДКЛЮЧЕНИЯ И SECRETS"
+          echo "============================="
+          echo "✅ SSH подключение работает!"
+          
+          echo "🌍 Информация о сервере:"
+          echo "Хост: $(hostname)"
+          echo "IP: $(hostname -I | cut -d' ' -f1)"
+          echo "Пользователь: $(whoami)"
+          echo "Дата/время: $(date)"
+          
+          echo ""
+          echo "📍 Проверяем директорию проекта:"
+          if [ -d "/var/www/bot_business_card" ]; then
+            echo "✅ Директория /var/www/bot_business_card найдена"
+            cd /var/www/bot_business_card
+            echo "Текущая директория: $(pwd)"
+            
+            # Проверяем права доступа
+            echo "📋 Права доступа:"
+            ls -la | head -5
+            
+            # Проверяем git
+            echo ""
+            echo "📝 Git информация:"
+            if [ -d ".git" ]; then
+              echo "✅ Git репозиторий найден"
+              echo "Текущая ветка: $(git branch --show-current)"
+              echo "Последний коммит: $(git log -1 --oneline)"
+              echo "Remote URL: $(git remote -v | head -1)"
+              
+              # Проверяем можем ли мы делать git операции
+              echo ""
+              echo "🔧 Тестируем git операции:"
+              git status --porcelain | head -5
+              
+              # Пробуем fetch
+              echo "Тестируем git fetch..."
+              if git fetch origin main 2>/dev/null; then
+                echo "✅ git fetch работает"
+              else
+                echo "❌ git fetch НЕ работает"
+                echo "Проверяем SSH ключи и доступ к GitHub..."
+                ssh -T git@github.com 2>&1 | head -3 || echo "SSH тест завершен"
+              fi
+            else
+              echo "❌ Git репозиторий НЕ найден"
+            fi
+          else
+            echo "❌ Директория /var/www/bot_business_card НЕ найдена!"
+            echo "Содержимое /var/www/:"
+            ls -la /var/www/ || echo "Директория /var/www не существует"
+          fi
+          
+          echo ""
+          echo "✅ Тест завершен"
