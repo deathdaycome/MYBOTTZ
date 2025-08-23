@@ -63,7 +63,41 @@ class OpenAIService:
             log_api_call("OpenAI", "generate_response", False)
             log_error(e, "generate_response")
             logger.error(f"Ошибка при генерации ответа: {e}")
+            
+            # Если ошибка 401 - проблема с API ключом
+            if "401" in str(e) or "User not found" in str(e):
+                logger.warning("OpenRouter API key invalid - using fallback response")
+                return self._generate_fallback_response(prompt, system_prompt)
+            
             return None
+    
+    def _generate_fallback_response(self, prompt: str, system_prompt: str = None) -> str:
+        """Fallback генератор ответов при недоступности AI API"""
+        logger.info("Using fallback response generator")
+        
+        # Простые шаблоны ответов на основе ключевых слов в промпте
+        prompt_lower = prompt.lower()
+        
+        if "цена" in prompt_lower or "стоимость" in prompt_lower or "сколько" in prompt_lower:
+            return "Стоимость зависит от объема и сложности задач. Давайте обсудим ваши требования подробнее, чтобы подготовить точную оценку."
+        
+        elif "срок" in prompt_lower or "время" in prompt_lower or "когда" in prompt_lower:
+            return "Сроки разработки зависят от технических требований. Обычно простой проект занимает 2-4 недели. Можем обсудить детали?"
+        
+        elif "можете" in prompt_lower or "можешь" in prompt_lower or "умеете" in prompt_lower:
+            return "Да, конечно! Специализируемся на разработке мобильных приложений, Telegram ботов и веб-сервисов. Расскажите подробнее о ваших задачах."
+        
+        elif "здравствуйте" in prompt_lower or "привет" in prompt_lower:
+            return "Здравствуйте! Рад видеть ваш интерес к нашим услугам. Какой проект вас интересует?"
+        
+        elif "спасибо" in prompt_lower or "благодарю" in prompt_lower:
+            return "Пожалуйста! Если возникнут вопросы - обращайтесь. Всегда готов помочь с вашим проектом."
+        
+        elif "портфолио" in prompt_lower or "примеры" in prompt_lower or "работы" in prompt_lower:
+            return "С удовольствием покажу примеры работ! У нас есть опыт в разработке различных проектов. Давайте созвонимся для детального обсуждения?"
+        
+        else:
+            return "Спасибо за ваше сообщение! Это интересный вопрос. Предлагаю обсудить детали в телефонном разговоре - так будет продуктивнее."
 
     async def create_technical_specification(self, user_request: str, additional_context: Dict = None) -> Dict[str, Any]:
         """Создание технического задания на основе пользовательского запроса"""
