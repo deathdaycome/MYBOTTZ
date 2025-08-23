@@ -597,6 +597,52 @@ async def avito_webhook(request: Request):
             # Отправляем через WebSocket
             if chat_id:
                 await broadcast_message(chat_id, message)
+            
+            # Отправляем Telegram уведомление о новом сообщении
+            if chat_id and message:
+                try:
+                    # Получаем информацию о чате
+                    avito_service = AvitoService()
+                    chats = await avito_service.get_chats(limit=50)
+                    
+                    # Находим нужный чат
+                    target_chat = None
+                    for chat in chats:
+                        if chat.id == chat_id:
+                            target_chat = chat
+                            break
+                    
+                    if target_chat:
+                        # Определяем имя клиента
+                        current_user_id = 216012096
+                        client_name = "Неизвестный клиент"
+                        for user in target_chat.users:
+                            if user.get("id") != current_user_id:
+                                client_name = user.get("name", "Неизвестный клиент")
+                                break
+                        
+                        # Получаем текст сообщения
+                        message_text = ""
+                        if isinstance(message, dict):
+                            content = message.get("content", {})
+                            if isinstance(content, dict):
+                                message_text = content.get("text", "")
+                            elif isinstance(content, str):
+                                message_text = content
+                        
+                        # Пропускаем уведомления о собственных сообщениях
+                        author_id = message.get("author_id")
+                        if author_id != current_user_id and message_text:
+                            # Отправляем уведомление в Telegram
+                            from ...services.notification_service import notify_avito_message
+                            await notify_avito_message(chat_id, client_name, message_text)
+                            logger.info(f"Telegram notification sent for chat {chat_id}")
+                            
+                            # TODO: Здесь можно добавить автоматические ответы на сервере
+                            # если нужно обрабатывать их даже когда интерфейс не открыт
+                    
+                except Exception as notify_error:
+                    logger.error(f"Error sending Telegram notification: {notify_error}")
         
         return JSONResponse({"status": "ok"})
     except Exception as e:

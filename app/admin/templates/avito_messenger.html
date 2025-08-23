@@ -37,11 +37,25 @@
                                 <i class="fas fa-search"></i>
                             </button>
                         </div>
-                        <div class="form-check mt-2">
-                            <input class="form-check-input" type="checkbox" id="showUnreadOnly">
-                            <label class="form-check-label" for="showUnreadOnly">
-                                Только непрочитанные
-                            </label>
+                        <div class="row mt-2">
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="showUnreadOnly">
+                                    <label class="form-check-label" for="showUnreadOnly">
+                                        Только непрочитанные
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-12 mt-2">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="autoResponseMode" onchange="toggleAutoResponseMode()">
+                                    <label class="form-check-label fw-bold" for="autoResponseMode">
+                                        <i class="fas fa-robot me-1"></i>Автоответы AI
+                                        <span id="autoResponseStatus" class="badge bg-secondary ms-2">ВЫКЛ</span>
+                                    </label>
+                                </div>
+                                <small class="text-muted">AI будет автоматически отвечать на новые сообщения</small>
+                            </div>
                         </div>
                     </div>
                     <!-- Список чатов -->
@@ -748,6 +762,11 @@ function connectWebSocket(chatId) {
             
             // Воспроизводим звук уведомления
             playNotificationSound();
+            
+            // Обрабатываем автоматический ответ если включен режим
+            if (autoResponseEnabled && data.message) {
+                processAutoResponse(currentChatId, data.message);
+            }
         }
     };
     
@@ -1257,5 +1276,117 @@ async function saveClient() {
         saveBtn.innerHTML = '<i class="fas fa-save"></i> Сохранить клиента';
     }
 }
+
+// === АВТОМАТИЧЕСКИЕ ОТВЕТЫ AI ===
+
+let autoResponseEnabled = false;
+
+// Переключение режима автоответов
+function toggleAutoResponseMode() {
+    const checkbox = document.getElementById('autoResponseMode');
+    const statusBadge = document.getElementById('autoResponseStatus');
+    
+    autoResponseEnabled = checkbox.checked;
+    
+    if (autoResponseEnabled) {
+        statusBadge.textContent = 'ВКЛ';
+        statusBadge.className = 'badge bg-success ms-2';
+        showNotification('Автоматические ответы AI включены', 'success');
+        
+        // Сохраняем состояние в localStorage
+        localStorage.setItem('avito_auto_response', 'true');
+    } else {
+        statusBadge.textContent = 'ВЫКЛ';
+        statusBadge.className = 'badge bg-secondary ms-2';
+        showNotification('Автоматические ответы AI выключены', 'info');
+        
+        // Сохраняем состояние в localStorage
+        localStorage.setItem('avito_auto_response', 'false');
+    }
+}
+
+// Загрузка состояния автоответов при инициализации
+function loadAutoResponseState() {
+    const saved = localStorage.getItem('avito_auto_response');
+    if (saved === 'true') {
+        document.getElementById('autoResponseMode').checked = true;
+        toggleAutoResponseMode();
+    }
+}
+
+// Автоматическая отправка ответа при получении нового сообщения
+async function processAutoResponse(chatId, message) {
+    if (!autoResponseEnabled) return;
+    
+    // Проверяем что это сообщение от клиента (не от нас)
+    const currentUserId = 216012096;
+    if (message.author_id === currentUserId) return;
+    
+    // Проверяем что сообщение содержит текст
+    const messageText = message.content?.text;
+    if (!messageText) return;
+    
+    try {
+        logger.info(`Auto-responding to message in chat ${chatId}`);
+        
+        // Генерируем автоматический ответ через AI
+        const response = await fetch(`/admin/avito/chats/${chatId}/ai-suggest`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            logger.error('Failed to generate auto-response');
+            return;
+        }
+        
+        const aiResponse = await response.json();
+        const generatedText = aiResponse.suggestion;
+        
+        if (!generatedText) {
+            logger.warning('No AI suggestion generated for auto-response');
+            return;
+        }
+        
+        // Небольшая задержка для имитации человека (2-5 секунд)
+        const delay = 2000 + Math.random() * 3000;
+        
+        setTimeout(async () => {
+            try {
+                // Отправляем автоматический ответ
+                const sendResponse = await fetch(`/admin/avito/chats/${chatId}/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: generatedText,
+                        auto_generated: true
+                    })
+                });
+                
+                if (sendResponse.ok) {
+                    logger.info(`Auto-response sent to chat ${chatId}`);
+                    showNotification('🤖 Автоматический ответ отправлен', 'info');
+                } else {
+                    logger.error('Failed to send auto-response');
+                }
+                
+            } catch (error) {
+                logger.error('Error sending auto-response:', error);
+            }
+        }, delay);
+        
+    } catch (error) {
+        logger.error('Error in processAutoResponse:', error);
+    }
+}
+
+// Инициализация автоответов при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadAutoResponseState();
+});
 </script>
 {% endblock %}

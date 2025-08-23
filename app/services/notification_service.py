@@ -582,6 +582,45 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Ошибка в _send_revision_message_images: {e}")
 
+    async def send_avito_notification(self, chat_id: str, client_name: str, message_text: str, message_link: str = None) -> bool:
+        """Отправка уведомления о новом сообщении с Avito"""
+        if not self.admin_chat_id or not self.bot:
+            logger.warning("Админ чат ID или бот не настроены для Avito уведомлений")
+            return False
+        
+        try:
+            # Обрезаем длинный текст сообщения
+            preview_text = message_text[:100] + "..." if len(message_text) > 100 else message_text
+            
+            # Формируем уведомление
+            notification_message = f"""
+🔔 <b>Новое сообщение с Avito</b>
+
+👤 <b>Клиент:</b> {client_name}
+💬 <b>Сообщение:</b> {preview_text}
+
+📱 <b>Чат ID:</b> <code>{chat_id}</code>
+🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}
+
+<a href="http://147.45.215.199:8001/admin/avito">📩 Открыть чат в админке</a>
+            """
+            
+            await self.bot.send_message(
+                chat_id=self.admin_chat_id,
+                text=notification_message,
+                parse_mode='HTML',
+                disable_web_page_preview=True
+            )
+            
+            log_api_call("Telegram", "send_avito_notification", True)
+            logger.info(f"Avito уведомление отправлено для чата {chat_id}")
+            return True
+            
+        except TelegramError as e:
+            log_api_call("Telegram", "send_avito_notification", False)
+            logger.error(f"Ошибка отправки Avito уведомления: {e}")
+            return False
+
 # Создаем глобальный экземпляр сервиса
 notification_service = NotificationService()
 
@@ -597,3 +636,7 @@ async def notify_user(user_id: int, message: str) -> bool:
 async def notify_error(error: str, context: Dict[str, Any] = None) -> bool:
     """Быстрое уведомление об ошибке"""
     return await notification_service.notify_error(error, context)
+
+async def notify_avito_message(chat_id: str, client_name: str, message_text: str) -> bool:
+    """Быстрое уведомление о новом сообщении с Avito"""
+    return await notification_service.send_avito_notification(chat_id, client_name, message_text)
