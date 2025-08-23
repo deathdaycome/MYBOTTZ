@@ -98,6 +98,35 @@ async def avito_messenger(
         "title": "Авито Мессенджер"
     })
 
+@router.get("/debug")
+async def debug_status(username: str = Depends(authenticate)):
+    """Диагностический эндпоинт для проверки состояния Avito сервиса"""
+    debug_info = {
+        "environment": {
+            "AVITO_CLIENT_ID": AVITO_CLIENT_ID[:10] + "..." if AVITO_CLIENT_ID else None,
+            "AVITO_CLIENT_SECRET": "***" if AVITO_CLIENT_SECRET else None,
+            "AVITO_USER_ID": AVITO_USER_ID
+        },
+        "service_status": "not_initialized"
+    }
+    
+    try:
+        service = get_avito_service()
+        debug_info["service_status"] = "initialized"
+        debug_info["service_user_id"] = service.user_id
+        
+        # Пробуем получить токен
+        try:
+            token = await service._get_access_token()
+            debug_info["token_status"] = f"ok ({token[:10]}...)"
+        except Exception as e:
+            debug_info["token_status"] = f"error: {str(e)}"
+            
+    except Exception as e:
+        debug_info["service_status"] = f"error: {str(e)}"
+    
+    return JSONResponse(debug_info)
+
 @router.post("/configure")
 async def configure_avito(
     request: Request,
