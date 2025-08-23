@@ -163,7 +163,7 @@ jobs:
                 BOT_TOKEN: '7881909419:AAEeAZIRYxQZxkVfKKUV5WYCemBk7qxkFP8',
                 TELEGRAM_BOT_TOKEN: '7881909419:AAEeAZIRYxQZxkVfKKUV5WYCemBk7qxkFP8',
                 BOT_USERNAME: 'ivan_dev_bot',
-                OPENROUTER_API_KEY: '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',
+                OPENROUTER_API_KEY: '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',
                 OPENROUTER_BASE_URL: 'https://openrouter.ai/api/v1',
                 DEFAULT_MODEL: 'openai/gpt-4o-mini',
                 DATABASE_URL: 'sqlite:///./data/bot.db',
