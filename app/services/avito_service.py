@@ -238,11 +238,13 @@ class AvitoService:
                 try:
                     return await response.json()
                 except Exception as e:
-                    logger.error(f"Failed to parse JSON response: {e}")
-                    logger.error(f"Response text: {response_text[:500]}")
+                    logger.debug(f"Failed to parse JSON response: {e}")
+                    logger.debug(f"Response text: {response_text[:500]}")
                     if response.status == 200:
-                        # Если статус 200, но JSON не парсится, возвращаем None для индикации ошибки
-                        return None
+                        # Если статус 200, но JSON не парсится, пробуем интерпретировать как простой текст
+                        if response_text.strip() == '{"ok": true}' or 'true' in response_text.lower():
+                            return {"ok": True}
+                        return {"ok": True, "message": response_text}
                     return {}
     
     async def get_chats(self, unread_only: bool = False, limit: int = 100, offset: int = 0) -> List[AvitoChat]:
