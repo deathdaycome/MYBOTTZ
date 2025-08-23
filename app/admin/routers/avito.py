@@ -364,6 +364,64 @@ async def mark_as_read(
         logger.error(f"Failed to mark chat as read: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/chats/{chat_id}/ai-suggest")
+async def generate_ai_response(
+    chat_id: str,
+    username: str = Depends(authenticate)
+):
+    """Генерация AI ответа для чата"""
+    try:
+        service = get_avito_service()
+        
+        # Получаем сообщения чата для анализа контекста
+        messages = await service.get_chat_messages(chat_id, limit=20)
+        
+        # Получаем информацию о чате
+        chat = await service.get_chat_info(chat_id)
+        
+        # Подготавливаем контекст для AI
+        context_messages = []
+        for msg in messages[-10:]:  # Берём последние 10 сообщений
+            if msg.type.value == "text" and msg.content.get("text"):
+                sender = "Клиент" if msg.direction == "in" else "Менеджер"
+                context_messages.append(f"{sender}: {msg.content['text']}")
+        
+        # Информация о товаре/услуге
+        item_context = ""
+        if chat.context and chat.context.get("type") == "item":
+            item = chat.context.get("value", {})
+            item_context = f"Товар/Услуга: {item.get('title', 'Не указано')}"
+            if item.get('price'):
+                item_context += f" (Цена: {item['price']} руб.)"
+        
+        # Генерируем ответ с помощью AI
+        from ...services.openai_service import generate_customer_response
+        
+        conversation_context = "\n".join(context_messages)
+        
+        ai_response = await generate_customer_response(
+            conversation_context, 
+            item_context,
+            chat.users
+        )
+        
+        return JSONResponse({
+            "suggestion": ai_response.get("response", "Извините, не могу сгенерировать ответ в данный момент."),
+            "reasoning": ai_response.get("reasoning", ""),
+            "confidence": ai_response.get("confidence", 0.5)
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to generate AI response for chat {chat_id}: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "ai_generation_failed",
+                "message": "Не удалось сгенерировать AI ответ",
+                "details": str(e)
+            }
+        )
+
 @router.post("/chats/{chat_id}/create-client")
 async def create_client_from_chat(
     chat_id: str,

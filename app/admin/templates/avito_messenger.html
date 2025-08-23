@@ -97,6 +97,30 @@
                         </div>
                     </div>
 
+                    <!-- AI Ассистент -->
+                    <div class="card-footer bg-light border-top-0" id="aiAssistant" style="display: none;">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fas fa-robot text-primary"></i>
+                            <small class="text-muted"><strong>AI Ассистент</strong> анализирует контекст чата</small>
+                            <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="hideAiAssistant()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div id="aiSuggestion" class="border rounded p-3 mb-2 bg-white">
+                            <div class="text-center p-2">
+                                <i class="fas fa-spinner fa-spin"></i> Генерирую ответ...
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success btn-sm" onclick="useAiSuggestion()">
+                                <i class="fas fa-check"></i> Использовать
+                            </button>
+                            <button class="btn btn-info btn-sm" onclick="regenerateAiSuggestion()">
+                                <i class="fas fa-sync-alt"></i> Новый вариант
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Форма отправки сообщения -->
                     <div class="card-footer bg-white">
                         <form id="messageForm" onsubmit="sendMessage(event)">
@@ -106,6 +130,9 @@
                                 </button>
                                 <input type="file" id="imageUpload" accept="image/*" style="display: none;" onchange="uploadImage(this)">
                                 <input type="text" class="form-control" id="messageInput" placeholder="Введите сообщение..." required>
+                                <button class="btn btn-outline-info" type="button" onclick="showAiAssistant()" title="AI Ассистент">
+                                    <i class="fas fa-robot"></i>
+                                </button>
                                 <button class="btn btn-primary" type="submit">
                                     <i class="fas fa-paper-plane"></i> Отправить
                                 </button>
@@ -825,5 +852,139 @@ document.getElementById('searchChats').addEventListener('input', function(e) {
 document.getElementById('showUnreadOnly').addEventListener('change', function() {
     loadChats();
 });
+
+// === AI АССИСТЕНТ ===
+
+let currentAiSuggestion = '';
+
+// Показать AI ассистента
+async function showAiAssistant() {
+    if (!currentChatId) {
+        showNotification('Выберите чат для генерации ответа', 'warning');
+        return;
+    }
+    
+    const aiAssistant = document.getElementById('aiAssistant');
+    const aiSuggestion = document.getElementById('aiSuggestion');
+    
+    // Показываем панель
+    aiAssistant.style.display = 'block';
+    
+    // Показываем индикатор загрузки
+    aiSuggestion.innerHTML = `
+        <div class="text-center p-2">
+            <i class="fas fa-spinner fa-spin text-primary"></i>
+            <small class="text-muted d-block mt-1">Анализирую контекст чата...</small>
+        </div>
+    `;
+    
+    try {
+        await generateAiResponse();
+    } catch (error) {
+        console.error('Error generating AI response:', error);
+        aiSuggestion.innerHTML = `
+            <div class="text-center p-2 text-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <small class="d-block mt-1">Ошибка генерации ответа</small>
+            </div>
+        `;
+    }
+}
+
+// Скрыть AI ассистента
+function hideAiAssistant() {
+    document.getElementById('aiAssistant').style.display = 'none';
+    currentAiSuggestion = '';
+}
+
+// Генерировать AI ответ
+async function generateAiResponse() {
+    const aiSuggestion = document.getElementById('aiSuggestion');
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/ai-suggest`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.suggestion) {
+            currentAiSuggestion = data.suggestion;
+            
+            aiSuggestion.innerHTML = `
+                <div class="mb-2">
+                    <small class="text-muted">💡 Предлагаемый ответ:</small>
+                </div>
+                <div class="p-2 border-start border-primary border-3">
+                    ${escapeHtml(data.suggestion)}
+                </div>
+                ${data.reasoning ? `
+                    <details class="mt-2">
+                        <summary class="text-muted small" style="cursor: pointer;">🧠 Логика AI</summary>
+                        <small class="text-muted d-block mt-1">${escapeHtml(data.reasoning)}</small>
+                    </details>
+                ` : ''}
+            `;
+        } else {
+            throw new Error('No suggestion received');
+        }
+        
+    } catch (error) {
+        console.error('AI generation error:', error);
+        aiSuggestion.innerHTML = `
+            <div class="text-center p-3">
+                <i class="fas fa-exclamation-triangle text-warning"></i>
+                <div class="small text-muted mt-1">
+                    Не удалось сгенерировать ответ.<br>
+                    Проверьте подключение к AI сервису.
+                </div>
+                <button class="btn btn-sm btn-outline-primary mt-2" onclick="generateAiResponse()">
+                    <i class="fas fa-retry"></i> Попробовать ещё раз
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Повторно сгенерировать ответ
+async function regenerateAiSuggestion() {
+    const aiSuggestion = document.getElementById('aiSuggestion');
+    
+    aiSuggestion.innerHTML = `
+        <div class="text-center p-2">
+            <i class="fas fa-sync-alt fa-spin text-info"></i>
+            <small class="text-muted d-block mt-1">Генерирую новый вариант...</small>
+        </div>
+    `;
+    
+    await generateAiResponse();
+}
+
+// Использовать предложенный ответ
+function useAiSuggestion() {
+    if (!currentAiSuggestion) {
+        showNotification('Нет предложенного ответа', 'warning');
+        return;
+    }
+    
+    // Вставляем предложенный ответ в поле ввода
+    const messageInput = document.getElementById('messageInput');
+    messageInput.value = currentAiSuggestion;
+    
+    // Скрываем AI панель
+    hideAiAssistant();
+    
+    // Фокусируемся на поле ввода
+    messageInput.focus();
+    
+    showNotification('Ответ добавлен в поле ввода', 'success');
+}
 </script>
 {% endblock %}
