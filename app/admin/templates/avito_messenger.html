@@ -133,6 +133,9 @@
                                 <button class="btn btn-outline-info" type="button" onclick="showAiAssistant()" title="AI Ассистент">
                                     <i class="fas fa-robot"></i>
                                 </button>
+                                <button class="btn btn-outline-success" type="button" onclick="showAddClientModal()" title="Добавить клиента">
+                                    <i class="fas fa-user-plus"></i>
+                                </button>
                                 <button class="btn btn-primary" type="submit">
                                     <i class="fas fa-paper-plane"></i> Отправить
                                 </button>
@@ -180,6 +183,104 @@
             </div>
             <div class="modal-body" id="chatInfoContent">
                 <!-- Информация загружается динамически -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления клиента -->
+<div class="modal fade" id="addClientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-plus me-2"></i>Добавить клиента из диалога
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-robot me-2"></i>
+                        <strong>AI анализирует диалог...</strong> Извлекаем контактные данные и требования клиента.
+                    </div>
+                </div>
+                
+                <div id="clientAnalysisContent">
+                    <div class="text-center p-4">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-3">Анализируем диалог для создания карточки клиента...</p>
+                    </div>
+                </div>
+
+                <form id="addClientForm" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientName" class="form-label">Имя клиента *</label>
+                                <input type="text" class="form-control" id="clientName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientPhone" class="form-label">Телефон</label>
+                                <input type="tel" class="form-control" id="clientPhone">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientTelegram" class="form-label">Telegram</label>
+                                <input type="text" class="form-control" id="clientTelegram">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="clientEmail">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="clientRequirements" class="form-label">Требования/Пожелания</label>
+                        <textarea class="form-control" id="clientRequirements" rows="4"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientSource" class="form-label">Источник</label>
+                                <select class="form-select" id="clientSource">
+                                    <option value="avito">Avito</option>
+                                    <option value="telegram">Telegram</option>
+                                    <option value="website">Сайт</option>
+                                    <option value="referral">Рекомендация</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientType" class="form-label">Тип клиента</label>
+                                <select class="form-select" id="clientType">
+                                    <option value="individual">Физическое лицо</option>
+                                    <option value="company">Компания</option>
+                                    <option value="ip">ИП</option>
+                                    <option value="self_employed">Самозанятый</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" id="saveClientBtn" onclick="saveClient()" style="display: none;">
+                    <i class="fas fa-save"></i> Сохранить клиента
+                </button>
             </div>
         </div>
     </div>
@@ -985,6 +1086,176 @@ function useAiSuggestion() {
     messageInput.focus();
     
     showNotification('Ответ добавлен в поле ввода', 'success');
+}
+
+// === ДОБАВЛЕНИЕ КЛИЕНТА ===
+
+// Показать модальное окно добавления клиента
+async function showAddClientModal() {
+    if (!currentChatId) {
+        showNotification('Выберите чат для анализа клиента', 'warning');
+        return;
+    }
+    
+    // Показываем модальное окно
+    const modal = new bootstrap.Modal(document.getElementById('addClientModal'));
+    modal.show();
+    
+    // Запускаем AI анализ диалога
+    await analyzeClientFromChat();
+}
+
+// AI анализ диалога для извлечения данных клиента
+async function analyzeClientFromChat() {
+    if (!currentChatId) return;
+    
+    const analysisContent = document.getElementById('clientAnalysisContent');
+    const clientForm = document.getElementById('addClientForm');
+    const saveBtn = document.getElementById('saveClientBtn');
+    
+    try {
+        // Показываем индикатор загрузки
+        analysisContent.innerHTML = `
+            <div class="text-center p-4">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <p class="mt-3">Анализируем диалог для создания карточки клиента...</p>
+            </div>
+        `;
+        
+        // Отправляем запрос на анализ диалога
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/analyze-client`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Ошибка анализа диалога');
+        }
+        
+        const analysis = await response.json();
+        
+        // Показываем результат анализа
+        analysisContent.innerHTML = `
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Анализ завершен!</strong> Найдена следующая информация:
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Извлеченные данные:</h6>
+                    <ul class="mb-0">
+                        ${analysis.name ? `<li><strong>Имя:</strong> ${analysis.name}</li>` : ''}
+                        ${analysis.phone ? `<li><strong>Телефон:</strong> ${analysis.phone}</li>` : ''}
+                        ${analysis.telegram ? `<li><strong>Telegram:</strong> ${analysis.telegram}</li>` : ''}
+                        ${analysis.email ? `<li><strong>Email:</strong> ${analysis.email}</li>` : ''}
+                        ${analysis.requirements ? `<li><strong>Требования:</strong> ${analysis.requirements}</li>` : ''}
+                    </ul>
+                </div>
+            </div>
+        `;
+        
+        // Заполняем форму
+        document.getElementById('clientName').value = analysis.name || '';
+        document.getElementById('clientPhone').value = analysis.phone || '';
+        document.getElementById('clientTelegram').value = analysis.telegram || '';
+        document.getElementById('clientEmail').value = analysis.email || '';
+        document.getElementById('clientRequirements').value = analysis.requirements || '';
+        document.getElementById('clientSource').value = 'avito';
+        
+        // Показываем форму и кнопку сохранения
+        clientForm.style.display = 'block';
+        saveBtn.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error analyzing client:', error);
+        
+        analysisContent.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Не удалось автоматически извлечь данные.</strong> 
+                Заполните форму вручную.
+            </div>
+        `;
+        
+        // Показываем пустую форму
+        clientForm.style.display = 'block';
+        saveBtn.style.display = 'block';
+        
+        // Устанавливаем источник как Avito
+        document.getElementById('clientSource').value = 'avito';
+    }
+}
+
+// Сохранить клиента
+async function saveClient() {
+    const form = document.getElementById('addClientForm');
+    const formData = new FormData(form);
+    
+    // Собираем данные формы
+    const clientData = {
+        name: document.getElementById('clientName').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim(),
+        telegram: document.getElementById('clientTelegram').value.trim(),
+        email: document.getElementById('clientEmail').value.trim(),
+        description: document.getElementById('clientRequirements').value.trim(),
+        source: document.getElementById('clientSource').value,
+        type: document.getElementById('clientType').value,
+        avito_chat_id: currentChatId
+    };
+    
+    // Валидация
+    if (!clientData.name) {
+        showNotification('Имя клиента обязательно', 'error');
+        return;
+    }
+    
+    if (!clientData.phone && !clientData.telegram && !clientData.email) {
+        showNotification('Укажите хотя бы один способ связи', 'warning');
+        return;
+    }
+    
+    try {
+        const saveBtn = document.getElementById('saveClientBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохраняем...';
+        
+        const response = await fetch('/admin/clients/api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(clientData)
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Ошибка сохранения клиента');
+        }
+        
+        // Закрываем модальное окно
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addClientModal'));
+        modal.hide();
+        
+        // Показываем уведомление с ссылкой
+        showNotification(
+            `Клиент "${clientData.name}" успешно добавлен! <a href="/admin/clients/${result.client.id}" target="_blank" class="btn btn-sm btn-light ms-2">Открыть карточку</a>`, 
+            'success'
+        );
+        
+        // Очищаем форму
+        form.reset();
+        
+    } catch (error) {
+        console.error('Error saving client:', error);
+        showNotification(error.message || 'Ошибка сохранения клиента', 'error');
+    } finally {
+        const saveBtn = document.getElementById('saveClientBtn');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Сохранить клиента';
+    }
 }
 </script>
 {% endblock %}

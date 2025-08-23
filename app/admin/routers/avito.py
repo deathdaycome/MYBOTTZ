@@ -602,3 +602,98 @@ async def avito_webhook(request: Request):
     except Exception as e:
         logger.error(f"Webhook processing error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+@router.post("/chats/{chat_id}/analyze-client")
+async def analyze_client_from_chat(
+    chat_id: str,
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """AI анализ диалога для создания карточки клиента"""
+    try:
+        # Получаем сообщения чата
+        avito_service = AvitoService()
+        messages = await avito_service.get_chat_messages(chat_id)
+        
+        if not messages:
+            raise HTTPException(status_code=404, detail="Сообщения не найдены")
+        
+        # Подготавливаем контекст для AI
+        conversation_text = []
+        current_user_id = 216012096  # ID текущего пользователя
+        
+        for message in messages:
+            author_name = message.get("author", {}).get("name", "Неизвестный")
+            content = message.get("content", {}).get("text", "")
+            
+            if content:
+                if message.get("author", {}).get("id") == current_user_id:
+                    conversation_text.append(f"Менеджер: {content}")
+                else:
+                    conversation_text.append(f"Клиент: {content}")
+        
+        conversation_context = "\n".join(conversation_text[-20:])  # Последние 20 сообщений
+        
+        # AI анализ для извлечения данных клиента
+        from ...services.openai_service import OpenAIService
+        ai_service = OpenAIService()
+        
+        analysis_prompt = f"""
+Проанализируй диалог между менеджером IT-компании и клиентом. Извлеки следующую информацию о клиенте:
+
+ДИАЛОГ:
+{conversation_context}
+
+Ответь в JSON формате:
+{{
+    "name": "имя клиента (если указано)",
+    "phone": "номер телефона (если указан, в формате +7XXXXXXXXXX)",
+    "telegram": "telegram username (если указан, без @)",
+    "email": "email адрес (если указан)",
+    "requirements": "краткое описание требований/пожеланий клиента (что хочет заказать)"
+}}
+
+ВАЖНО: Если информация не найдена, оставь поле пустым (""). Телефон нормализуй к формату +7XXXXXXXXXX.
+"""
+        
+        try:
+            ai_response = await ai_service.generate_response_with_model(
+                analysis_prompt, 
+                model="openai/gpt-4o-mini"
+            )
+            
+            # Парсим JSON ответ от AI
+            import json
+            import re
+            
+            # Извлекаем JSON из ответа AI
+            json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
+            if json_match:
+                analysis_data = json.loads(json_match.group())
+            else:
+                # Если JSON не найден, возвращаем пустую структуру
+                analysis_data = {
+                    "name": "",
+                    "phone": "",
+                    "telegram": "",
+                    "email": "",
+                    "requirements": ""
+                }
+                
+        except Exception as ai_error:
+            logger.error(f"AI analysis error: {ai_error}")
+            # Возвращаем пустую структуру при ошибке AI
+            analysis_data = {
+                "name": "",
+                "phone": "",
+                "telegram": "",
+                "email": "",
+                "requirements": ""
+            }
+        
+        logger.info(f"Client analysis completed for chat {chat_id}: {analysis_data}")
+        return analysis_data
+        
+    except Exception as e:
+        logger.error(f"Error analyzing client from chat {chat_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Ошибка анализа диалога: {str(e)}")

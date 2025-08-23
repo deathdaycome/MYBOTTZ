@@ -12,6 +12,9 @@ import logging
 from dataclasses import dataclass
 from enum import Enum
 from datetime import timedelta
+import redis.asyncio as aioredis
+import pickle
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +95,11 @@ class AvitoService:
         self.access_token = None
         self.token_expires_at = None
         
+        # Redis кэш для чатов
+        self._redis_client = None
+        self.cache_ttl = 300  # 5 минут TTL для кэша чатов
+        self.messages_cache_ttl = 600  # 10 минут для сообщений
+        
         # Проверяем наличие обязательных параметров
         if not self.client_id or not self.client_secret:
             raise ValueError("client_id and client_secret are required for Avito service")
@@ -130,6 +138,66 @@ class AvitoService:
                 
                 logger.info(f"Access token received, expires in {expires_in} seconds")
                 return self.access_token
+
+    async def _get_redis_client(self):
+        """Получение клиента Redis для кэширования"""
+        if self._redis_client is None:
+            try:
+                self._redis_client = aioredis.from_url("redis://localhost:6379/0", decode_responses=False)
+                await self._redis_client.ping()
+                logger.info("Redis connection established")
+            except Exception as e:
+                logger.warning(f"Redis connection failed: {e}. Caching disabled.")
+                self._redis_client = None
+        return self._redis_client
+
+    def _cache_key(self, prefix: str, *args) -> str:
+        """Генерация ключа для кэша"""
+        key_data = f"{prefix}:{':'.join(str(arg) for arg in args)}"
+        return f"avito:{hashlib.md5(key_data.encode()).hexdigest()}"
+
+    async def _get_from_cache(self, key: str):
+        """Получение данных из кэша"""
+        redis = await self._get_redis_client()
+        if redis is None:
+            return None
+        
+        try:
+            data = await redis.get(key)
+            if data:
+                return pickle.loads(data)
+        except Exception as e:
+            logger.warning(f"Cache read error: {e}")
+        return None
+
+    async def _set_cache(self, key: str, data: Any, ttl: int = None):
+        """Сохранение данных в кэш"""
+        redis = await self._get_redis_client()
+        if redis is None:
+            return
+        
+        try:
+            serialized_data = pickle.dumps(data)
+            if ttl:
+                await redis.setex(key, ttl, serialized_data)
+            else:
+                await redis.set(key, serialized_data)
+        except Exception as e:
+            logger.warning(f"Cache write error: {e}")
+
+    async def _invalidate_cache(self, pattern: str):
+        """Инвалидация кэша по паттерну"""
+        redis = await self._get_redis_client()
+        if redis is None:
+            return
+        
+        try:
+            keys = await redis.keys(pattern)
+            if keys:
+                await redis.delete(*keys)
+                logger.info(f"Invalidated {len(keys)} cache entries")
+        except Exception as e:
+            logger.warning(f"Cache invalidation error: {e}")
     
     async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict:
         """Выполнение запроса к API Авито"""
@@ -176,10 +244,19 @@ class AvitoService:
                     return {}
     
     async def get_chats(self, unread_only: bool = False, limit: int = 100, offset: int = 0) -> List[AvitoChat]:
-        """Получение списка чатов"""
+        """Получение списка чатов с кэшированием"""
         if not self.user_id:
             logger.error("User ID is not set. Please configure Avito service with user_id.")
             raise Exception("User ID is not set. Please configure Avito service with user_id.")
+
+        # Генерируем ключ кэша
+        cache_key = self._cache_key("chats", self.user_id, unread_only, limit, offset)
+        
+        # Проверяем кэш
+        cached_data = await self._get_from_cache(cache_key)
+        if cached_data:
+            logger.info(f"Retrieved {len(cached_data)} chats from cache")
+            return [AvitoChat(**chat_data) for chat_data in cached_data]
             
         params = {
             "limit": limit,
@@ -234,10 +311,30 @@ class AvitoService:
                 continue
         
         logger.info(f"Retrieved {len(chats)} chats")
+        
+        # Сохраняем в кэш
+        try:
+            cache_data = [chat.to_dict() for chat in chats]
+            await self._set_cache(cache_key, cache_data, self.cache_ttl)
+            logger.info(f"Cached {len(chats)} chats for {self.cache_ttl} seconds")
+        except Exception as e:
+            logger.warning(f"Failed to cache chats: {e}")
+        
         return chats
     
     async def get_chat_messages(self, chat_id: str, limit: int = 100, offset: int = 0) -> List[AvitoMessage]:
-        """Получение сообщений чата"""
+        """Получение сообщений чата с кэшированием"""
+        
+        # Генерируем ключ кэша для сообщений
+        cache_key = self._cache_key("messages", self.user_id, chat_id, limit, offset)
+        
+        # Проверяем кэш (только для первой страницы, чтобы не кэшировать старые сообщения)
+        if offset == 0:
+            cached_data = await self._get_from_cache(cache_key)
+            if cached_data:
+                logger.info(f"Retrieved {len(cached_data)} messages from cache for chat {chat_id}")
+                return [AvitoMessage(**msg_data) for msg_data in cached_data]
+        
         params = {
             "limit": limit,
             "offset": offset
@@ -279,6 +376,15 @@ class AvitoService:
             )
             messages.append(message)
         
+        # Кэшируем сообщения (только для первой страницы)
+        if offset == 0:
+            try:
+                cache_data = [msg.to_dict() for msg in messages]
+                await self._set_cache(cache_key, cache_data, self.messages_cache_ttl)
+                logger.info(f"Cached {len(messages)} messages for chat {chat_id}")
+            except Exception as e:
+                logger.warning(f"Failed to cache messages: {e}")
+        
         return messages
     
     async def send_message(self, chat_id: str, text: str) -> AvitoMessage:
@@ -295,6 +401,11 @@ class AvitoService:
             f"/messenger/v1/accounts/{self.user_id}/chats/{chat_id}/messages",
             json=data
         )
+        
+        # Инвалидируем кэш после отправки сообщения
+        await self._invalidate_cache(f"avito:*messages*{chat_id}*")
+        await self._invalidate_cache(f"avito:*chats*{self.user_id}*")
+        logger.info(f"Invalidated cache after sending message to chat {chat_id}")
         
         return AvitoMessage(
             id=result["id"],
