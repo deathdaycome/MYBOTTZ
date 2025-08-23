@@ -77,6 +77,14 @@ class Settings:
     CONSULTANT_MAX_TOKENS: int = int(os.getenv("CONSULTANT_MAX_TOKENS", "1000"))
     CONSULTANT_TEMPERATURE: float = float(os.getenv("CONSULTANT_TEMPERATURE", "0.7"))
     
+    # Avito API Settings
+    AVITO_CLIENT_ID: str = os.getenv("AVITO_CLIENT_ID", "")
+    AVITO_CLIENT_SECRET: str = os.getenv("AVITO_CLIENT_SECRET", "")
+    AVITO_USER_ID: str = os.getenv("AVITO_USER_ID", "")
+    
+    # Domain for webhooks
+    DOMAIN: str = os.getenv("DOMAIN", "147.45.215.199:8001")
+    
     # Paths
     UPLOADS_DIR: str = "uploads"
     DOCUMENTS_DIR: str = f"{UPLOADS_DIR}/documents"
