@@ -439,19 +439,9 @@ let chatsData = {};
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
-    // 🚨 ОТЛАДОЧНАЯ ИНФОРМАЦИЯ
-    console.log('🚨 DEBUG: Страница загружена');
-    console.log('🚨 DEBUG: Ищем элемент autoResponseMode...');
+    // Инициализация переключателей автоответов
     const toggle = document.getElementById('autoResponseMode');
     const debugToggle = document.getElementById('debugAutoResponseMode');
-    console.log('🚨 DEBUG: Основной toggle найден:', !!toggle);
-    console.log('🚨 DEBUG: Debug toggle найден:', !!debugToggle);
-    
-    if (!toggle && !debugToggle) {
-        alert('🚨 КРИТИЧЕСКАЯ ОШИБКА: Переключатели AI автоответов НЕ НАЙДЕНЫ на странице!');
-    } else {
-        alert('✅ SUCCESS: Переключатели найдены! Основной: ' + !!toggle + ', Debug: ' + !!debugToggle);
-    }
     
     checkConfiguration();
     loadChats(); // Загружаем чаты сразу
