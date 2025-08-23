@@ -28,6 +28,10 @@ class OpenAIService:
     
     async def generate_response(self, prompt: str, user_id: int = None, system_prompt: str = None) -> str:
         """Базовый метод для генерации ответов от AI"""
+        return await self.generate_response_with_model(prompt, user_id, system_prompt, self.default_model)
+    
+    async def generate_response_with_model(self, prompt: str, user_id: int = None, system_prompt: str = None, model: str = None) -> str:
+        """Генерация ответа с указанием конкретной модели"""
         try:
             messages = []
             
@@ -38,8 +42,9 @@ class OpenAIService:
             
             start_time = time.time()
             
+            # Используем синхронный вызов, так как клиент синхронный
             response = self.client.chat.completions.create(
-                model=self.default_model,
+                model=model or self.default_model,
                 messages=messages,
                 temperature=0.7,
                 max_tokens=2000
@@ -896,6 +901,8 @@ async def generate_customer_response(conversation_context: str, item_context: st
     """
     try:
         service = ai_service
+        logger.info(f"Generating AI response for conversation context: {conversation_context[:100]}...")
+        logger.info(f"Using OpenRouter API: {bool(settings.OPENROUTER_API_KEY)}, Base URL: {service.base_url}")
         
         # Определяем имя клиента
         client_name = "Клиент"
@@ -935,7 +942,12 @@ async def generate_customer_response(conversation_context: str, item_context: st
         system_prompt = """Ты - опытный IT-менеджер с 10+ лет опыта продаж технических услуг.
 Твоя цель - помочь клиенту и довести до сделки, оставаясь профессиональным и полезным."""
 
-        response = await service.generate_response(prompt, system_prompt=system_prompt)
+        # Используем более быструю и дешевую модель для AI ассистента
+        response = await service.generate_response_with_model(
+            prompt, 
+            system_prompt=system_prompt,
+            model="openai/gpt-4o-mini"  # Дешевая и быстрая модель
+        )
         
         if response:
             # Дополнительный анализ для reasoning
@@ -947,7 +959,11 @@ async def generate_customer_response(conversation_context: str, item_context: st
 
 Какую стратегию ты использовал?"""
             
-            reasoning = await service.generate_response(reasoning_prompt, "Ты - аналитик продаж.")
+            reasoning = await service.generate_response_with_model(
+                reasoning_prompt, 
+                system_prompt="Ты - аналитик продаж.",
+                model="openai/gpt-4o-mini"
+            )
             
             return {
                 "response": response.strip(),
