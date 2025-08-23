@@ -5,7 +5,7 @@
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi import APIRouter, Depends, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import APIRouter, Depends, Request, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File, BackgroundTasks
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -948,3 +948,191 @@ async def export_chat_dialog(
     except Exception as e:
         logger.error(f"Error exporting chat: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+# WebSocket connections для real-time обновлений
+active_connections: List[WebSocket] = []
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"WebSocket подключен. Всего подключений: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+            logger.info(f"WebSocket отключен. Всего подключений: {len(self.active_connections)}")
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        try:
+            await websocket.send_text(message)
+        except Exception as e:
+            logger.error(f"Ошибка отправки сообщения WebSocket: {e}")
+            self.disconnect(websocket)
+
+    async def broadcast(self, message: dict):
+        """Отправка сообщения всем подключенным клиентам"""
+        if not self.active_connections:
+            return
+        
+        message_str = json.dumps(message)
+        disconnected = []
+        
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message_str)
+            except Exception as e:
+                logger.error(f"Ошибка отправки broadcast сообщения: {e}")
+                disconnected.append(connection)
+        
+        # Удаляем неактивные соединения
+        for connection in disconnected:
+            self.disconnect(connection)
+
+manager = ConnectionManager()
+
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint для real-time обновлений чатов"""
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Ждем сообщения от клиента (ping для поддержания соединения)
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"Ошибка WebSocket: {e}")
+        manager.disconnect(websocket)
+
+
+@router.post("/webhook")
+async def avito_webhook(request: Request, background_tasks: BackgroundTasks):
+    """
+    Endpoint для получения webhook уведомлений от Avito
+    Обновляет чаты в реальном времени
+    """
+    try:
+        # Получаем данные webhook
+        webhook_data = await request.json()
+        logger.info(f"Получен webhook от Avito: {json.dumps(webhook_data, indent=2, ensure_ascii=False)}")
+        
+        # Добавляем обработку в фон
+        background_tasks.add_task(process_webhook_data, webhook_data)
+        
+        # Возвращаем успешный ответ быстро (в пределах 2 секунд как требует Avito)
+        return {"ok": True, "status": "received"}
+        
+    except Exception as e:
+        logger.error(f"Ошибка обработки webhook: {e}")
+        # Все равно возвращаем 200, чтобы Avito не отключил webhook
+        return {"ok": False, "error": str(e)}
+
+
+async def process_webhook_data(webhook_data: dict):
+    """Обработка данных webhook в фоне"""
+    try:
+        # Определяем тип события
+        if "message" in webhook_data:
+            await handle_new_message_webhook(webhook_data)
+        elif "chat" in webhook_data:
+            await handle_chat_update_webhook(webhook_data)
+        else:
+            logger.info(f"Неизвестный тип webhook события: {webhook_data}")
+            
+    except Exception as e:
+        logger.error(f"Ошибка обработки webhook данных: {e}")
+
+
+async def handle_new_message_webhook(webhook_data: dict):
+    """Обработка нового сообщения из webhook"""
+    try:
+        message_data = webhook_data.get("message", {})
+        chat_id = message_data.get("chat_id")
+        author_id = message_data.get("author_id")
+        
+        if not chat_id:
+            return
+            
+        logger.info(f"Новое сообщение в чате {chat_id} от {author_id}")
+        
+        # Проверяем что сообщение от клиента (не от нас)
+        current_user_id = int(settings.AVITO_USER_ID)
+        if author_id == current_user_id:
+            logger.info("Сообщение от нас самих, игнорируем")
+            return
+        
+        # Отправляем уведомление в Telegram (если настроено)
+        notification_service = NotificationService()
+        if notification_service:
+            try:
+                message_text = message_data.get("content", {}).get("text", "Новое сообщение")
+                if len(message_text) > 100:
+                    message_text = message_text[:100] + "..."
+                
+                notification_text = f"""
+🔔 <b>Новое сообщение Avito</b>
+
+💬 <b>Текст:</b> {message_text}
+🔗 <a href="https://{settings.DOMAIN}/admin/avito/">Открыть чат</a>
+                """
+                
+                await notification_service.send_admin_notification(notification_text.strip())
+                logger.info("Уведомление отправлено в Telegram")
+                
+            except Exception as e:
+                logger.error(f"Ошибка отправки Telegram уведомления: {e}")
+        
+        # Отправляем обновление через WebSocket
+        await manager.broadcast({
+            "type": "new_message",
+            "chat_id": chat_id,
+            "message": message_data,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        logger.info(f"WebSocket уведомление отправлено для чата {chat_id}")
+        
+    except Exception as e:
+        logger.error(f"Ошибка обработки нового сообщения webhook: {e}")
+
+
+async def handle_chat_update_webhook(webhook_data: dict):
+    """Обработка обновления чата из webhook"""
+    try:
+        chat_data = webhook_data.get("chat", {})
+        chat_id = chat_data.get("id")
+        
+        if not chat_id:
+            return
+            
+        logger.info(f"Обновление чата {chat_id}")
+        
+        # Отправляем обновление через WebSocket
+        await manager.broadcast({
+            "type": "chat_update", 
+            "chat_id": chat_id,
+            "chat": chat_data,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка обработки обновления чата webhook: {e}")
+
+
+@router.get("/webhook/status")
+async def webhook_status():
+    """Проверка статуса webhook endpoint"""
+    return {
+        "status": "active",
+        "timestamp": datetime.now().isoformat(),
+        "websocket_connections": len(manager.active_connections),
+        "message": "Avito webhook endpoint is working"
+    }
