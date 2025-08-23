@@ -87,9 +87,9 @@ class AvitoPollingService:
             import traceback
             logger.error(f"Traceback: {traceback.format_exc()}")
     
-    async def check_chat_for_new_messages(self, chat: dict):
+    async def check_chat_for_new_messages(self, chat):
         """Проверка новых сообщений в конкретном чате"""
-        chat_id = chat['id']
+        chat_id = chat.id  # Используем атрибут объекта, а не индекс словаря
         
         try:
             # Получаем сообщения чата
@@ -104,15 +104,15 @@ class AvitoPollingService:
                 self.known_messages[chat_id] = set()
                 # При первом запуске просто запоминаем все текущие сообщения
                 for msg in messages:
-                    self.known_messages[chat_id].add(msg['id'])
+                    self.known_messages[chat_id].add(msg.id)  # Используем атрибут объекта
                 return
             
             # Ищем новые сообщения
             new_messages = []
             for msg in messages:
-                if msg['id'] not in self.known_messages[chat_id]:
+                if msg.id not in self.known_messages[chat_id]:  # Используем атрибут объекта
                     new_messages.append(msg)
-                    self.known_messages[chat_id].add(msg['id'])
+                    self.known_messages[chat_id].add(msg.id)  # Используем атрибут объекта
             
             # Обрабатываем новые сообщения
             if new_messages:
@@ -125,16 +125,16 @@ class AvitoPollingService:
         except Exception as e:
             logger.error(f"Ошибка при проверке чата {chat_id}: {e}")
     
-    async def process_new_message(self, chat: dict, message: dict):
+    async def process_new_message(self, chat, message):
         """Обработка нового сообщения"""
-        chat_id = chat['id']
+        chat_id = chat.id  # Используем атрибут объекта
         current_user_id = 216012096  # ID текущего пользователя
         
         # Проверяем что сообщение от клиента (не от нас)
-        if message['author_id'] == current_user_id:
+        if message.author_id == current_user_id:  # Используем атрибут объекта
             return
             
-        logger.info(f"Новое сообщение в чате {chat_id} от {message['author_id']}")
+        logger.info(f"Новое сообщение в чате {chat_id} от {message.author_id}")
         
         # Отправляем Telegram уведомление
         await self.send_telegram_notification(chat, message)
@@ -143,20 +143,20 @@ class AvitoPollingService:
         if self.auto_response_enabled:
             await self.send_auto_response(chat_id, message)
     
-    async def send_telegram_notification(self, chat: dict, message: dict):
+    async def send_telegram_notification(self, chat, message):
         """Отправка Telegram уведомления о новом сообщении"""
         try:
             # Получаем имя пользователя
             user_name = "Неизвестный"
             current_user_id = 216012096
             
-            for user in chat.get('users', []):
+            for user in chat.users:  # Используем атрибут объекта
                 if user['id'] != current_user_id:
                     user_name = user.get('name', 'Неизвестный')
                     break
             
             # Текст сообщения (обрезаем если слишком длинный)
-            message_text = message.get('content', {}).get('text', 'Без текста')
+            message_text = message.content.get('text', 'Без текста')  # Используем атрибут объекта
             if len(message_text) > 100:
                 message_text = message_text[:100] + "..."
             
@@ -175,10 +175,10 @@ class AvitoPollingService:
         except Exception as e:
             logger.error(f"Ошибка отправки Telegram уведомления: {e}")
     
-    async def send_auto_response(self, chat_id: str, message: dict):
+    async def send_auto_response(self, chat_id: str, message):
         """Отправка автоматического ответа"""
         try:
-            message_text = message.get('content', {}).get('text', '')
+            message_text = message.content.get('text', '')  # Используем атрибут объекта
             if not message_text:
                 return
                 
