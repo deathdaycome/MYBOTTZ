@@ -47,9 +47,19 @@ async def run_admin_panel():
             print(f"✅ ADMIN_CHAT_ID: {settings.ADMIN_CHAT_ID}")
             
             print("🔔 Запускаем Avito polling сервис для уведомлений...")
+            
+            # Проверяем что сервис инициализирован правильно
+            print(f"📋 Polling активен: {polling_service.polling_active}")
+            print(f"🤖 Автоответы: {polling_service.auto_response_enabled}")
+            print(f"📞 Notification service: {polling_service.notification_service is not None}")
+            
             # Запускаем polling в background task
             task = asyncio.create_task(polling_service.start_polling(interval=30))
             print("✅ Avito polling сервис запущен в фоне")
+            
+            # Ждем немного, чтобы увидеть первые логи
+            await asyncio.sleep(2)
+            print("🔍 Первый цикл polling должен начаться через 28 секунд")
             
         except Exception as e:
             print(f"❌ Ошибка запуска Avito polling: {e}")

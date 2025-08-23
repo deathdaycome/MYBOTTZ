@@ -25,6 +25,8 @@ class MessageType(Enum):
     LINK = "link"
     SYSTEM = "system"
     DELETED = "deleted"
+    FILE = "file"  # Добавляем тип для файлов
+    APP_CALL = "appCall"  # Добавляем тип для звонков
 
 @dataclass
 class AvitoMessage:
