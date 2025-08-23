@@ -1,0 +1,129 @@
+name: Debug Deploy with Full Diagnostics
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Debug and force deploy
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT }}
+        script: |
+          echo "🔍 ПОЛНАЯ ДИАГНОСТИКА И АГРЕССИВНЫЙ ДЕПЛОЙ"
+          echo "=========================================="
+          
+          cd /var/www/bot_business_card
+          
+          echo "📝 ДО ОБНОВЛЕНИЯ:"
+          echo "Текущий коммит: $(git log -1 --oneline)"
+          echo "Размер avito_messenger.html: $(wc -c < app/admin/templates/avito_messenger.html 2>/dev/null || echo 'файл не найден') bytes"
+          
+          # АГРЕССИВНАЯ ОЧИСТКА
+          echo ""
+          echo "🧹 АГРЕССИВНАЯ ОЧИСТКА..."
+          git clean -fdx
+          git reset --hard HEAD
+          git stash clear
+          
+          # ПРИНУДИТЕЛЬНОЕ ПОЛУЧЕНИЕ ИЗМЕНЕНИЙ
+          echo ""
+          echo "📥 ПРИНУДИТЕЛЬНОЕ ПОЛУЧЕНИЕ ИЗМЕНЕНИЙ..."
+          git remote -v
+          
+          # Настраиваем git для работы с GitHub
+          git config --global --add safe.directory /var/www/bot_business_card
+          git config pull.rebase false
+          
+          # Пробуем разные способы обновления
+          echo "Способ 1: git fetch + reset"
+          if git fetch origin main; then
+            echo "✅ git fetch успешен"
+            git reset --hard origin/main
+          else
+            echo "❌ git fetch не работает, пробуем способ 2"
+            
+            echo "Способ 2: Клонирование заново"
+            cd /var/www
+            rm -rf bot_business_card_backup
+            mv bot_business_card bot_business_card_backup
+            
+            git clone https://github.com/deathdaycome/MYBOTTZ.git bot_business_card
+            cd bot_business_card
+            
+            # Восстанавливаем важные файлы
+            if [ -f "/var/www/bot_business_card_backup/.env" ]; then
+              cp /var/www/bot_business_card_backup/.env .env
+            fi
+            if [ -d "/var/www/bot_business_card_backup/data" ]; then
+              cp -r /var/www/bot_business_card_backup/data/* data/ 2>/dev/null || true
+            fi
+          fi
+          
+          echo ""
+          echo "📝 ПОСЛЕ ОБНОВЛЕНИЯ:"
+          echo "Новый коммит: $(git log -1 --oneline)"
+          echo "Размер avito_messenger.html: $(wc -c < app/admin/templates/avito_messenger.html) bytes"
+          
+          # ПРОВЕРЯЕМ ФАЙЛ
+          echo ""
+          echo "🔍 ПРОВЕРЯЕМ ОБНОВИЛСЯ ЛИ ФАЙЛ:"
+          if grep -q "🚨 ОТЛАДКА" app/admin/templates/avito_messenger.html; then
+            echo "✅✅✅ DEBUG БЛОК НАЙДЕН! ФАЙЛ ОБНОВЛЁН!"
+            grep -n "🚨 ОТЛАДКА" app/admin/templates/avito_messenger.html | head -1
+          else
+            echo "❌❌❌ DEBUG БЛОК ВСЁ ЕЩЁ НЕ НАЙДЕН!"
+            echo "Показываем содержимое файла:"
+            head -20 app/admin/templates/avito_messenger.html
+            
+            echo ""
+            echo "ПРЯМАЯ ЗАМЕНА ФАЙЛА:"
+            cat > app/admin/templates/avito_messenger.html << 'EOF'
+{% extends "base.html" %}
+{% block title %}Авито Мессенджер - Админ панель{% endblock %}
+{% block content %}
+<!-- 🚨 КРИТИЧЕСКИЙ ТЕСТ: ФАЙЛ ОБНОВЛЁН ПРИНУДИТЕЛЬНО -->
+<div class="alert alert-danger border-3 border-danger mb-4 text-center" style="background: linear-gradient(45deg, #ff4757, #ff6b6b); font-size: 24px; padding: 30px;">
+    <h1>🚨 ЭКСТРЕННЫЙ ТЕСТ 🚨</h1>
+    <h2>ЕСЛИ ВЫ ВИДИТЕ ЭТО - ФАЙЛ НАКОНЕЦ ОБНОВИЛСЯ!</h2>
+    <div class="form-check form-switch d-inline-block">
+        <input class="form-check-input" type="checkbox" id="emergencyToggle" style="transform: scale(3);">
+        <label class="form-check-label text-white fw-bold fs-3 ms-3" for="emergencyToggle">
+            🤖 AI АВТООТВЕТЫ (ЭКСТРЕННЫЙ ТЕСТ)
+        </label>
+    </div>
+</div>
+<script>
+document.getElementById('emergencyToggle').onchange = function() {
+    alert('🎉 ПЕРЕКЛЮЧАТЕЛЬ РАБОТАЕТ! Состояние: ' + (this.checked ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН'));
+}
+alert('🚨 ЭКСТРЕННЫЙ ФАЙЛ ЗАГРУЖЕН! Если видите это сообщение - деплой наконец работает!');
+</script>
+{% endblock %}
+EOF
+            echo "✅ Файл заменён экстренной версией"
+          fi
+          
+          # ЖЁСТКИЙ ПЕРЕЗАПУСК
+          echo ""
+          echo "🔄 ЖЁСТКИЙ ПЕРЕЗАПУСК PM2..."
+          pm2 kill
+          sleep 2
+          pm2 start ecosystem.config.js
+          pm2 save
+          
+          # ОЧИСТКА КЭШЕЙ
+          echo ""
+          echo "🧹 ОЧИСТКА КЭШЕЙ..."
+          find . -name "*.pyc" -delete 2>/dev/null || true
+          find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+          
+          echo ""
+          echo "✅ АГРЕССИВНЫЙ ДЕПЛОЙ ЗАВЕРШЁН!"
+          echo "Проверьте сайт: http://147.45.215.199:8001/admin/avito/"
