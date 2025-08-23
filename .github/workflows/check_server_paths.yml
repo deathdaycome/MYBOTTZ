@@ -1,0 +1,103 @@
+name: Check Server Paths
+
+on:
+  workflow_dispatch:  # Ручной запуск
+
+jobs:
+  check-paths:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Check server file paths and content
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        password: ${{ secrets.SERVER_PASSWORD }}
+        port: ${{ secrets.SERVER_PORT }}
+        script: |
+          echo "🔍 ДИАГНОСТИКА ПУТЕЙ НА СЕРВЕРЕ"
+          echo "================================="
+          
+          # Проверяем текущую директорию
+          echo "📍 Текущая директория:"
+          pwd
+          
+          # Переходим в директорию проекта
+          cd /var/www/bot_business_card
+          
+          echo "📍 Директория проекта:"
+          pwd
+          ls -la
+          
+          # Проверяем структуру директории admin
+          echo ""
+          echo "📁 Структура app/admin:"
+          find app/admin -type f -name "*.html" -o -name "*.py" | head -20
+          
+          # Проверяем шаблоны
+          echo ""
+          echo "📄 Шаблоны в app/admin/templates:"
+          ls -la app/admin/templates/ || echo "❌ Директория templates не найдена"
+          
+          # Проверяем конкретный файл avito_messenger.html
+          echo ""
+          echo "🔍 Проверяем avito_messenger.html:"
+          if [ -f "app/admin/templates/avito_messenger.html" ]; then
+            echo "✅ Файл найден"
+            echo "📏 Размер файла: $(wc -c < app/admin/templates/avito_messenger.html) bytes"
+            echo "📅 Дата изменения: $(stat -c %y app/admin/templates/avito_messenger.html)"
+            
+            # Ищем наш debug блок
+            echo ""
+            echo "🔍 Ищем отладочный блок:"
+            if grep -q "🚨 ОТЛАДКА" app/admin/templates/avito_messenger.html; then
+              echo "✅ Debug блок найден!"
+              grep -n "🚨 ОТЛАДКА" app/admin/templates/avito_messenger.html | head -3
+            else
+              echo "❌ Debug блок НЕ найден!"
+            fi
+            
+            # Ищем переключатели
+            echo ""
+            echo "🔍 Ищем переключатели AI:"
+            if grep -q "autoResponseMode" app/admin/templates/avito_messenger.html; then
+              echo "✅ Переключатели найдены!"
+              grep -c "autoResponseMode" app/admin/templates/avito_messenger.html
+              echo "Строки с переключателями:"
+              grep -n "autoResponseMode" app/admin/templates/avito_messenger.html | head -5
+            else
+              echo "❌ Переключатели НЕ найдены!"
+            fi
+            
+            # Показываем первые строки файла
+            echo ""
+            echo "📝 Первые 50 строк файла:"
+            head -50 app/admin/templates/avito_messenger.html
+            
+          else
+            echo "❌ Файл avito_messenger.html НЕ найден!"
+          fi
+          
+          # Проверяем последний коммит
+          echo ""
+          echo "📝 Последний коммит в проекте:"
+          git log -1 --oneline --no-merges
+          
+          # Проверяем статус git
+          echo ""
+          echo "📋 Git статус:"
+          git status --porcelain
+          
+          # Проверяем процесс PM2
+          echo ""
+          echo "🚀 PM2 статус:"
+          pm2 status
+          
+          # Проверяем логи PM2
+          echo ""
+          echo "📋 Последние логи PM2:"
+          pm2 logs bot-business-card --lines 10 --nostream
+          
+          echo ""
+          echo "✅ Диагностика завершена"
