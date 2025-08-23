@@ -3,18 +3,45 @@
 {% block title %}Авито Мессенджер - Админ панель{% endblock %}
 
 {% block content %}
+<!-- 🚨 ОТЛАДКА: ОГРОМНЫЙ ЗАМЕТНЫЙ БЛОК В САМОМ ВЕРХУ -->
+<div class="alert alert-danger border-3 border-danger mb-4" style="background: linear-gradient(45deg, #ff4757, #ff6b6b); font-size: 18px; box-shadow: 0 4px 20px rgba(255, 71, 87, 0.3);">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <i class="fas fa-robot me-3" style="font-size: 30px;"></i>
+            <strong>🚨 ОТЛАДКА: Если вы видите этот блок - значит шаблон обновился!</strong>
+        </div>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="topAutoResponseMode" onchange="toggleAutoResponseMode()" style="transform: scale(3); accent-color: #fff;">
+            <label class="form-check-label text-white fw-bold fs-4 ms-3" for="topAutoResponseMode">
+                🤖 AI Автоответы <span id="topAutoResponseStatus" class="badge bg-light text-dark ms-2">ВЫКЛ</span>
+            </label>
+        </div>
+    </div>
+</div>
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0 text-primary">
             <i class="fas fa-comments me-2"></i>Авито Мессенджер
         </h1>
-        <div class="btn-group">
-            <button class="btn btn-outline-primary" onclick="refreshChats()">
-                <i class="fas fa-sync-alt me-2"></i>Обновить
-            </button>
-            <button class="btn btn-primary" onclick="showSettings()">
-                <i class="fas fa-cog me-2"></i>Настройки
-            </button>
+        <div class="d-flex align-items-center gap-3">
+            <!-- 🚨 ОТЛАДКА: Дополнительный переключатель в заголовке страницы -->
+            <div class="alert alert-warning py-2 px-3 mb-0 border-2 border-danger" style="background: linear-gradient(45deg, #ff6b6b, #feca57);">
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="debugAutoResponseMode" onchange="toggleAutoResponseMode()" style="transform: scale(2); accent-color: #ff0000;">
+                    <label class="form-check-label fw-bold text-dark" for="debugAutoResponseMode" style="margin-left: 15px; font-size: 16px;">
+                        <i class="fas fa-robot me-2 text-danger" style="font-size: 20px;"></i>🚨 DEBUG: AI Автоответы
+                        <span id="debugAutoResponseStatus" class="badge bg-danger text-white ms-2 fw-bold">ВЫКЛ</span>
+                    </label>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-outline-primary" onclick="refreshChats()">
+                    <i class="fas fa-sync-alt me-2"></i>Обновить
+                </button>
+                <button class="btn btn-primary" onclick="showSettings()">
+                    <i class="fas fa-cog me-2"></i>Настройки
+                </button>
+            </div>
         </div>
     </div>
 
@@ -424,6 +451,20 @@ let chatsData = {};
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
+    // 🚨 ОТЛАДОЧНАЯ ИНФОРМАЦИЯ
+    console.log('🚨 DEBUG: Страница загружена');
+    console.log('🚨 DEBUG: Ищем элемент autoResponseMode...');
+    const toggle = document.getElementById('autoResponseMode');
+    const debugToggle = document.getElementById('debugAutoResponseMode');
+    console.log('🚨 DEBUG: Основной toggle найден:', !!toggle);
+    console.log('🚨 DEBUG: Debug toggle найден:', !!debugToggle);
+    
+    if (!toggle && !debugToggle) {
+        alert('🚨 КРИТИЧЕСКАЯ ОШИБКА: Переключатели AI автоответов НЕ НАЙДЕНЫ на странице!');
+    } else {
+        alert('✅ SUCCESS: Переключатели найдены! Основной: ' + !!toggle + ', Debug: ' + !!debugToggle);
+    }
+    
     checkConfiguration();
     loadChats(); // Загружаем чаты сразу
     setInterval(loadChats, 30000); // Обновление каждые 30 секунд
@@ -1281,24 +1322,59 @@ let autoResponseEnabled = false;
 
 // Переключение режима автоответов
 function toggleAutoResponseMode() {
+    console.log('🚨 DEBUG: toggleAutoResponseMode вызвана');
+    
     const checkbox = document.getElementById('autoResponseMode');
     const statusBadge = document.getElementById('autoResponseStatus');
+    const debugCheckbox = document.getElementById('debugAutoResponseMode');
+    const debugStatusBadge = document.getElementById('debugAutoResponseStatus');
+    const topCheckbox = document.getElementById('topAutoResponseMode');
+    const topStatusBadge = document.getElementById('topAutoResponseStatus');
     
-    autoResponseEnabled = checkbox.checked;
+    console.log('🚨 DEBUG: Элементы найдены:', {
+        checkbox: !!checkbox,
+        statusBadge: !!statusBadge,
+        debugCheckbox: !!debugCheckbox,
+        debugStatusBadge: !!debugStatusBadge,
+        topCheckbox: !!topCheckbox,
+        topStatusBadge: !!topStatusBadge
+    });
+    
+    // Определяем состояние из любого доступного checkbox
+    let isChecked = false;
+    if (checkbox && checkbox.checked) isChecked = true;
+    if (debugCheckbox && debugCheckbox.checked) isChecked = true;
+    if (topCheckbox && topCheckbox.checked) isChecked = true;
+    
+    autoResponseEnabled = isChecked;
+    console.log('🚨 DEBUG: autoResponseEnabled =', autoResponseEnabled);
+    
+    // Синхронизируем состояние всех переключателей
+    if (checkbox) checkbox.checked = autoResponseEnabled;
+    if (debugCheckbox) debugCheckbox.checked = autoResponseEnabled;
+    if (topCheckbox) topCheckbox.checked = autoResponseEnabled;
+    
+    const statusText = autoResponseEnabled ? 'ВКЛ' : 'ВЫКЛ';
+    const statusClass = autoResponseEnabled ? 'badge bg-success ms-2' : 'badge bg-secondary ms-2';
+    
+    if (statusBadge) {
+        statusBadge.textContent = statusText;
+        statusBadge.className = statusClass;
+    }
+    if (debugStatusBadge) {
+        debugStatusBadge.textContent = statusText;
+        debugStatusBadge.className = autoResponseEnabled ? 'badge bg-success text-white ms-2 fw-bold' : 'badge bg-danger text-white ms-2 fw-bold';
+    }
+    if (topStatusBadge) {
+        topStatusBadge.textContent = statusText;
+        topStatusBadge.className = autoResponseEnabled ? 'badge bg-success text-dark ms-2' : 'badge bg-light text-dark ms-2';
+    }
     
     if (autoResponseEnabled) {
-        statusBadge.textContent = 'ВКЛ';
-        statusBadge.className = 'badge bg-success ms-2';
-        showNotification('Автоматические ответы AI включены', 'success');
-        
-        // Сохраняем состояние в localStorage
+        showNotification('✅ Автоматические ответы AI включены', 'success');
         localStorage.setItem('avito_auto_response', 'true');
     } else {
-        statusBadge.textContent = 'ВЫКЛ';
-        statusBadge.className = 'badge bg-secondary ms-2';
-        showNotification('Автоматические ответы AI выключены', 'info');
-        
-        // Сохраняем состояние в localStorage
+        showNotification('❌ Автоматические ответы AI выключены', 'info');
         localStorage.setItem('avito_auto_response', 'false');
     }
 }
