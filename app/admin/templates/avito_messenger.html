@@ -3,34 +3,19 @@
 {% block title %}Авито Мессенджер - Админ панель{% endblock %}
 
 {% block content %}
-<!-- 🚨 ОТЛАДКА: ОГРОМНЫЙ ЗАМЕТНЫЙ БЛОК В САМОМ ВЕРХУ -->
-<div class="alert alert-danger border-3 border-danger mb-4" style="background: linear-gradient(45deg, #ff4757, #ff6b6b); font-size: 18px; box-shadow: 0 4px 20px rgba(255, 71, 87, 0.3);">
-    <div class="d-flex justify-content-between align-items-center">
-        <div>
-            <i class="fas fa-robot me-3" style="font-size: 30px;"></i>
-            <strong>🚨 ОТЛАДКА: Если вы видите этот блок - значит шаблон обновился! (v2.0)</strong>
-        </div>
-        <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="topAutoResponseMode" onchange="toggleAutoResponseMode()" style="transform: scale(3); accent-color: #fff;">
-            <label class="form-check-label text-white fw-bold fs-4 ms-3" for="topAutoResponseMode">
-                🤖 AI Автоответы <span id="topAutoResponseStatus" class="badge bg-light text-dark ms-2">ВЫКЛ</span>
-            </label>
-        </div>
-    </div>
-</div>
 <div class="container-fluid px-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 mb-0 text-primary">
             <i class="fas fa-comments me-2"></i>Авито Мессенджер
         </h1>
         <div class="d-flex align-items-center gap-3">
-            <!-- 🚨 ОТЛАДКА: Дополнительный переключатель в заголовке страницы -->
-            <div class="alert alert-warning py-2 px-3 mb-0 border-2 border-danger" style="background: linear-gradient(45deg, #ff6b6b, #feca57);">
-                <div class="form-check form-switch mb-0">
-                    <input class="form-check-input" type="checkbox" id="debugAutoResponseMode" onchange="toggleAutoResponseMode()" style="transform: scale(2); accent-color: #ff0000;">
-                    <label class="form-check-label fw-bold text-dark" for="debugAutoResponseMode" style="margin-left: 15px; font-size: 16px;">
-                        <i class="fas fa-robot me-2 text-danger" style="font-size: 20px;"></i>🚨 DEBUG: AI Автоответы
-                        <span id="debugAutoResponseStatus" class="badge bg-danger text-white ms-2 fw-bold">ВЫКЛ</span>
+            <!-- AI Автоответы -->
+            <div class="d-flex align-items-center">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="mainAutoResponseMode" onchange="toggleAutoResponseMode()" style="transform: scale(1.3);">
+                    <label class="form-check-label fw-bold text-primary ms-2" for="mainAutoResponseMode">
+                        <i class="fas fa-robot me-2"></i>AI Автоответы
+                        <span id="mainAutoResponseStatus" class="badge bg-secondary ms-2">ВЫКЛ</span>
                     </label>
                 </div>
             </div>
@@ -53,16 +38,6 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Чаты</h5>
                         <div class="d-flex align-items-center gap-3">
-                            <!-- 🤖 ПЕРЕКЛЮЧАТЕЛЬ AI АВТООТВЕТОВ - ОЧЕНЬ ЗАМЕТНЫЙ! -->
-                            <div class="border border-warning rounded p-2 bg-warning bg-opacity-25">
-                                <div class="form-check form-switch mb-0">
-                                    <input class="form-check-input" type="checkbox" id="autoResponseMode" onchange="toggleAutoResponseMode()" style="transform: scale(1.5); accent-color: #ffc107;">
-                                    <label class="form-check-label text-white fw-bold" for="autoResponseMode" style="margin-left: 12px; font-size: 14px;">
-                                        <i class="fas fa-robot me-2 text-warning fs-5"></i>AI Автоответы
-                                        <span id="autoResponseStatus" class="badge bg-warning text-dark ms-2 fw-bold">ВЫКЛ</span>
-                                    </label>
-                                </div>
-                            </div>
                             <span class="badge bg-white text-primary fs-6" id="unreadCount">0</span>
                         </div>
                     </div>
@@ -1322,53 +1297,18 @@ let autoResponseEnabled = false;
 
 // Переключение режима автоответов
 function toggleAutoResponseMode() {
-    console.log('🚨 DEBUG: toggleAutoResponseMode вызвана');
+    const checkbox = document.getElementById('mainAutoResponseMode');
+    const statusBadge = document.getElementById('mainAutoResponseStatus');
     
-    const checkbox = document.getElementById('autoResponseMode');
-    const statusBadge = document.getElementById('autoResponseStatus');
-    const debugCheckbox = document.getElementById('debugAutoResponseMode');
-    const debugStatusBadge = document.getElementById('debugAutoResponseStatus');
-    const topCheckbox = document.getElementById('topAutoResponseMode');
-    const topStatusBadge = document.getElementById('topAutoResponseStatus');
+    if (!checkbox || !statusBadge) return;
     
-    console.log('🚨 DEBUG: Элементы найдены:', {
-        checkbox: !!checkbox,
-        statusBadge: !!statusBadge,
-        debugCheckbox: !!debugCheckbox,
-        debugStatusBadge: !!debugStatusBadge,
-        topCheckbox: !!topCheckbox,
-        topStatusBadge: !!topStatusBadge
-    });
-    
-    // Определяем состояние из любого доступного checkbox
-    let isChecked = false;
-    if (checkbox && checkbox.checked) isChecked = true;
-    if (debugCheckbox && debugCheckbox.checked) isChecked = true;
-    if (topCheckbox && topCheckbox.checked) isChecked = true;
-    
-    autoResponseEnabled = isChecked;
-    console.log('🚨 DEBUG: autoResponseEnabled =', autoResponseEnabled);
-    
-    // Синхронизируем состояние всех переключателей
-    if (checkbox) checkbox.checked = autoResponseEnabled;
-    if (debugCheckbox) debugCheckbox.checked = autoResponseEnabled;
-    if (topCheckbox) topCheckbox.checked = autoResponseEnabled;
+    autoResponseEnabled = checkbox.checked;
     
     const statusText = autoResponseEnabled ? 'ВКЛ' : 'ВЫКЛ';
-    const statusClass = autoResponseEnabled ? 'badge bg-success ms-2' : 'badge bg-secondary ms-2';
+    const statusClass = autoResponseEnabled ? 'bg-success' : 'bg-secondary';
     
-    if (statusBadge) {
-        statusBadge.textContent = statusText;
-        statusBadge.className = statusClass;
-    }
-    if (debugStatusBadge) {
-        debugStatusBadge.textContent = statusText;
-        debugStatusBadge.className = autoResponseEnabled ? 'badge bg-success text-white ms-2 fw-bold' : 'badge bg-danger text-white ms-2 fw-bold';
-    }
-    if (topStatusBadge) {
-        topStatusBadge.textContent = statusText;
-        topStatusBadge.className = autoResponseEnabled ? 'badge bg-success text-dark ms-2' : 'badge bg-light text-dark ms-2';
-    }
+    statusBadge.textContent = statusText;
+    statusBadge.className = `badge ${statusClass} ms-2`;
     
     if (autoResponseEnabled) {
         showNotification('✅ Автоматические ответы AI включены', 'success');
@@ -1382,8 +1322,9 @@ function toggleAutoResponseMode() {
 // Загрузка состояния автоответов при инициализации
 function loadAutoResponseState() {
     const saved = localStorage.getItem('avito_auto_response');
-    if (saved === 'true') {
-        document.getElementById('autoResponseMode').checked = true;
+    const checkbox = document.getElementById('mainAutoResponseMode');
+    if (saved === 'true' && checkbox) {
+        checkbox.checked = true;
         toggleAutoResponseMode();
     }
 }
