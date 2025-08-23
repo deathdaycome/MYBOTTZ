@@ -53,21 +53,16 @@ def get_current_user(username: str):
                 }
     return None
 
-# Инициализация сервиса Авито
-AVITO_CLIENT_ID = os.getenv("AVITO_CLIENT_ID")
-AVITO_CLIENT_SECRET = os.getenv("AVITO_CLIENT_SECRET")
-AVITO_USER_ID = os.getenv("AVITO_USER_ID")
-
 # WebSocket connections storage
 websocket_connections = {}
 
-# Инициализация сервиса сразу при импорте, если есть User ID
-logger.info(f"Avito environment check: CLIENT_ID={AVITO_CLIENT_ID[:10] + '...' if AVITO_CLIENT_ID else 'None'}, CLIENT_SECRET={'***' if AVITO_CLIENT_SECRET else 'None'}, USER_ID={AVITO_USER_ID}")
+# Инициализация сервиса Авито через Settings
+logger.info(f"Avito environment check: CLIENT_ID={settings.AVITO_CLIENT_ID[:10] + '...' if settings.AVITO_CLIENT_ID else 'None'}, CLIENT_SECRET={'***' if settings.AVITO_CLIENT_SECRET else 'None'}, USER_ID={settings.AVITO_USER_ID}")
 
-if AVITO_USER_ID and AVITO_CLIENT_ID and AVITO_CLIENT_SECRET:
+if settings.AVITO_USER_ID and settings.AVITO_CLIENT_ID and settings.AVITO_CLIENT_SECRET:
     try:
-        user_id = int(AVITO_USER_ID)
-        init_avito_service(AVITO_CLIENT_ID, AVITO_CLIENT_SECRET, user_id)
+        user_id = int(settings.AVITO_USER_ID)
+        init_avito_service(settings.AVITO_CLIENT_ID, settings.AVITO_CLIENT_SECRET, user_id)
         logger.info(f"Avito service initialized with User ID: {user_id}")
     except Exception as e:
         logger.error(f"Failed to initialize Avito service on import: {e}")
@@ -82,10 +77,10 @@ async def startup_event():
         service = get_avito_service()
         logger.info("Avito service already initialized")
     except:
-        if AVITO_USER_ID:
+        if settings.AVITO_USER_ID:
             try:
-                user_id = int(AVITO_USER_ID)
-                init_avito_service(AVITO_CLIENT_ID, AVITO_CLIENT_SECRET, user_id)
+                user_id = int(settings.AVITO_USER_ID)
+                init_avito_service(settings.AVITO_CLIENT_ID, settings.AVITO_CLIENT_SECRET, user_id)
                 logger.info(f"Avito service initialized in startup event with User ID: {user_id}")
             except Exception as e:
                 logger.error(f"Failed to initialize Avito service in startup: {e}")
