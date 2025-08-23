@@ -149,7 +149,7 @@ class AvitoService:
                 await self._redis_client.ping()
                 logger.info("Redis connection established")
             except Exception as e:
-                logger.warning(f"Redis connection failed: {e}. Caching disabled.")
+                logger.debug(f"Redis connection failed: {e}. Caching disabled.")
                 self._redis_client = None
         return self._redis_client
 
@@ -169,7 +169,7 @@ class AvitoService:
             if data:
                 return pickle.loads(data)
         except Exception as e:
-            logger.warning(f"Cache read error: {e}")
+            logger.debug(f"Cache read error: {e}")
         return None
 
     async def _set_cache(self, key: str, data: Any, ttl: int = None):
@@ -185,7 +185,7 @@ class AvitoService:
             else:
                 await redis.set(key, serialized_data)
         except Exception as e:
-            logger.warning(f"Cache write error: {e}")
+            logger.debug(f"Cache write error: {e}")
 
     async def _invalidate_cache(self, pattern: str):
         """Инвалидация кэша по паттерну"""
@@ -199,7 +199,7 @@ class AvitoService:
                 await redis.delete(*keys)
                 logger.info(f"Invalidated {len(keys)} cache entries")
         except Exception as e:
-            logger.warning(f"Cache invalidation error: {e}")
+            logger.debug(f"Cache invalidation error: {e}")
     
     async def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict:
         """Выполнение запроса к API Авито"""
