@@ -17,7 +17,7 @@ from datetime import datetime
 import logging
 import os
 
-from ...database.database import get_db_context
+from ...database.database import get_db_context, get_db
 from ...database.crm_models import Client, ClientStatus, ClientType
 from ...database.models import AdminUser
 from ...services.avito_service import get_avito_service, init_avito_service, AvitoService
