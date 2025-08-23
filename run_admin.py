@@ -31,11 +31,30 @@ async def run_admin_panel():
     async def start_avito_polling():
         try:
             from app.services.avito_polling_service import polling_service
+            from app.config.settings import settings
+            
+            print("🔔 Проверяем настройки для Avito polling...")
+            
+            if not settings.BOT_TOKEN:
+                print("⚠️  BOT_TOKEN не установлен - уведомления недоступны")
+                return
+                
+            if not settings.ADMIN_CHAT_ID:
+                print("⚠️  ADMIN_CHAT_ID не установлен - уведомления недоступны")
+                return
+                
+            print(f"✅ BOT_TOKEN: {'***' + settings.BOT_TOKEN[-4:] if settings.BOT_TOKEN else 'НЕ ЗАДАН'}")
+            print(f"✅ ADMIN_CHAT_ID: {settings.ADMIN_CHAT_ID}")
+            
             print("🔔 Запускаем Avito polling сервис для уведомлений...")
             # Запускаем polling в background task
-            asyncio.create_task(polling_service.start_polling(interval=30))
+            task = asyncio.create_task(polling_service.start_polling(interval=30))
+            print("✅ Avito polling сервис запущен в фоне")
+            
         except Exception as e:
-            print(f"⚠️  Ошибка запуска Avito polling: {e}")
+            print(f"❌ Ошибка запуска Avito polling: {e}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
     
     @app.on_event("startup")
     async def startup_event():

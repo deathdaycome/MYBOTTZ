@@ -28,12 +28,22 @@ class AvitoPollingService:
     def _initialize_bot(self):
         """Инициализация Telegram бота для уведомлений"""
         try:
+            if not settings.BOT_TOKEN:
+                logger.error("BOT_TOKEN не установлен в переменных окружения")
+                return
+                
+            if not settings.ADMIN_CHAT_ID:
+                logger.error("ADMIN_CHAT_ID не установлен в переменных окружения")
+                return
+                
             from telegram import Bot
             bot = Bot(token=settings.BOT_TOKEN)
             self.notification_service.set_bot(bot)
-            logger.info("Telegram бот для уведомлений инициализирован")
+            logger.info(f"Telegram бот для уведомлений инициализирован. ADMIN_CHAT_ID: {settings.ADMIN_CHAT_ID}")
         except Exception as e:
             logger.error(f"Ошибка инициализации Telegram бота: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
         
     async def start_polling(self, interval: int = 30):
         """Запуск polling с указанным интервалом (секунды)"""
@@ -56,20 +66,26 @@ class AvitoPollingService:
     async def check_new_messages(self):
         """Проверка новых сообщений во всех чатах"""
         try:
-            avito_service = await get_avito_service()
+            avito_service = get_avito_service()  # Убираем await - это обычная функция
             if not avito_service:
+                logger.warning("Avito service не инициализирован")
                 return
                 
             # Получаем список чатов
             chats = await avito_service.get_chats()
             if not chats:
+                logger.info("Чаты не найдены")
                 return
                 
+            logger.info(f"Проверяем {len(chats)} чатов на новые сообщения")
+            
             for chat in chats:
                 await self.check_chat_for_new_messages(chat)
                 
         except Exception as e:
             logger.error(f"Ошибка при проверке новых сообщений: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     
     async def check_chat_for_new_messages(self, chat: dict):
         """Проверка новых сообщений в конкретном чате"""
@@ -77,7 +93,7 @@ class AvitoPollingService:
         
         try:
             # Получаем сообщения чата
-            avito_service = await get_avito_service()
+            avito_service = get_avito_service()  # Убираем await
             messages = await avito_service.get_chat_messages(chat_id)
             
             if not messages:
@@ -99,8 +115,12 @@ class AvitoPollingService:
                     self.known_messages[chat_id].add(msg['id'])
             
             # Обрабатываем новые сообщения
-            for message in new_messages:
-                await self.process_new_message(chat, message)
+            if new_messages:
+                logger.info(f"Найдено {len(new_messages)} новых сообщений в чате {chat_id}")
+                for message in new_messages:
+                    await self.process_new_message(chat, message)
+            else:
+                logger.debug(f"Новых сообщений в чате {chat_id} нет")
                 
         except Exception as e:
             logger.error(f"Ошибка при проверке чата {chat_id}: {e}")
@@ -186,7 +206,7 @@ class AvitoPollingService:
             )
             
             # Отправляем ответ через Avito API
-            avito_service = await get_avito_service()
+            avito_service = get_avito_service()  # Убираем await
             if avito_service:
                 success = await avito_service.send_message(chat_id, ai_response)
                 if success:
