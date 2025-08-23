@@ -60,13 +60,17 @@ AVITO_USER_ID = os.getenv("AVITO_USER_ID")
 websocket_connections = {}
 
 # Инициализация сервиса сразу при импорте, если есть User ID
-if AVITO_USER_ID:
+logger.info(f"Avito environment check: CLIENT_ID={AVITO_CLIENT_ID[:10] + '...' if AVITO_CLIENT_ID else 'None'}, CLIENT_SECRET={'***' if AVITO_CLIENT_SECRET else 'None'}, USER_ID={AVITO_USER_ID}")
+
+if AVITO_USER_ID and AVITO_CLIENT_ID and AVITO_CLIENT_SECRET:
     try:
         user_id = int(AVITO_USER_ID)
         init_avito_service(AVITO_CLIENT_ID, AVITO_CLIENT_SECRET, user_id)
         logger.info(f"Avito service initialized with User ID: {user_id}")
     except Exception as e:
         logger.error(f"Failed to initialize Avito service on import: {e}")
+else:
+    logger.warning("Avito service not initialized: missing environment variables (CLIENT_ID, CLIENT_SECRET, or USER_ID)")
 
 @router.on_event("startup")
 async def startup_event():

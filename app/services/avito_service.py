@@ -92,6 +92,10 @@ class AvitoService:
         self.access_token = None
         self.token_expires_at = None
         
+        # Проверяем наличие обязательных параметров
+        if not self.client_id or not self.client_secret:
+            raise ValueError("client_id and client_secret are required for Avito service")
+        
     async def _get_access_token(self) -> str:
         """Получение токена доступа через OAuth 2.0 client_credentials"""
         if self.access_token and self.token_expires_at and datetime.now() < self.token_expires_at:
@@ -109,7 +113,7 @@ class AvitoService:
                 "Content-Type": "application/x-www-form-urlencoded"
             }
             
-            logger.info(f"Getting access token for client_id: {self.client_id[:10]}...")
+            logger.info(f"Getting access token for client_id: {self.client_id[:10] if self.client_id else 'None'}...")
             
             async with session.post(self.auth_url, data=data, headers=headers) as response:
                 response_text = await response.text()

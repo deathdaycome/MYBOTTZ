@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Avito Frontend</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .log { background: #f0f0f0; padding: 10px; margin: 10px 0; border-left: 3px solid #007bff; }
+        .error { border-left-color: #dc3545; background: #fff5f5; }
+        .success { border-left-color: #28a745; background: #f5fff5; }
+        button { padding: 10px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Debug Avito Frontend</h1>
+    
+    <button onclick="testChats()">Тест загрузки чатов</button>
+    <button onclick="testMessages()">Тест загрузки сообщений</button>
+    <button onclick="clearLogs()">Очистить логи</button>
+    
+    <div id="logs"></div>
+
+    <script>
+        const logs = document.getElementById('logs');
+        
+        function log(message, type = 'log') {
+            const div = document.createElement('div');
+            div.className = `log ${type}`;
+            div.innerHTML = `<strong>[${new Date().toLocaleTimeString()}]</strong> ${message}`;
+            logs.appendChild(div);
+            logs.scrollTop = logs.scrollHeight;
+            console.log(message);
+        }
+        
+        function clearLogs() {
+            logs.innerHTML = '';
+        }
+        
+        // Создаем Basic Auth заголовок
+        const auth = btoa('admin:qwerty123');
+        const headers = {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/json'
+        };
+        
+        async function testChats() {
+            log('🔄 Тестируем загрузку чатов...');
+            
+            try {
+                const response = await fetch('/admin/avito/chats', { headers });
+                
+                log(`📡 Статус ответа: ${response.status}`);
+                log(`📊 Заголовки: ${JSON.stringify(Object.fromEntries(response.headers))}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Получены данные: ${JSON.stringify(data, null, 2)}`, 'success');
+                    
+                    // Сохраняем первый чат для теста сообщений
+                    if (data.chats && data.chats.length > 0) {
+                        window.testChatId = data.chats[0].id;
+                        log(`💾 Сохранен ID чата для теста: ${window.testChatId}`, 'success');
+                    }
+                    
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Ошибка ${response.status}: ${errorText}`, 'error');
+                    
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        log(`🔍 Детали ошибки: ${JSON.stringify(errorData, null, 2)}`, 'error');
+                    } catch (e) {
+                        log(`⚠️ Не удалось распарсить ошибку как JSON`, 'error');
+                    }
+                }
+                
+            } catch (error) {
+                log(`💥 Исключение: ${error.message}`, 'error');
+                log(`📍 Stack trace: ${error.stack}`, 'error');
+            }
+        }
+        
+        async function testMessages() {
+            const chatId = window.testChatId || 'u2i-tIiKX21UKaBNFasNXH5v3A';
+            
+            log(`🔄 Тестируем загрузку сообщений для чата: ${chatId}`);
+            
+            try {
+                const url = `/admin/avito/chats/${chatId}/messages`;
+                log(`🌐 URL запроса: ${url}`);
+                
+                const response = await fetch(url, { headers });
+                
+                log(`📡 Статус ответа: ${response.status}`);
+                log(`📊 Заголовки: ${JSON.stringify(Object.fromEntries(response.headers))}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Получены сообщения: ${JSON.stringify(data, null, 2)}`, 'success');
+                    
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Ошибка ${response.status}: ${errorText}`, 'error');
+                    
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        log(`🔍 Детали ошибки: ${JSON.stringify(errorData, null, 2)}`, 'error');
+                    } catch (e) {
+                        log(`⚠️ Не удалось распарсить ошибку как JSON`, 'error');
+                    }
+                }
+                
+            } catch (error) {
+                log(`💥 Исключение: ${error.message}`, 'error');
+                log(`📍 Stack trace: ${error.stack}`, 'error');
+            }
+        }
+        
+        // Автоматически тестируем чаты при загрузке
+        window.onload = () => {
+            log('🚀 Страница загружена, начинаем автотест');
+            setTimeout(testChats, 1000);
+        };
+    </script>
+</body>
+</html>
