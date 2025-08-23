@@ -51,7 +51,7 @@ jobs:
           echo "🔑 Обновляем OpenRouter ключ в .env..."
           if [ -f ".env" ]; then
             # Заменяем старый ключ на новый
-            sed -i 's/OPENROUTER_API_KEY=.*/OPENROUTER_API_KEY=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/' .env
+            sed -i 's/OPENROUTER_API_KEY=.*/OPENROUTER_API_KEY=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/' .env
             echo "✅ OpenRouter ключ обновлен в .env"
           else
             echo "❌ .env файл не найден!"
@@ -246,7 +246,7 @@ jobs:
           
           # Проверяем что новый ключ загрузился
           echo "🔑 Проверяем новый OpenRouter ключ:"
-          if pm2 env 0 | grep "OPENROUTER_API_KEY" | grep -q "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"; then
+          if pm2 env 0 | grep "OPENROUTER_API_KEY" | grep -q "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"; then
             echo "✅✅✅ НОВЫЙ OPENROUTER КЛЮЧ УСПЕШНО ЗАГРУЖЕН!"
           else
             echo "❌❌❌ ВНИМАНИЕ: Новый ключ не найден, проверьте .env файл"
