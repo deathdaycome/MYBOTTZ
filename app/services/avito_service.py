@@ -99,7 +99,7 @@ class AvitoService:
         
         # Redis кэш для чатов
         self._redis_client = None
-        self.cache_ttl = 300  # 5 минут TTL для кэша чатов
+        self.cache_ttl = 30   # 30 секунд TTL для кэша чатов
         self.messages_cache_ttl = 600  # 10 минут для сообщений
         
         # Проверяем наличие обязательных параметров
@@ -326,18 +326,20 @@ class AvitoService:
         
         return chats
     
-    async def get_chat_messages(self, chat_id: str, limit: int = 100, offset: int = 0) -> List[AvitoMessage]:
-        """Получение сообщений чата с кэшированием"""
+    async def get_chat_messages(self, chat_id: str, limit: int = 100, offset: int = 0, use_cache: bool = True) -> List[AvitoMessage]:
+        """Получение сообщений чата с опциональным кэшированием"""
         
-        # Генерируем ключ кэша для сообщений
-        cache_key = self._cache_key("messages", self.user_id, chat_id, limit, offset)
-        
-        # Проверяем кэш (только для первой страницы, чтобы не кэшировать старые сообщения)
-        if offset == 0:
-            cached_data = await self._get_from_cache(cache_key)
-            if cached_data:
-                logger.info(f"Retrieved {len(cached_data)} messages from cache for chat {chat_id}")
-                return [AvitoMessage(**msg_data) for msg_data in cached_data]
+        # Если кэширование отключено, пропускаем проверку кэша
+        if use_cache:
+            # Генерируем ключ кэша для сообщений
+            cache_key = self._cache_key("messages", self.user_id, chat_id, limit, offset)
+            
+            # Проверяем кэш (только для первой страницы, чтобы не кэшировать старые сообщения)
+            if offset == 0:
+                cached_data = await self._get_from_cache(cache_key)
+                if cached_data:
+                    logger.info(f"Retrieved {len(cached_data)} messages from cache for chat {chat_id}")
+                    return [AvitoMessage(**msg_data) for msg_data in cached_data]
         
         params = {
             "limit": limit,
@@ -380,9 +382,10 @@ class AvitoService:
             )
             messages.append(message)
         
-        # Кэшируем сообщения (только для первой страницы)
-        if offset == 0:
+        # Кэшируем сообщения (только для первой страницы и если кэширование включено)
+        if offset == 0 and use_cache:
             try:
+                cache_key = self._cache_key("messages", self.user_id, chat_id, limit, offset)
                 cache_data = [msg.to_dict() for msg in messages]
                 await self._set_cache(cache_key, cache_data, self.messages_cache_ttl)
                 logger.info(f"Cached {len(messages)} messages for chat {chat_id}")
@@ -390,6 +393,10 @@ class AvitoService:
                 logger.warning(f"Failed to cache messages: {e}")
         
         return messages
+    
+    async def get_chat_messages_no_cache(self, chat_id: str, limit: int = 100, offset: int = 0) -> List[AvitoMessage]:
+        """Получение сообщений чата БЕЗ кэширования (для polling)"""
+        return await self.get_chat_messages(chat_id, limit, offset, use_cache=False)
     
     async def send_message(self, chat_id: str, text: str) -> AvitoMessage:
         """Отправка текстового сообщения"""

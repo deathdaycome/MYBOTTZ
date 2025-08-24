@@ -92,9 +92,9 @@ class AvitoPollingService:
         chat_id = chat.id  # Используем атрибут объекта, а не индекс словаря
         
         try:
-            # Получаем сообщения чата
+            # Получаем сообщения чата БЕЗ кэширования (для polling)
             avito_service = get_avito_service()  # Убираем await
-            messages = await avito_service.get_chat_messages(chat_id)
+            messages = await avito_service.get_chat_messages_no_cache(chat_id)
             
             if not messages:
                 return
