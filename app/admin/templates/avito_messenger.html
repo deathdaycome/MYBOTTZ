@@ -515,6 +515,9 @@ async function loadChats() {
         
         const data = await response.json();
         console.log('Received chats data:', data);
+        console.log('data.chats type:', typeof data.chats);
+        console.log('data.chats is array:', Array.isArray(data.chats));
+        console.log('data.chats length:', data.chats ? data.chats.length : 'undefined');
         
         if (data && data.chats) {
             // Устанавливаем текущий User ID если он пришёл в ответе
@@ -562,7 +565,8 @@ function showAuthorizationMessage() {
 // Отображение списка чатов
 function displayChats(chats) {
     const chatList = document.getElementById('chatList');
-    console.log('Displaying chats:', chats.length, 'chats');
+    console.log('displayChats called with:', chats);
+    console.log('Displaying chats:', chats ? chats.length : 'chats is null/undefined', 'chats');
     
     if (!chats || chats.length === 0) {
         chatList.innerHTML = `
@@ -1515,7 +1519,6 @@ function stopAutoRefresh() {
 }
 
 // WebSocket для real-time обновлений
-let ws = null;
 let wsReconnectInterval = null;
 let wsReconnectAttempts = 0;
 const maxReconnectAttempts = 5;
