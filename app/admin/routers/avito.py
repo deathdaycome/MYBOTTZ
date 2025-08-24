@@ -174,7 +174,15 @@ async def get_chats(
         chats_data = [chat.to_dict() for chat in chats]
         
         logger.info(f"Returning {len(chats_data)} chats to frontend")
-        return JSONResponse({"chats": chats_data, "total": len(chats_data)})
+        
+        # Включаем current_user_id для фронтенда
+        response_data = {
+            "chats": chats_data, 
+            "total": len(chats_data),
+            "current_user_id": service.user_id
+        }
+        
+        return JSONResponse(response_data)
     except Exception as e:
         logger.error(f"Failed to get chats: {e}", exc_info=True)
         if "not initialized" in str(e):

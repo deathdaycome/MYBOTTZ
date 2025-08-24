@@ -436,6 +436,7 @@
 let currentChatId = null;
 let ws = null;
 let chatsData = {};
+let currentUserId = null;
 
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', function() {
@@ -471,37 +472,75 @@ async function checkConfiguration() {
 
 // Загрузка списка чатов
 async function loadChats() {
+    const chatList = document.getElementById('chatList');
+    
     try {
-        const showUnreadOnly = document.getElementById('showUnreadOnly').checked;
+        // Показываем индикатор загрузки
+        chatList.innerHTML = `
+            <div class="text-center p-4 text-muted">
+                <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                <p>Загрузка чатов...</p>
+            </div>
+        `;
+        
+        const showUnreadOnlyEl = document.getElementById('showUnreadOnly');
+        const showUnreadOnly = showUnreadOnlyEl ? showUnreadOnlyEl.checked : false;
         const response = await fetch(`/admin/avito/chats?unread_only=${showUnreadOnly}`);
         
+        console.log('Response status:', response.status);
+        
         if (!response.ok) {
-            const errorData = await response.json();
+            let errorData;
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                errorData = { detail: `HTTP ${response.status}` };
+            }
+            
+            console.error('API Error:', errorData);
             
             if (response.status === 400) {
-                // Проблема с конфигурацией
                 if (errorData.detail && errorData.detail.includes('not configured')) {
                     showSettings();
                 } else {
-                    // Показываем сообщение об авторизации
                     showAuthorizationMessage();
                 }
                 return;
             } else if (response.status === 403 || response.status === 401) {
-                // Проблема с авторизацией
                 showAuthorizationMessage();
                 return;
             }
-            throw new Error('Failed to load chats');
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
         }
         
         const data = await response.json();
-        displayChats(data.chats);
-        updateUnreadCount(data.chats);
+        console.log('Received chats data:', data);
+        
+        if (data && data.chats) {
+            // Устанавливаем текущий User ID если он пришёл в ответе
+            if (data.current_user_id) {
+                currentUserId = data.current_user_id;
+                console.log('Set currentUserId to:', currentUserId);
+            }
+            console.log('About to display chats. Data structure:', data);
+            displayChats(data.chats);
+            updateUnreadCount(data.chats);
+        } else {
+            console.error('Invalid response format:', data);
+            throw new Error('Неверный формат ответа от сервера');
+        }
     } catch (error) {
         console.error('Error loading chats:', error);
-        showNotification('Ошибка загрузки чатов. Возможно, требуется авторизация.', 'error');
-        showAuthorizationMessage();
+        chatList.innerHTML = `
+            <div class="text-center p-4 text-danger">
+                <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                <h5>Ошибка загрузки чатов</h5>
+                <p>${error.message}</p>
+                <button class="btn btn-primary mt-2" onclick="loadChats()">
+                    <i class="fas fa-sync-alt"></i> Попробовать снова
+                </button>
+            </div>
+        `;
     }
 }
 
@@ -523,8 +562,9 @@ function showAuthorizationMessage() {
 // Отображение списка чатов
 function displayChats(chats) {
     const chatList = document.getElementById('chatList');
+    console.log('Displaying chats:', chats.length, 'chats');
     
-    if (chats.length === 0) {
+    if (!chats || chats.length === 0) {
         chatList.innerHTML = `
             <div class="text-center p-4 text-muted">
                 <i class="fas fa-inbox fa-3x mb-3"></i>
@@ -540,17 +580,22 @@ function displayChats(chats) {
     
     chatList.innerHTML = '';
     
-    chats.forEach(chat => {
+    chats.forEach((chat, index) => {
+        console.log(`Processing chat ${index + 1}:`, chat);
         chatsData[chat.id] = chat;
         
         const chatItem = document.createElement('div');
         chatItem.className = `chat-item ${chat.unread_count > 0 ? 'unread' : ''} ${chat.id === currentChatId ? 'active' : ''}`;
         chatItem.onclick = () => selectChat(chat.id);
         
-        const currentUserId = 216012096; // ID текущего пользователя
-        const userName = chat.users.find(u => u.id !== currentUserId)?.name || 'Неизвестный';
+        // Используем currentUserId если он есть, иначе fallback
+        const userIdToExclude = currentUserId || 216012096;
+        const otherUser = chat.users ? chat.users.find(u => u.id !== userIdToExclude) : null;
+        const userName = otherUser?.name || otherUser?.id?.toString() || 'Неизвестный';
         const lastMessageText = chat.last_message?.content?.text || 'Нет сообщений';
         const lastMessageTime = chat.last_message ? formatTime(chat.last_message.created) : '';
+        
+        console.log(`Chat ${chat.id}: userName=${userName}, lastMessage=${lastMessageText}`);
         
         chatItem.innerHTML = `
             <div class="d-flex justify-content-between align-items-start">
@@ -569,6 +614,8 @@ function displayChats(chats) {
         
         chatList.appendChild(chatItem);
     });
+    
+    console.log('Chats displayed successfully');
 }
 
 // Обновление счетчика непрочитанных
@@ -594,8 +641,9 @@ async function selectChat(chatId) {
     // Загружаем информацию о чате
     const chat = chatsData[chatId];
     if (chat) {
-        const currentUserId = 216012096; // ID текущего пользователя
-        const userName = chat.users.find(u => u.id !== currentUserId)?.name || 'Неизвестный';
+        const userIdToExclude = currentUserId || 216012096;
+        const otherUser = chat.users.find(u => u.id !== userIdToExclude);
+        const userName = otherUser?.name || otherUser?.id?.toString() || 'Неизвестный';
         document.getElementById('chatUserName').textContent = userName;
         document.getElementById('chatAvatar').textContent = userName.charAt(0).toUpperCase();
         
