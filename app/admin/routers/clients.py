@@ -35,8 +35,8 @@ async def clients_page(
         raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра клиентов")
     
     # Получаем элементы навигации
-    from ..app import get_navigation_items
-    navigation_items = get_navigation_items(current_user.get("role", "admin") if isinstance(current_user, dict) else current_user.role)
+    from .admin_main import get_navigation_items
+    navigation_items = get_navigation_items(current_user, db)
     
     # Получаем статистику
     total_clients = db.query(Client).count()
