@@ -585,6 +585,40 @@ async def broadcast_message(chat_id: str, message: Dict):
         for ws in disconnected:
             websocket_connections[chat_id].remove(ws)
 
+@router.post("/setup-webhook")
+async def setup_avito_webhook(request: Request, db: Session = Depends(get_db)):
+    """Настройка webhook для уведомлений Avito"""
+    username, password = get_credentials(request)
+    if username != settings.ADMIN_USERNAME:
+        raise HTTPException(status_code=401, detail="Требуется авторизация")
+    
+    try:
+        avito_service = AvitoService()
+        webhook_url = "http://147.45.215.199:8001/admin/avito/webhook"
+        
+        # Подписываемся на webhook
+        success = await avito_service.subscribe_webhook(webhook_url)
+        
+        if success:
+            logger.info(f"Webhook успешно настроен: {webhook_url}")
+            return JSONResponse({
+                "success": True,
+                "message": f"Webhook настроен для URL: {webhook_url}",
+                "webhook_url": webhook_url
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "message": "Ошибка настройки webhook"
+            }, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"Ошибка настройки webhook: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": f"Ошибка: {str(e)}"
+        }, status_code=500)
+
 @router.post("/webhook")
 async def avito_webhook(request: Request):
     """Обработка webhook уведомлений от Авито"""
@@ -639,9 +673,19 @@ async def avito_webhook(request: Request):
                         author_id = message.get("author_id")
                         if author_id != current_user_id and message_text:
                             # Отправляем уведомление в Telegram
-                            from ...services.notification_service import notify_avito_message
-                            await notify_avito_message(chat_id, client_name, message_text)
-                            logger.info(f"Telegram notification sent for chat {chat_id}")
+                            try:
+                                from ...services.notification_service import notification_service
+                                from telegram import Bot
+                                from ...config.settings import settings
+                                
+                                # Убеждаемся что бот настроен
+                                if not notification_service.bot and settings.BOT_TOKEN:
+                                    notification_service.set_bot(Bot(settings.BOT_TOKEN))
+                                
+                                await notification_service.send_avito_notification(chat_id, client_name, message_text)
+                                logger.info(f"Telegram notification sent for chat {chat_id}")
+                            except Exception as bot_error:
+                                logger.error(f"Error setting up bot for notification: {bot_error}")
                             
                             # TODO: Здесь можно добавить автоматические ответы на сервере
                             # если нужно обрабатывать их даже когда интерфейс не открыт

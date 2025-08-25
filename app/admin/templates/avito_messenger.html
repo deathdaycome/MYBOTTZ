@@ -190,6 +190,17 @@
                         <input type="text" class="form-control" id="avitoUserId" required>
                         <small class="text-muted">ID вашего аккаунта на Авито</small>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telegram уведомления</label>
+                        <div>
+                            <button type="button" class="btn btn-success" onclick="setupWebhook()">
+                                <i class="fas fa-bell me-2"></i>Настроить уведомления
+                            </button>
+                            <small class="text-muted d-block mt-2">
+                                Настройте webhook для получения уведомлений в Telegram о новых сообщениях
+                            </small>
+                        </div>
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -1890,6 +1901,32 @@ function updateCrmDropdown(chatId, clientId) {
         </div>
     </div>
 </div>
+
+// Настройка webhook для уведомлений
+async function setupWebhook() {
+    try {
+        showNotification('Настраиваем webhook...', 'info');
+        
+        const response = await fetch('/admin/avito/setup-webhook', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('✅ Webhook настроен! Уведомления будут приходить в Telegram', 'success');
+        } else {
+            showNotification(`❌ Ошибка настройки: ${data.message}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error setting up webhook:', error);
+        showNotification('❌ Ошибка подключения к серверу', 'error');
+    }
+}
 
 </script>
 {% endblock %}
