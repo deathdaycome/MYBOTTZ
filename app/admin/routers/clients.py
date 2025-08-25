@@ -35,7 +35,7 @@ async def clients_page(
         raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра клиентов")
     
     # Получаем элементы навигации
-    from .admin_main import get_navigation_items
+    from ..navigation import get_navigation_items
     navigation_items = get_navigation_items(current_user, db)
     
     # Получаем статистику
