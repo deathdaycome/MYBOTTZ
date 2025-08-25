@@ -302,6 +302,9 @@
                 <button type="button" class="btn btn-primary" id="nextBtn" onclick="nextStep()">
                     Далее<i class="fas fa-arrow-right ms-2"></i>
                 </button>
+                <button type="button" class="btn btn-info me-2" id="fillWithAiBtn" onclick="fillWithAI()" style="display: none;">
+                    <i class="fas fa-robot me-2"></i>Заполнить с ИИ
+                </button>
                 <button type="button" class="btn generate-button" id="generateBtn" onclick="generateDocument()" style="display: none;">
                     <i class="fas fa-file-export me-2"></i>Создать документ
                 </button>
@@ -540,6 +543,7 @@ function showStep(step) {
     document.getElementById('prevBtn').style.display = step > 1 ? 'inline-block' : 'none';
     document.getElementById('nextBtn').style.display = step < 3 ? 'inline-block' : 'none';
     document.getElementById('generateBtn').style.display = step === 3 ? 'inline-block' : 'none';
+    document.getElementById('fillWithAiBtn').style.display = step === 3 ? 'inline-block' : 'none';
 }
 
 async function nextStep() {
@@ -693,6 +697,150 @@ async function createDefaultTemplates() {
         }
     } catch (error) {
         showAlert('danger', 'Ошибка создания шаблонов: ' + error.message);
+    }
+}
+
+// Заполнение шаблона с помощью ИИ
+async function fillWithAI() {
+    try {
+        if (!selectedTemplate || !selectedEntity) {
+            showAlert('warning', 'Выберите шаблон и сущность');
+            return;
+        }
+
+        // Показываем индикатор загрузки
+        const btn = document.getElementById('fillWithAiBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>ИИ работает...';
+        btn.disabled = true;
+
+        const response = await fetch('/admin/documents/api/ai-fill', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                template_id: selectedTemplate.id,
+                entity_type: selectedEntity.type,
+                entity_id: parseInt(selectedEntity.id)
+            })
+        });
+        
+        const result = await response.json();
+        
+        // Восстанавливаем кнопку
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        
+        if (result.success) {
+            // Показываем результат в модальном окне
+            showAIFilledPreview(result.content, result.suggestions);
+        } else {
+            showAlert('danger', result.message || 'Ошибка заполнения ИИ');
+        }
+    } catch (error) {
+        // Восстанавливаем кнопку в случае ошибки
+        const btn = document.getElementById('fillWithAiBtn');
+        btn.innerHTML = '<i class="fas fa-robot me-2"></i>Заполнить с ИИ';
+        btn.disabled = false;
+        
+        showAlert('danger', 'Ошибка заполнения с ИИ: ' + error.message);
+    }
+}
+
+// Показать превью заполненного ИИ документа
+function showAIFilledPreview(content, suggestions) {
+    // Создаем модальное окно для превью
+    const modalHtml = `
+        <div class="modal fade" id="aiPreviewModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-robot me-2 text-info"></i>
+                            Документ заполнен с помощью ИИ
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-lightbulb me-2"></i>
+                            ИИ проанализировал данные и заполнил шаблон. Проверьте содержимое и при необходимости внесите корректировки.
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Заполненный контент:</strong></label>
+                            <textarea class="form-control" rows="10" id="aiContent" readonly>${content}</textarea>
+                        </div>
+                        
+                        ${suggestions && suggestions.length > 0 ? `
+                            <div class="mb-3">
+                                <label class="form-label"><strong>Рекомендации ИИ:</strong></label>
+                                <ul class="list-group">
+                                    ${suggestions.map(s => `<li class="list-group-item"><i class="fas fa-check text-success me-2"></i>${s}</li>`).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                        <button type="button" class="btn btn-success" onclick="createDocumentWithAIContent()">
+                            <i class="fas fa-check me-2"></i>Создать документ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Удаляем предыдущее модальное окно если есть
+    const existingModal = document.getElementById('aiPreviewModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Добавляем новое модальное окно
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Показываем модальное окно
+    const modal = new bootstrap.Modal(document.getElementById('aiPreviewModal'));
+    modal.show();
+}
+
+// Создать документ с AI контентом
+async function createDocumentWithAIContent() {
+    try {
+        const content = document.getElementById('aiContent').value;
+        
+        const response = await fetch('/admin/documents/api/create-with-content', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                template_id: selectedTemplate.id,
+                entity_type: selectedEntity.type,
+                entity_id: parseInt(selectedEntity.id),
+                content: content,
+                filled_by: 'AI'
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            // Закрываем все модальные окна
+            bootstrap.Modal.getInstance(document.getElementById('aiPreviewModal')).hide();
+            bootstrap.Modal.getInstance(document.getElementById('generateModal')).hide();
+            
+            showAlert('success', 'Документ с AI-заполнением успешно создан!');
+            loadDocuments(currentPage);
+        } else {
+            showAlert('danger', result.message);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка создания документа: ' + error.message);
     }
 }
 

@@ -15,7 +15,7 @@ from ...database.models import AdminUser, User
 from ...database.crm_models import Client, ClientType, ClientStatus, Lead, Deal, Document, ClientTag
 from ...services.rbac_service import RBACService, require_permission
 from ...config.logging import get_logger
-from ..auth import get_current_admin_user
+from ..middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/clients", tags=["clients"])

@@ -426,6 +426,12 @@
                     <!-- Загружается динамически -->
                 </div>
             </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-success" id="createDealFromModalBtn">
+                    <i class="fas fa-handshake me-2"></i>Создать сделку
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -437,6 +443,7 @@ const username = 'admin';
 const password = 'qwerty123';
 let currentPage = 1;
 let currentClients = [];
+let currentClientId = null;
 
 // Загрузка клиентов
 async function loadClients(page = 1) {
@@ -526,6 +533,10 @@ function renderClients(clients) {
                     <button class="btn btn-sm btn-outline-primary" onclick="viewClient(${client.id})" 
                             title="Просмотр">
                         <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="createDealFromClient(${client.id})"
+                            title="Создать сделку">
+                        <i class="fas fa-handshake"></i>
                     </button>
                     <button class="btn btn-sm btn-outline-warning" onclick="editClient(${client.id})"
                             title="Редактировать">
@@ -632,6 +643,7 @@ async function viewClient(clientId) {
         
         const data = await response.json();
         if (data.success) {
+            currentClientId = clientId;
             showClientDetails(data.client);
         } else {
             showAlert('danger', data.message);
@@ -749,6 +761,15 @@ function showClientDetails(client) {
     document.getElementById('clientDetails').innerHTML = detailsHtml;
     const modal = new bootstrap.Modal(document.getElementById('viewClientModal'));
     modal.show();
+    
+    // Добавляем обработчик для кнопки создания сделки
+    const createDealBtn = document.getElementById('createDealFromModalBtn');
+    createDealBtn.onclick = () => {
+        if (currentClientId) {
+            modal.hide();
+            createDealFromClient(currentClientId);
+        }
+    };
 }
 
 // Отображение сделок
@@ -954,6 +975,73 @@ document.getElementById('searchInput').addEventListener('keypress', function(e) 
         loadClients(1);
     }
 });
+
+// Функция создания сделки из клиента
+async function createDealFromClient(clientId) {
+    try {
+        if (!confirm('Создать новую сделку для этого клиента?')) {
+            return;
+        }
+
+        // Получаем данные клиента
+        const clientResponse = await fetch(`/admin/clients/api/${clientId}`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!clientResponse.ok) {
+            throw new Error(`HTTP ${clientResponse.status}`);
+        }
+
+        const clientData = await clientResponse.json();
+        if (!clientData.success || !clientData.client) {
+            throw new Error(clientData.message || 'Клиент не найден');
+        }
+
+        const client = clientData.client;
+
+        // Базовые данные для сделки
+        const dealData = {
+            title: `Сделка с ${client.name}`,
+            description: `Сделка создана для клиента: ${client.name}`,
+            client_id: clientId,
+            amount: 100000,
+            prepayment_percent: 50,
+            priority: 'normal'
+        };
+
+        // Отправляем запрос на создание сделки
+        const dealResponse = await fetch('/admin/deals/api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dealData),
+            credentials: 'include'
+        });
+
+        if (!dealResponse.ok) {
+            const errorData = await dealResponse.json();
+            throw new Error(errorData.detail || errorData.message || `HTTP ${dealResponse.status}`);
+        }
+
+        const dealResult = await dealResponse.json();
+        if (!dealResult.success) {
+            throw new Error(dealResult.message || 'Ошибка создания сделки');
+        }
+
+        showNotification('✅ Сделка успешно создана!', 'success');
+        
+        // Предлагаем перейти к сделкам
+        if (confirm('Сделка создана! Перейти к разделу сделок?')) {
+            window.location.href = '/admin/deals';
+        }
+
+    } catch (error) {
+        console.error('Create deal from client error:', error);
+        showNotification(`Ошибка при создании сделки: ${error.message}`, 'danger');
+    }
+}
 
 // Загрузка при старте
 document.addEventListener('DOMContentLoaded', () => {

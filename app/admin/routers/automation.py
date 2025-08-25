@@ -11,7 +11,7 @@ from ...database.models import AdminUser
 from ...services.project_automation import ProjectAutomationService
 from ...services.scheduler import scheduler
 from ...config.logging import get_logger
-from ..auth import get_current_admin_user
+from ..middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["automation"])

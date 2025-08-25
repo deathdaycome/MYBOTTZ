@@ -13,10 +13,10 @@ from datetime import datetime, timedelta
 from ...database.database import get_db
 from ...database.models import AdminUser, Project
 from ...database.crm_models import Deal, DealStatus, Client, Lead, Document, ServiceCatalog
-from ...database.audit_models import AuditLog
+from ...database.audit_models import AuditLog, AuditActionType, AuditEntityType
 from ...services.rbac_service import RBACService
 from ...config.logging import get_logger
-from ..auth import get_current_admin_user
+from ..middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/deals", tags=["deals"])
@@ -277,13 +277,13 @@ async def create_deal(
         
         # Логируем действие
         audit_log = AuditLog(
-            action="create",
-            entity_type="deal",
+            action_type=AuditActionType.CREATE,
+            entity_type=AuditEntityType.DEAL,
             entity_id=deal.id,
-            new_data=deal.to_dict(),
+            new_values=deal.to_dict(),
             description=f"Создана сделка: {deal.title}",
             user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
         )
         db.add(audit_log)
         db.commit()
@@ -346,14 +346,14 @@ async def update_deal_status(
         
         # Логируем действие
         audit_log = AuditLog(
-            action="update_status",
-            entity_type="deal",
+            action_type=AuditActionType.UPDATE,
+            entity_type=AuditEntityType.DEAL,
             entity_id=deal.id,
-            old_data={"status": old_status.value if old_status else None},
-            new_data={"status": status_enum.value},
+            old_values={"status": old_status.value if old_status else None},
+            new_values={"status": status_enum.value},
             description=f"Изменен статус сделки '{deal.title}': {old_status.value if old_status else 'Новая'} → {status_enum.value}",
             user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
         )
         db.add(audit_log)
         db.commit()
@@ -443,14 +443,14 @@ async def add_payment(
         
         # Логируем действие
         audit_log = AuditLog(
-            action="add_payment",
-            entity_type="deal",
+            action_type=AuditActionType.UPDATE,
+            entity_type=AuditEntityType.DEAL,
             entity_id=deal.id,
-            old_data={"paid_amount": old_paid},
-            new_data={"paid_amount": deal.paid_amount, "payment": amount},
+            old_values={"paid_amount": old_paid},
+            new_values={"paid_amount": deal.paid_amount, "payment": amount},
             description=f"Добавлен платеж {amount:,.0f} ₽ к сделке '{deal.title}'",
             user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
         )
         db.add(audit_log)
         db.commit()
@@ -501,13 +501,13 @@ async def convert_deal_to_project(
         if result["success"]:
             # Логируем действие
             audit_log = AuditLog(
-                action="convert_to_project",
-                entity_type="deal",
+                action_type=AuditActionType.UPDATE,
+                entity_type=AuditEntityType.DEAL,
                 entity_id=deal_id,
-                new_data=result["data"],
+                new_values=result["data"],
                 description=f"Сделка конвертирована в проект через IntegrationService",
                 user_id=user_id,
-                user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+                user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
             )
             db.add(audit_log)
             db.commit()

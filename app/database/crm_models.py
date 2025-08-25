@@ -209,6 +209,7 @@ class Lead(Base):
     contact_phone = Column(String(50), nullable=True)
     contact_email = Column(String(255), nullable=True)
     contact_telegram = Column(String(100), nullable=True)
+    contact_whatsapp = Column(String(50), nullable=True)
     
     # Детали лида
     description = Column(Text, nullable=True)
@@ -259,6 +260,7 @@ class Lead(Base):
             "contact_phone": self.contact_phone,
             "contact_email": self.contact_email,
             "contact_telegram": self.contact_telegram,
+            "contact_whatsapp": self.contact_whatsapp,
             "description": self.description,
             "requirements": self.requirements,
             "budget": self.budget,

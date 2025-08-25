@@ -10,7 +10,7 @@ from ...database.database import get_db
 from ...database.models import AdminUser
 from ...services.backup_service import backup_service
 from ...config.logging import get_logger
-from ..auth import get_current_admin_user
+from ..middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/backup", tags=["backup"])

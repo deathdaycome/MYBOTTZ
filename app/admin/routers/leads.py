@@ -13,10 +13,10 @@ from datetime import datetime, timedelta
 from ...database.database import get_db
 from ...database.models import AdminUser
 from ...database.crm_models import Lead, LeadStatus, Client, Deal, DealStatus
-from ...database.audit_models import AuditLog
+from ...database.audit_models import AuditLog, AuditActionType, AuditEntityType
 from ...services.rbac_service import RBACService
 from ...config.logging import get_logger
-from ..auth import get_current_admin_user
+from ..middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -69,6 +69,7 @@ async def leads_page(
         "request": request,
         "user": current_user,
         "username": current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+        "password": current_user.get("password", "") if isinstance(current_user, dict) else current_user.password if hasattr(current_user, 'password') else "",
         "user_role": current_user.get("role", "admin") if isinstance(current_user, dict) else current_user.role,
         "navigation_items": navigation_items,
         "stats": {
@@ -162,6 +163,10 @@ async def get_leads(
             if lead.manager:
                 lead_dict["manager_name"] = lead.manager.username
             
+            # Информация о создателе (продажнике)
+            if lead.created_by:
+                lead_dict["created_by_name"] = lead.created_by.username
+            
             # Рассчитываем время в воронке
             if lead.created_at:
                 days_in_funnel = (datetime.utcnow() - lead.created_at).days
@@ -220,6 +225,7 @@ async def create_lead(
             contact_phone=data.get("contact_phone"),
             contact_email=data.get("contact_email"),
             contact_telegram=data.get("contact_telegram"),
+            contact_whatsapp=data.get("contact_whatsapp"),
             description=data.get("description"),
             requirements=data.get("requirements"),
             budget=data.get("budget"),
@@ -237,13 +243,13 @@ async def create_lead(
         
         # Логируем действие
         audit_log = AuditLog(
-            action="create",
-            entity_type="lead",
+            action_type=AuditActionType.CREATE,
+            entity_type=AuditEntityType.LEAD,
             entity_id=lead.id,
-            new_data=lead.to_dict(),
+            new_values=lead.to_dict(),
             description=f"Создан лид: {lead.title}",
             user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
         )
         db.add(audit_log)
         db.commit()
@@ -256,6 +262,146 @@ async def create_lead(
         
     except Exception as e:
         logger.error(f"Ошибка создания лида: {str(e)}")
+        db.rollback()
+        return {"success": False, "message": str(e)}
+
+
+@router.get("/api/{lead_id}", response_class=JSONResponse)
+async def get_lead_by_id(
+    lead_id: int,
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Получить конкретный лид по ID"""
+    try:
+        # Проверяем права
+        rbac = RBACService(db)
+        if not rbac.check_data_access(current_user, "leads", lead_id, "view"):
+            return {"success": False, "message": "Нет прав на просмотр данного лида"}
+        
+        lead = db.query(Lead).filter(Lead.id == lead_id).first()
+        if not lead:
+            return {"success": False, "message": "Лид не найден"}
+        
+        lead_dict = lead.to_dict()
+        
+        # Добавляем информацию о клиенте
+        if lead.client:
+            lead_dict["client_name"] = lead.client.name
+            lead_dict["client_type"] = lead.client.type.value if lead.client.type else None
+        
+        # Информация о менеджере
+        if lead.manager:
+            lead_dict["manager_name"] = lead.manager.username
+        
+        # Информация о создателе
+        if lead.created_by:
+            lead_dict["created_by_name"] = lead.created_by.username
+        
+        # Рассчитываем время в воронке
+        if lead.created_at:
+            days_in_funnel = (datetime.utcnow() - lead.created_at).days
+            lead_dict["days_in_funnel"] = days_in_funnel
+        
+        return {
+            "success": True,
+            "lead": lead_dict
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения лида: {str(e)}")
+        return {"success": False, "message": str(e)}
+
+
+@router.put("/api/{lead_id}", response_class=JSONResponse)
+async def update_lead(
+    lead_id: int,
+    request: Request,
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Обновить лид"""
+    try:
+        # Проверяем права
+        rbac = RBACService(db)
+        if not rbac.check_data_access(current_user, "leads", lead_id, "edit"):
+            return {"success": False, "message": "Нет прав на редактирование данного лида"}
+        
+        lead = db.query(Lead).filter(Lead.id == lead_id).first()
+        if not lead:
+            return {"success": False, "message": "Лид не найден"}
+        
+        data = await request.json()
+        
+        # Сохраняем старые значения для аудита
+        old_values = lead.to_dict()
+        
+        # Обновляем поля
+        if "title" in data:
+            lead.title = data["title"]
+        if "status" in data:
+            try:
+                lead.status = LeadStatus[data["status"].upper()]
+            except KeyError:
+                pass
+        if "source" in data:
+            lead.source = data["source"]
+        if "client_id" in data:
+            lead.client_id = data["client_id"]
+        if "contact_name" in data:
+            lead.contact_name = data["contact_name"]
+        if "contact_phone" in data:
+            lead.contact_phone = data["contact_phone"]
+        if "contact_email" in data:
+            lead.contact_email = data["contact_email"]
+        if "contact_telegram" in data:
+            lead.contact_telegram = data["contact_telegram"]
+        if "contact_whatsapp" in data:
+            lead.contact_whatsapp = data["contact_whatsapp"]
+        if "description" in data:
+            lead.description = data["description"]
+        if "requirements" in data:
+            lead.requirements = data["requirements"]
+        if "budget" in data:
+            lead.budget = data["budget"]
+        if "probability" in data:
+            lead.probability = data["probability"]
+        if "expected_close_date" in data and data["expected_close_date"]:
+            lead.expected_close_date = datetime.fromisoformat(data["expected_close_date"])
+        if "next_action_date" in data and data["next_action_date"]:
+            lead.next_action_date = datetime.fromisoformat(data["next_action_date"])
+        if "notes" in data:
+            lead.notes = data["notes"]
+        if "manager_id" in data:
+            lead.manager_id = data["manager_id"]
+        
+        lead.updated_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(lead)
+        
+        # Логируем действие
+        audit_log = AuditLog(
+            action_type=AuditActionType.UPDATE,
+            entity_type=AuditEntityType.LEAD,
+            entity_id=lead.id,
+            old_values=old_values,
+            new_values=lead.to_dict(),
+            description=f"Обновлен лид: {lead.title}",
+            user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
+            user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+        )
+        db.add(audit_log)
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Лид успешно обновлен",
+            "lead": lead.to_dict()
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка обновления лида: {str(e)}")
         db.rollback()
         return {"success": False, "message": str(e)}
 
@@ -315,14 +461,14 @@ async def update_lead_status(
         
         # Логируем действие
         audit_log = AuditLog(
-            action="update_status",
-            entity_type="lead",
+            action_type=AuditActionType.UPDATE,
+            entity_type=AuditEntityType.LEAD,
             entity_id=lead.id,
-            old_data={"status": old_status.value if old_status else None},
-            new_data={"status": status_enum.value},
+            old_values={"status": old_status.value if old_status else None},
+            new_values={"status": status_enum.value},
             description=f"Изменен статус лида '{lead.title}': {old_status.value if old_status else 'Новый'} → {status_enum.value}",
             user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
         )
         db.add(audit_log)
         db.commit()
@@ -374,13 +520,13 @@ async def convert_lead_to_deal(
         if result["success"]:
             # Логируем действие
             audit_log = AuditLog(
-                action="convert",
-                entity_type="lead",
+                action_type=AuditActionType.LEAD_CONVERT,
+                entity_type=AuditEntityType.LEAD,
                 entity_id=lead_id,
-                new_data=result["data"],
+                new_values=result["data"],
                 description=f"Лид конвертирован в сделку через IntegrationService",
                 user_id=user_id,
-                user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+                user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
             )
             db.add(audit_log)
             db.commit()

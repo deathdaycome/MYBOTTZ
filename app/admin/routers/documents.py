@@ -10,7 +10,7 @@ import json
 
 from ...database.database import get_db
 from sqlalchemy.orm import Session
-from ..auth import get_current_admin_user
+from ..middleware.auth import get_current_admin_user
 from ...services.document_service import DocumentService
 from ...services.rbac_service import RBACService
 from ...database.crm_models import Document, DocumentTemplate
@@ -592,3 +592,209 @@ async def create_default_templates(
         "success": True,
         "message": "Стандартные шаблоны успешно созданы"
     })
+
+
+@router.post("/api/ai-fill")
+async def ai_fill_template(
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_admin_user)
+):
+    """Заполнить шаблон с помощью AI"""
+    rbac = RBACService(db)
+    
+    if not rbac.has_permission(user, 'documents.create'):
+        return JSONResponse(content={"success": False, "message": "Нет прав на создание документов"}, status_code=403)
+    
+    try:
+        data = await request.json()
+        template_id = data.get('template_id')
+        entity_type = data.get('entity_type')
+        entity_id = data.get('entity_id')
+        
+        if not all([template_id, entity_type, entity_id]):
+            return JSONResponse(content={"success": False, "message": "Не указаны все параметры"}, status_code=400)
+        
+        # Получаем шаблон
+        template = db.query(DocumentTemplate).filter(
+            DocumentTemplate.id == template_id, 
+            DocumentTemplate.is_active == True
+        ).first()
+        
+        if not template:
+            return JSONResponse(content={"success": False, "message": "Шаблон не найден"}, status_code=404)
+        
+        # Получаем данные сущности для заполнения
+        entity_data = await get_entity_data(db, entity_type, entity_id)
+        if not entity_data:
+            return JSONResponse(content={"success": False, "message": f"Не найдена {entity_type} с ID {entity_id}"}, status_code=404)
+        
+        # Используем простую AI логику (заглушка - можно подключить OpenAI/Claude API)
+        filled_content = ai_fill_template_content(template.content, entity_data, template.doc_type)
+        suggestions = generate_ai_suggestions(entity_data, template.doc_type)
+        
+        logger.info(f"Template {template_id} AI-filled for {entity_type} {entity_id} by user {user.id}")
+        
+        return JSONResponse(content={
+            "success": True,
+            "content": filled_content,
+            "suggestions": suggestions,
+            "message": "Шаблон заполнен с помощью ИИ"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error AI-filling template: {e}")
+        return JSONResponse(content={"success": False, "message": f"Ошибка заполнения: {str(e)}"}, status_code=500)
+
+
+@router.post("/api/create-with-content")
+async def create_document_with_content(
+    request: Request,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_admin_user)
+):
+    """Создать документ с готовым контентом"""
+    rbac = RBACService(db)
+    
+    if not rbac.has_permission(user, 'documents.create'):
+        return JSONResponse(content={"success": False, "message": "Нет прав на создание документов"}, status_code=403)
+    
+    try:
+        data = await request.json()
+        template_id = data.get('template_id')
+        entity_type = data.get('entity_type') 
+        entity_id = data.get('entity_id')
+        content = data.get('content')
+        filled_by = data.get('filled_by', 'manual')
+        
+        if not all([template_id, entity_type, entity_id, content]):
+            return JSONResponse(content={"success": False, "message": "Не указаны все параметры"}, status_code=400)
+        
+        doc_service = DocumentService(db)
+        document = doc_service.create_document_with_content(
+            template_id=template_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            content=content,
+            created_by=user.id,
+            filled_by=filled_by
+        )
+        
+        if document:
+            logger.info(f"Document created with {filled_by} content by user {user.id}")
+            return JSONResponse(content={
+                "success": True,
+                "document_id": document.id,
+                "message": f"Документ создан (заполнен {filled_by})"
+            })
+        else:
+            return JSONResponse(content={"success": False, "message": "Ошибка создания документа"}, status_code=500)
+            
+    except Exception as e:
+        logger.error(f"Error creating document with content: {e}")
+        return JSONResponse(content={"success": False, "message": f"Ошибка создания: {str(e)}"}, status_code=500)
+
+
+async def get_entity_data(db: Session, entity_type: str, entity_id: int) -> dict:
+    """Получить данные сущности для заполнения шаблона"""
+    try:
+        if entity_type == 'client':
+            from ...database.crm_models import Client
+            entity = db.query(Client).filter(Client.id == entity_id).first()
+            if entity:
+                return {
+                    'name': entity.name,
+                    'phone': entity.phone or '',
+                    'email': entity.email or '',
+                    'company_name': entity.company_name or '',
+                    'address': entity.address or '',
+                    'type': 'Клиент'
+                }
+        elif entity_type == 'deal':
+            from ...database.crm_models import Deal
+            entity = db.query(Deal).filter(Deal.id == entity_id).first()
+            if entity:
+                client_name = entity.client.name if entity.client else 'Не указан'
+                return {
+                    'title': entity.title,
+                    'amount': entity.amount or 0,
+                    'description': entity.description or '',
+                    'client_name': client_name,
+                    'status': entity.status.value if entity.status else 'новая',
+                    'type': 'Сделка'
+                }
+        elif entity_type == 'lead':
+            from ...database.crm_models import Lead
+            entity = db.query(Lead).filter(Lead.id == entity_id).first()
+            if entity:
+                return {
+                    'title': entity.title,
+                    'contact_name': entity.contact_name or '',
+                    'contact_phone': entity.contact_phone or '',
+                    'contact_email': entity.contact_email or '',
+                    'company_name': entity.company_name or '',
+                    'description': entity.description or '',
+                    'budget': entity.budget or 0,
+                    'type': 'Лид'
+                }
+    except Exception as e:
+        logger.error(f"Error getting entity data: {e}")
+    
+    return None
+
+
+def ai_fill_template_content(template_content: str, entity_data: dict, doc_type: str) -> str:
+    """Простая AI заглушка для заполнения шаблона"""
+    # Это упрощенная версия - можно подключить OpenAI API или Claude API
+    filled_content = template_content
+    
+    # Заменяем основные плейсхолдеры
+    replacements = {
+        '{client_name}': entity_data.get('name', entity_data.get('client_name', 'Клиент')),
+        '{client_phone}': entity_data.get('phone', entity_data.get('contact_phone', '')),
+        '{client_email}': entity_data.get('email', entity_data.get('contact_email', '')),
+        '{company_name}': entity_data.get('company_name', ''),
+        '{amount}': str(entity_data.get('amount', entity_data.get('budget', 0))),
+        '{description}': entity_data.get('description', ''),
+        '{title}': entity_data.get('title', ''),
+        '{date}': datetime.now().strftime('%d.%m.%Y'),
+        '{current_date}': datetime.now().strftime('%d.%m.%Y')
+    }
+    
+    for placeholder, value in replacements.items():
+        filled_content = filled_content.replace(placeholder, str(value))
+    
+    return filled_content
+
+
+def generate_ai_suggestions(entity_data: dict, doc_type: str) -> List[str]:
+    """Генерация AI рекомендаций"""
+    suggestions = []
+    
+    if doc_type == 'contract':
+        suggestions.extend([
+            "Проверьте правильность указания реквизитов сторон",
+            "Убедитесь в корректности суммы договора",
+            "Проверьте сроки выполнения работ"
+        ])
+    elif doc_type == 'invoice':
+        if entity_data.get('amount', 0) > 100000:
+            suggestions.append("Крупная сумма - рекомендуется разбить на этапы")
+        suggestions.extend([
+            "Проверьте НДС если применимо",
+            "Укажите корректные банковские реквизиты"
+        ])
+    elif doc_type == 'offer':
+        suggestions.extend([
+            "Добавьте детальное описание услуг",
+            "Укажите условия оплаты",
+            "Проверьте срок действия предложения"
+        ])
+    
+    # Общие рекомендации
+    if not entity_data.get('phone') and not entity_data.get('contact_phone'):
+        suggestions.append("Отсутствует контактный телефон")
+    if not entity_data.get('email') and not entity_data.get('contact_email'):
+        suggestions.append("Отсутствует email для связи")
+    
+    return suggestions

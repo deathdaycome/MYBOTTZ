@@ -46,6 +46,7 @@
 .kanban-header.lost { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #333; }
 
 .lead-card {
+    position: relative;
     background: white;
     border-radius: 8px;
     padding: 1rem;
@@ -62,6 +63,31 @@
 
 .lead-card.dragging {
     opacity: 0.5;
+    transform: rotate(5deg);
+    z-index: 1000;
+}
+
+.kanban-cards {
+    min-height: 100px;
+    transition: all 0.3s ease;
+}
+
+.kanban-cards.drag-over {
+    background-color: rgba(102, 126, 234, 0.1);
+    border: 2px dashed #667eea;
+    border-radius: 8px;
+}
+
+.updating-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 1001;
 }
 
 .lead-title {
@@ -214,6 +240,23 @@
     background: #667eea;
     color: white;
     border-color: #667eea;
+}
+
+.lead-actions .btn {
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+.lead-actions .btn .fab {
+    font-size: 0.875rem;
+}
+
+.btn-outline-info:hover .fab {
+    color: white;
+}
+
+.btn-outline-success:hover .fab {
+    color: white;
 }
 </style>
 {% endblock %}
@@ -470,6 +513,16 @@
                     
                     <div class="row mb-3">
                         <div class="col-md-6">
+                            <label class="form-label">WhatsApp</label>
+                            <input type="text" class="form-control" id="contactWhatsApp" placeholder="+7 900 123-45-67">
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Пустая колонка для выравнивания -->
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
                             <label class="form-label">Бюджет</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" id="leadBudget" placeholder="100000">
@@ -521,8 +574,117 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-info" onclick="convertToClient()">Создать клиента</button>
                 <button type="button" class="btn btn-success" onclick="convertToDeal()">Конвертировать в сделку</button>
                 <button type="button" class="btn btn-primary" onclick="editLead()">Редактировать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования лида -->
+<div class="modal fade" id="editLeadModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Редактировать лид</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editLeadForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Название *</label>
+                                <input type="text" class="form-control" id="editLeadTitle" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Статус</label>
+                                <select class="form-select" id="editLeadStatus">
+                                    <option value="new">Новый</option>
+                                    <option value="contact_made">Первый контакт</option>
+                                    <option value="qualification">Квалификация</option>
+                                    <option value="proposal_sent">Отправлено КП</option>
+                                    <option value="negotiation">Переговоры</option>
+                                    <option value="won">Выиграно</option>
+                                    <option value="lost">Проиграно</option>
+                                    <option value="postponed">Отложено</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Источник</label>
+                                <select class="form-select" id="editLeadSource">
+                                    <option value="site">Сайт</option>
+                                    <option value="avito">Avito</option>
+                                    <option value="fl.ru">FL.ru</option>
+                                    <option value="kwork">Kwork</option>
+                                    <option value="2gis">2ГИС</option>
+                                    <option value="yandex">Яндекс.Карты</option>
+                                    <option value="direktcrm">Директ</option>
+                                    <option value="social">Соцсети</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Контактное лицо</label>
+                                <input type="text" class="form-control" id="editContactName">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Телефон</label>
+                                <input type="tel" class="form-control" id="editContactPhone">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="editContactEmail">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Telegram</label>
+                                <input type="text" class="form-control" id="editContactTelegram" placeholder="@username">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">WhatsApp</label>
+                                <input type="text" class="form-control" id="editContactWhatsapp" placeholder="+7 999 123 45 67">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Бюджет</label>
+                                <input type="number" class="form-control" id="editBudget">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Вероятность (%)</label>
+                                <input type="number" class="form-control" id="editProbability" min="0" max="100">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea class="form-control" id="editDescription" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Требования</label>
+                        <textarea class="form-control" id="editRequirements" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Заметки</label>
+                        <textarea class="form-control" id="editNotes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveLeadChanges()">Сохранить</button>
             </div>
         </div>
     </div>
@@ -553,9 +715,13 @@ async function loadLeads() {
         });
         
         const data = await response.json();
+        console.log('Received leads data:', data);
         if (data.success) {
-            leads = data.data;
+            leads = data.leads || [];
+            console.log('Loaded leads:', leads.length);
             renderLeads();
+        } else {
+            console.error('API error:', data.message);
         }
     } catch (error) {
         console.error('Error loading leads:', error);
@@ -594,6 +760,9 @@ function renderLeads() {
             badge.textContent = counters[status] || 0;
         }
     });
+    
+    // Инициализируем drag-and-drop
+    initDragAndDrop();
 }
 
 // Создание карточки лида
@@ -612,6 +781,7 @@ function createLeadCard(lead) {
         ${lead.company_name ? `<div class="lead-company">${lead.company_name}</div>` : ''}
         <div class="lead-source ${sourceClass}">${sourceIcon} ${lead.source || 'Не указан'}</div>
         
+        ${lead.created_by_name ? `<div class="text-muted small"><i class="fas fa-user"></i> ${lead.created_by_name}</div>` : ''}
         ${lead.budget ? `<div class="text-muted small">Бюджет: ${formatCurrency(lead.budget)}</div>` : ''}
         
         <div class="lead-probability">
@@ -634,6 +804,24 @@ function createLeadCard(lead) {
             <button class="btn btn-sm btn-outline-success" onclick="callLead(${lead.id})">
                 <i class="fas fa-phone"></i> Звонок
             </button>
+            ${lead.contact_telegram ? `
+                <button class="btn btn-sm btn-outline-info" onclick="openTelegram('${lead.contact_telegram}')" title="Написать в Telegram">
+                    <i class="fab fa-telegram"></i>
+                </button>
+            ` : ''}
+            ${lead.contact_whatsapp ? `
+                <button class="btn btn-sm btn-outline-success" onclick="openWhatsApp('${lead.contact_whatsapp}')" title="Написать в WhatsApp">
+                    <i class="fab fa-whatsapp"></i>
+                </button>
+            ` : ''}
+            <div class="btn-group mt-1" role="group">
+                <button class="btn btn-sm btn-outline-info" onclick="convertLeadToClient(${lead.id})" title="Создать клиента">
+                    <i class="fas fa-user-plus"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-warning" onclick="convertLeadToDeal(${lead.id})" title="Создать сделку">
+                    <i class="fas fa-handshake"></i>
+                </button>
+            </div>
         </div>
     `;
     
@@ -652,6 +840,7 @@ function initDragAndDrop() {
     
     columns.forEach(column => {
         column.addEventListener('dragover', handleDragOver);
+        column.addEventListener('dragleave', handleDragLeave);
         column.addEventListener('drop', handleDrop);
     });
 }
@@ -667,26 +856,62 @@ function handleDragEnd(e) {
 
 function handleDragOver(e) {
     e.preventDefault();
+    const column = e.target.closest('.kanban-cards');
+    if (column) {
+        column.classList.add('drag-over');
+    }
+}
+
+function handleDragLeave(e) {
+    const column = e.target.closest('.kanban-cards');
+    if (column && !column.contains(e.relatedTarget)) {
+        column.classList.remove('drag-over');
+    }
 }
 
 async function handleDrop(e) {
     e.preventDefault();
     
+    // Убираем визуальные эффекты
+    document.querySelectorAll('.kanban-cards').forEach(col => {
+        col.classList.remove('drag-over');
+    });
+    
     if (draggedElement) {
+        const dropColumn = e.target.closest('.kanban-cards');
         const newStatus = e.target.closest('.kanban-column').dataset.status;
         const leadId = draggedElement.dataset.leadId;
         const oldStatus = draggedElement.dataset.status;
         
         if (newStatus !== oldStatus) {
+            // Показываем лоадер
+            draggedElement.style.opacity = '0.7';
+            draggedElement.innerHTML += '<div class="updating-spinner">Обновление...</div>';
+            
             // Обновляем статус на сервере
-            await updateLeadStatus(leadId, newStatus);
+            const success = await updateLeadStatus(leadId, newStatus);
             
-            // Перемещаем элемент
-            e.target.closest('.kanban-cards').appendChild(draggedElement);
-            draggedElement.dataset.status = newStatus;
-            
-            // Обновляем счетчики
-            updateCounters();
+            if (success) {
+                // Перемещаем элемент
+                dropColumn.appendChild(draggedElement);
+                draggedElement.dataset.status = newStatus;
+                
+                // Обновляем счетчики
+                updateCounters();
+                
+                // Удаляем лоадер
+                draggedElement.style.opacity = '1';
+                const spinner = draggedElement.querySelector('.updating-spinner');
+                if (spinner) spinner.remove();
+                
+                console.log(`Lead ${leadId} moved from ${oldStatus} to ${newStatus}`);
+            } else {
+                // При ошибке возвращаем элемент обратно
+                draggedElement.style.opacity = '1';
+                const spinner = draggedElement.querySelector('.updating-spinner');
+                if (spinner) spinner.remove();
+                alert('Ошибка обновления статуса лида');
+            }
         }
     }
 }
@@ -704,11 +929,16 @@ async function updateLeadStatus(leadId, newStatus) {
         });
         
         const data = await response.json();
-        if (!data.success) {
-            console.error('Error updating lead status:', data.error);
+        if (data.success) {
+            console.log('Lead status updated successfully');
+            return true;
+        } else {
+            console.error('Error updating lead status:', data.message);
+            return false;
         }
     } catch (error) {
         console.error('Error updating lead status:', error);
+        return false;
     }
 }
 
@@ -770,6 +1000,10 @@ function updateProbabilityLabel() {
 }
 
 async function saveNewLead() {
+    console.log('DEBUG: saveNewLead called');
+    console.log('DEBUG: username = {{ username }}');
+    console.log('DEBUG: password = {{ password }}');
+    
     const formData = {
         title: document.getElementById('leadTitle').value,
         source_type: document.getElementById('leadSourceType').value,
@@ -783,23 +1017,34 @@ async function saveNewLead() {
         contact_phone: document.getElementById('contactPhone').value,
         contact_email: document.getElementById('contactEmail').value,
         contact_telegram: document.getElementById('contactTelegram').value,
+        contact_whatsapp: document.getElementById('contactWhatsApp').value,
         budget: parseFloat(document.getElementById('leadBudget').value) || null,
         probability: parseInt(document.getElementById('leadProbability').value),
         description: document.getElementById('leadDescription').value,
         tags: document.getElementById('leadTags').value.split(',').map(tag => tag.trim()).filter(tag => tag)
     };
     
+    console.log('DEBUG: formData =', formData);
+    
     try {
+        const authHeader = 'Basic ' + btoa('{{ username }}:{{ password }}');
+        console.log('DEBUG: authHeader =', authHeader);
+        
         const response = await fetch('/admin/leads/api', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Basic ' + btoa('{{ username }}:{{ password }}')
+                'Authorization': authHeader
             },
             body: JSON.stringify(formData)
         });
         
+        console.log('DEBUG: response status =', response.status);
+        console.log('DEBUG: response ok =', response.ok);
+        
         const data = await response.json();
+        console.log('DEBUG: response data =', data);
+        
         if (data.success) {
             // Закрываем модальное окно
             bootstrap.Modal.getInstance(document.getElementById('addLeadModal')).hide();
@@ -813,9 +1058,11 @@ async function saveNewLead() {
             // Показываем уведомление
             showNotification('Лид успешно добавлен!', 'success');
         } else {
-            showNotification('Ошибка: ' + data.error, 'danger');
+            console.log('DEBUG: Server returned error:', data.message || data.error);
+            showNotification('Ошибка: ' + (data.message || data.error), 'danger');
         }
     } catch (error) {
+        console.error('DEBUG: Exception caught:', error);
         showNotification('Ошибка при добавлении лида', 'danger');
     }
 }
@@ -831,7 +1078,7 @@ async function viewLead(leadId) {
         
         const data = await response.json();
         if (data.success) {
-            const lead = data.data;
+            const lead = data.lead;
             currentLeadId = leadId; // Сохраняем ID текущего лида
             document.getElementById('viewLeadTitle').textContent = lead.title;
             
@@ -844,6 +1091,7 @@ async function viewLead(leadId) {
                         <p><strong>Источник:</strong> ${lead.source_type === 'hot' ? '🔥' : '❄️'} ${lead.source}</p>
                         <p><strong>Вероятность:</strong> ${lead.probability}%</p>
                         ${lead.budget ? `<p><strong>Бюджет:</strong> ${formatCurrency(lead.budget)}</p>` : ''}
+                        ${lead.created_by_name ? `<p><strong>Создал:</strong> ${lead.created_by_name}</p>` : ''}
                     </div>
                     <div class="col-md-6">
                         <h6>Контактная информация</h6>
@@ -851,6 +1099,7 @@ async function viewLead(leadId) {
                         ${lead.contact_phone ? `<p><strong>Телефон:</strong> ${lead.contact_phone}</p>` : ''}
                         ${lead.contact_email ? `<p><strong>Email:</strong> ${lead.contact_email}</p>` : ''}
                         ${lead.contact_telegram ? `<p><strong>Telegram:</strong> ${lead.contact_telegram}</p>` : ''}
+                        ${lead.contact_whatsapp ? `<p><strong>WhatsApp:</strong> ${lead.contact_whatsapp}</p>` : ''}
                     </div>
                 </div>
             `;
@@ -1012,9 +1261,341 @@ async function executeConvertToDeal() {
     }
 }
 
-function editLead() {
-    // Здесь будет логика редактирования
-    console.log('Edit lead');
+async function editLead() {
+    if (!currentLeadId) return;
+    
+    try {
+        // Получаем данные лида для заполнения формы
+        const response = await fetch(`/admin/leads/api/${currentLeadId}`, {
+            headers: {
+                'Authorization': 'Basic ' + btoa('{{ username }}:{{ password }}')
+            }
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            const lead = data.lead;
+            
+            // Заполняем форму данными лида
+            document.getElementById('editLeadTitle').value = lead.title || '';
+            document.getElementById('editLeadStatus').value = lead.status || 'new';
+            document.getElementById('editLeadSource').value = lead.source || '';
+            document.getElementById('editContactName').value = lead.contact_name || '';
+            document.getElementById('editContactPhone').value = lead.contact_phone || '';
+            document.getElementById('editContactEmail').value = lead.contact_email || '';
+            document.getElementById('editContactTelegram').value = lead.contact_telegram || '';
+            document.getElementById('editContactWhatsapp').value = lead.contact_whatsapp || '';
+            document.getElementById('editBudget').value = lead.budget || '';
+            document.getElementById('editProbability').value = lead.probability || 50;
+            document.getElementById('editDescription').value = lead.description || '';
+            document.getElementById('editRequirements').value = lead.requirements || '';
+            document.getElementById('editNotes').value = lead.notes || '';
+            
+            // Закрываем модальное окно просмотра и открываем редактирование
+            const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewLeadModal'));
+            if (viewModal) {
+                viewModal.hide();
+            }
+            
+            const editModal = new bootstrap.Modal(document.getElementById('editLeadModal'));
+            editModal.show();
+        } else {
+            showNotification('Не удалось загрузить данные лида', 'danger');
+        }
+    } catch (error) {
+        console.error('Edit lead error:', error);
+        showNotification('Ошибка при загрузке данных лида', 'danger');
+    }
+}
+
+async function saveLeadChanges() {
+    if (!currentLeadId) return;
+    
+    try {
+        const leadData = {
+            title: document.getElementById('editLeadTitle').value,
+            status: document.getElementById('editLeadStatus').value,
+            source: document.getElementById('editLeadSource').value,
+            contact_name: document.getElementById('editContactName').value,
+            contact_phone: document.getElementById('editContactPhone').value,
+            contact_email: document.getElementById('editContactEmail').value,
+            contact_telegram: document.getElementById('editContactTelegram').value,
+            contact_whatsapp: document.getElementById('editContactWhatsapp').value,
+            budget: parseFloat(document.getElementById('editBudget').value) || null,
+            probability: parseInt(document.getElementById('editProbability').value) || 50,
+            description: document.getElementById('editDescription').value,
+            requirements: document.getElementById('editRequirements').value,
+            notes: document.getElementById('editNotes').value
+        };
+        
+        const response = await fetch(`/admin/leads/api/${currentLeadId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa('{{ username }}:{{ password }}')
+            },
+            body: JSON.stringify(leadData)
+        });
+        
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Лид успешно обновлен', 'success');
+            
+            // Закрываем модальное окно редактирования
+            const editModal = bootstrap.Modal.getInstance(document.getElementById('editLeadModal'));
+            if (editModal) {
+                editModal.hide();
+            }
+            
+            // Обновляем список лидов
+            loadLeads();
+        } else {
+            showNotification('Ошибка обновления: ' + (data.message || 'Неизвестная ошибка'), 'danger');
+        }
+    } catch (error) {
+        console.error('Save lead error:', error);
+        showNotification('Ошибка при сохранении изменений', 'danger');
+    }
+}
+
+// Функция для открытия Telegram
+function openTelegram(telegramHandle) {
+    if (!telegramHandle) return;
+    
+    // Убираем @ если он есть
+    const cleanHandle = telegramHandle.replace(/^@/, '');
+    
+    // Формируем URL для Telegram
+    const telegramUrl = `https://t.me/${cleanHandle}`;
+    
+    // Открываем в новой вкладке
+    window.open(telegramUrl, '_blank');
+    
+    console.log(`Opening Telegram chat: ${telegramUrl}`);
+}
+
+// Функция для открытия WhatsApp
+function openWhatsApp(phoneNumber) {
+    if (!phoneNumber) return;
+    
+    // Очищаем номер от лишних символов
+    let cleanNumber = phoneNumber.replace(/[^\d+]/g, '');
+    
+    // Если номер не начинается с +, добавляем код России
+    if (!cleanNumber.startsWith('+')) {
+        if (!cleanNumber.startsWith('7') && !cleanNumber.startsWith('8')) {
+            cleanNumber = '+7' + cleanNumber;
+        } else if (cleanNumber.startsWith('8')) {
+            cleanNumber = '+7' + cleanNumber.substring(1);
+        } else if (cleanNumber.startsWith('7')) {
+            cleanNumber = '+' + cleanNumber;
+        }
+    }
+    
+    // Формируем URL для WhatsApp
+    const whatsappUrl = `https://wa.me/${cleanNumber.replace('+', '')}`;
+    
+    // Открываем в новой вкладке
+    window.open(whatsappUrl, '_blank');
+    
+    console.log(`Opening WhatsApp chat: ${whatsappUrl}`);
+}
+
+// Функция для конвертации лида в клиента
+async function convertToClient() {
+    try {
+        const leadId = currentLeadId;
+        if (!leadId) {
+            showNotification('Ошибка: лид не выбран', 'danger');
+            return;
+        }
+
+        // Получаем данные лида
+        const response = await fetch(`/admin/leads/api/${leadId}`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.success || !data.lead) {
+            throw new Error(data.message || 'Лид не найден');
+        }
+
+        const lead = data.lead;
+
+        // Создаем клиента на основе данных лида
+        const clientData = {
+            name: lead.company_name || lead.contact_name || 'Клиент из лида',
+            phone: lead.contact_phone || '',
+            email: lead.contact_email || '',
+            telegram: lead.contact_telegram || '',
+            description: `Клиент создан из лида: ${lead.title}`,
+            source: lead.source || 'lead_conversion',
+            lead_id: leadId
+        };
+
+        // Отправляем запрос на создание клиента
+        const createResponse = await fetch('/admin/clients/api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(clientData),
+            credentials: 'include'
+        });
+
+        if (!createResponse.ok) {
+            const errorData = await createResponse.json();
+            throw new Error(errorData.detail || `HTTP ${createResponse.status}`);
+        }
+
+        const createData = await createResponse.json();
+        if (!createData.success) {
+            throw new Error(createData.message || 'Ошибка создания клиента');
+        }
+
+        showNotification('✅ Клиент успешно создан!', 'success');
+        
+        // Закрываем модальное окно
+        const modal = bootstrap.Modal.getInstance(document.getElementById('viewLeadModal'));
+        if (modal) modal.hide();
+        
+        // Предлагаем перейти к клиентам
+        if (confirm('Клиент создан! Перейти к разделу клиентов?')) {
+            window.location.href = '/admin/clients';
+        }
+
+    } catch (error) {
+        console.error('Convert to client error:', error);
+        showNotification(`Ошибка при создании клиента: ${error.message}`, 'danger');
+    }
+}
+
+// Быстрая конвертация лида в клиента с канбан-доски
+async function convertLeadToClient(leadId) {
+    try {
+        // Получаем данные лида
+        const response = await fetch(`/admin/leads/api/${leadId}`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.success || !data.lead) {
+            throw new Error(data.message || 'Лид не найден');
+        }
+
+        const lead = data.lead;
+
+        // Создаем клиента на основе данных лида
+        const clientData = {
+            name: lead.company_name || lead.contact_name || 'Клиент из лида',
+            phone: lead.contact_phone || '',
+            email: lead.contact_email || '',
+            telegram: lead.contact_telegram || '',
+            description: `Клиент создан из лида: ${lead.title}`,
+            source: lead.source || 'lead_conversion',
+            lead_id: leadId
+        };
+
+        // Отправляем запрос на создание клиента
+        const createResponse = await fetch('/admin/clients/api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(clientData),
+            credentials: 'include'
+        });
+
+        if (!createResponse.ok) {
+            const errorData = await createResponse.json();
+            throw new Error(errorData.detail || `HTTP ${createResponse.status}`);
+        }
+
+        const createData = await createResponse.json();
+        if (!createData.success) {
+            throw new Error(createData.message || 'Ошибка создания клиента');
+        }
+
+        showNotification('✅ Клиент успешно создан!', 'success');
+
+    } catch (error) {
+        console.error('Convert lead to client error:', error);
+        showNotification(`Ошибка при создании клиента: ${error.message}`, 'danger');
+    }
+}
+
+// Быстрая конвертация лида в сделку с канбан-доски
+async function convertLeadToDeal(leadId) {
+    try {
+        if (!confirm('Создать сделку из этого лида?')) {
+            return;
+        }
+
+        // Получаем данные лида
+        const leadResponse = await fetch(`/admin/leads/api/${leadId}`, {
+            method: 'GET',
+            credentials: 'include'
+        });
+
+        if (!leadResponse.ok) {
+            throw new Error(`HTTP ${leadResponse.status}`);
+        }
+
+        const leadData = await leadResponse.json();
+        if (!leadData.success || !leadData.lead) {
+            throw new Error(leadData.message || 'Лид не найден');
+        }
+
+        const lead = leadData.lead;
+
+        // Базовые данные для сделки
+        const dealData = {
+            title: lead.title || 'Сделка из лида',
+            description: lead.description || '',
+            amount: lead.budget || 100000,
+            prepayment_percent: 50,
+            priority: 'normal'
+        };
+
+        // Отправляем запрос на конвертацию
+        const convertResponse = await fetch(`/admin/leads/api/${leadId}/convert`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dealData),
+            credentials: 'include'
+        });
+
+        if (!convertResponse.ok) {
+            const errorData = await convertResponse.json();
+            throw new Error(errorData.detail || `HTTP ${convertResponse.status}`);
+        }
+
+        const convertData = await convertResponse.json();
+        if (!convertData.success) {
+            throw new Error(convertData.message || 'Ошибка конвертации');
+        }
+
+        showNotification('✅ Сделка успешно создана!', 'success');
+        
+        // Обновляем список лидов
+        loadLeads();
+
+    } catch (error) {
+        console.error('Convert lead to deal error:', error);
+        showNotification(`Ошибка при создании сделки: ${error.message}`, 'danger');
+    }
 }
 </script>
 

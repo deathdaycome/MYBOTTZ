@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ...database.database import get_db
 from ...database.models import AdminUser
-from ..auth import get_current_admin_user
+from ..middleware.auth import get_current_admin_user
 from ..navigation import get_navigation_items
 
 router = APIRouter(prefix="/leads", tags=["leads"])

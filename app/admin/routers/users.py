@@ -2,18 +2,22 @@
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from ...database.database import get_db
 from ...database.models import AdminUser
 from ...config.logging import get_logger
 from ...services.auth_service import AuthService
+from ..middleware.auth import get_current_admin_user
+from ...services.rbac_service import RBACService
 
 logger = get_logger(__name__)
 
 router = APIRouter(tags=["admin_users"])
+templates = Jinja2Templates(directory="app/admin/templates")
 
 # Базовая аутентификация
 security = HTTPBasic()
@@ -29,7 +33,46 @@ def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> A
         )
     return user
 
-@router.get("/")
+@router.get("", response_class=HTMLResponse)
+async def users_page(
+    request: Request,
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Страница управления пользователями"""
+    # Проверяем права доступа
+    rbac = RBACService(db)
+    if not rbac.check_permission(current_user, "users.view"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра пользователей")
+    
+    # Получаем элементы навигации
+    from ..app import get_navigation_items
+    navigation_items = get_navigation_items(current_user.get("role", "admin") if isinstance(current_user, dict) else current_user.role)
+    
+    # Получаем список пользователей
+    users = db.query(AdminUser).all()
+    
+    # Статистика
+    stats = {
+        "total": len(users),
+        "owners": len([u for u in users if u.role == "owner"]),
+        "admins": len([u for u in users if u.role == "admin"]), 
+        "executors": len([u for u in users if u.role == "executor"]),
+        "salespeople": len([u for u in users if u.role == "salesperson"])
+    }
+    
+    return templates.TemplateResponse("users.html", {
+        "request": request,
+        "user": current_user,
+        "username": current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+        "password": current_user.get("password", "") if isinstance(current_user, dict) else current_user.password if hasattr(current_user, 'password') else "",
+        "user_role": current_user.get("role", "admin") if isinstance(current_user, dict) else current_user.role,
+        "navigation_items": navigation_items,
+        "users": users,
+        "stats": stats
+    })
+
+@router.get("/api")
 async def get_admin_users():
     """Получить список всех админ-пользователей - временно без аутентификации для отладки"""
     try:
@@ -63,7 +106,7 @@ async def get_executors():
             "executors": []
         }
 
-@router.post("/")
+@router.post("/api/users/create", response_class=JSONResponse)
 async def create_user(
     request: Request,
     current_user: AdminUser = Depends(get_current_user)
@@ -71,10 +114,10 @@ async def create_user(
     """Создать нового пользователя (только для владельца)"""
     try:
         if not current_user.is_owner():
-            return {
-                "success": False,
-                "message": "Только владелец может создавать пользователей"
-            }
+            raise HTTPException(
+                status_code=403,
+                detail="Только владелец может создавать пользователей"
+            )
         
         data = await request.json()
         username = data.get("username")
@@ -85,16 +128,16 @@ async def create_user(
         last_name = data.get("last_name")
         
         if not username or not password:
-            return {
-                "success": False,
-                "message": "Логин и пароль обязательны"
-            }
+            raise HTTPException(
+                status_code=400,
+                detail="Логин и пароль обязательны"
+            )
         
-        if role not in ["owner", "executor"]:
-            return {
-                "success": False,
-                "message": "Недопустимая роль"
-            }
+        if role not in ["owner", "admin", "executor", "salesperson"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Недопустимая роль"
+            )
         
         user = AuthService.create_user(
             username=username,
@@ -106,22 +149,24 @@ async def create_user(
         )
         
         if not user:
-            return {
-                "success": False,
-                "message": "Пользователь с таким логином уже существует"
-            }
+            raise HTTPException(
+                status_code=400,
+                detail="Пользователь с таким логином уже существует"
+            )
         
         return {
             "success": True,
             "message": "Пользователь успешно создан",
             "user": user.to_dict()
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Ошибка создания пользователя: {e}")
-        return {
-            "success": False,
-            "message": f"Ошибка создания пользователя: {str(e)}"
-        }
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка создания пользователя: {str(e)}"
+        )
 
 @router.put("/{user_id}/password")
 async def change_user_password(

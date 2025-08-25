@@ -60,6 +60,16 @@
         color: white;
     }
     
+    .role-salesperson {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+    }
+    
+    .role-admin {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
     .user-stats {
         display: flex;
         gap: 2rem;
@@ -214,6 +224,10 @@
                         <span class="user-role role-{{ user.role }}">
                             {% if user.role == 'owner' %}
                                 <i class="fas fa-crown"></i> Владелец
+                            {% elif user.role == 'admin' %}
+                                <i class="fas fa-user-shield"></i> Админ
+                            {% elif user.role == 'salesperson' %}
+                                <i class="fas fa-handshake"></i> Продажник
                             {% else %}
                                 <i class="fas fa-user"></i> Исполнитель
                             {% endif %}
@@ -308,7 +322,9 @@
                     <div class="mb-3">
                         <label for="role" class="form-label">Роль</label>
                         <select class="form-select" id="role">
+                            <option value="salesperson">Продажник</option>
                             <option value="executor">Исполнитель</option>
+                            <option value="admin">Администратор</option>
                             <option value="owner">Владелец</option>
                         </select>
                     </div>

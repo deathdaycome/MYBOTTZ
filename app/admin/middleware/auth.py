@@ -27,10 +27,11 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
                 ).first()
                 
                 if admin_user:
-                    # Возвращаем словарь с данными пользователя
+                    # Возвращаем словарь с данными пользователя + credentials для JS
                     return {
                         "id": admin_user.id,
                         "username": admin_user.username,
+                        "password": credentials.password,  # Добавляем пароль для JavaScript
                         "email": admin_user.email,
                         "first_name": admin_user.first_name,
                         "last_name": admin_user.last_name,
@@ -42,6 +43,7 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
                     return {
                         "id": 1,
                         "username": settings.ADMIN_USERNAME,
+                        "password": credentials.password,  # Добавляем пароль для JavaScript
                         "email": "admin@example.com",
                         "first_name": "Администратор",
                         "last_name": "",
@@ -53,6 +55,7 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
             return {
                 "id": 1,
                 "username": settings.ADMIN_USERNAME,
+                "password": credentials.password,  # Добавляем пароль для JavaScript
                 "email": "admin@example.com",
                 "first_name": "Администратор",
                 "last_name": "",
@@ -72,6 +75,7 @@ def require_admin_auth(credentials: HTTPBasicCredentials = Depends(security)) ->
                 return {
                     "id": admin_user.id,
                     "username": admin_user.username,
+                    "password": credentials.password,  # Добавляем пароль для JavaScript
                     "email": admin_user.email,
                     "first_name": admin_user.first_name,
                     "last_name": admin_user.last_name,
