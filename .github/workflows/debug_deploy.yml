@@ -2,6 +2,11 @@ name: Debug Deploy with Full Diagnostics
 
 on:
   workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deploy (yes/no)'
+        required: true
+        default: 'no'
 
 jobs:
   debug-deploy:
@@ -84,29 +89,12 @@ jobs:
             
             echo ""
             echo "ПРЯМАЯ ЗАМЕНА ФАЙЛА:"
-            cat > app/admin/templates/avito_messenger.html << 'EOF'
-{% extends "base.html" %}
-{% block title %}Авито Мессенджер - Админ панель{% endblock %}
-{% block content %}
-<!-- 🚨 КРИТИЧЕСКИЙ ТЕСТ: ФАЙЛ ОБНОВЛЁН ПРИНУДИТЕЛЬНО -->
-<div class="alert alert-danger border-3 border-danger mb-4 text-center" style="background: linear-gradient(45deg, #ff4757, #ff6b6b); font-size: 24px; padding: 30px;">
-    <h1>🚨 ЭКСТРЕННЫЙ ТЕСТ 🚨</h1>
-    <h2>ЕСЛИ ВЫ ВИДИТЕ ЭТО - ФАЙЛ НАКОНЕЦ ОБНОВИЛСЯ!</h2>
-    <div class="form-check form-switch d-inline-block">
-        <input class="form-check-input" type="checkbox" id="emergencyToggle" style="transform: scale(3);">
-        <label class="form-check-label text-white fw-bold fs-3 ms-3" for="emergencyToggle">
-            🤖 AI АВТООТВЕТЫ (ЭКСТРЕННЫЙ ТЕСТ)
-        </label>
-    </div>
-</div>
-<script>
-document.getElementById('emergencyToggle').onchange = function() {
-    alert('🎉 ПЕРЕКЛЮЧАТЕЛЬ РАБОТАЕТ! Состояние: ' + (this.checked ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН'));
-}
-alert('🚨 ЭКСТРЕННЫЙ ФАЙЛ ЗАГРУЖЕН! Если видите это сообщение - деплой наконец работает!');
-</script>
-{% endblock %}
-EOF
+            echo "{% extends \"base.html\" %}" > app/admin/templates/avito_messenger.html
+            echo "{% block title %}Авито Мессенджер - Админ панель{% endblock %}" >> app/admin/templates/avito_messenger.html
+            echo "{% block content %}" >> app/admin/templates/avito_messenger.html
+            echo "<!-- 🚨 КРИТИЧЕСКИЙ ТЕСТ: ФАЙЛ ОБНОВЛЁН ПРИНУДИТЕЛЬНО -->" >> app/admin/templates/avito_messenger.html
+            echo "<div class=\"alert alert-danger mb-4\"><h1>🚨 ЭКСТРЕННЫЙ ТЕСТ 🚨</h1></div>" >> app/admin/templates/avito_messenger.html
+            echo "{% endblock %}" >> app/admin/templates/avito_messenger.html
             echo "✅ Файл заменён экстренной версией"
           fi
           
