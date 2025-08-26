@@ -4,146 +4,345 @@
 
 {% block head %}
 <style>
+/* Основные стили */
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.main-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.main-header h1 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+    margin: 0;
+}
+
+/* Красивые кнопки */
+.btn-modern {
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-modern:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-modern:hover:before {
+    left: 100%;
+}
+
+.btn-modern.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-modern.btn-success {
+    background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(86, 171, 47, 0.4);
+}
+
+.btn-modern.btn-outline-primary {
+    background: transparent;
+    border: 2px solid #667eea;
+    color: #667eea;
+}
+
+.btn-modern.btn-outline-primary:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btn-modern.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.875rem;
+}
+
+.btn-modern:hover {
+    transform: translateY(-2px);
+}
+
+/* Навигационные табы */
+.nav-tabs-modern {
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 10px;
+    margin-bottom: 30px;
+}
+
+.nav-tabs-modern .nav-item {
+    margin: 0 5px;
+}
+
+.nav-tabs-modern .nav-link {
+    border: none;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+    padding: 15px 25px;
+    transition: all 0.3s ease;
+    background: transparent;
+}
+
+.nav-tabs-modern .nav-link:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-tabs-modern .nav-link.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Карточки сотрудников */
 .notification-card {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    background: #fff;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    margin-bottom: 30px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.notification-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.5);
 }
 
 .notification-header {
-    background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-    padding: 15px 20px;
-    border-radius: 8px 8px 0 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px 25px;
+    border: none;
 }
 
-.notification-body {
-    padding: 20px;
-}
-
-.role-badge {
-    font-size: 0.8em;
-    padding: 4px 8px;
-    border-radius: 12px;
-}
-
-.role-executor {
-    background-color: #e3f2fd;
-    color: #1976d2;
-}
-
-.role-salesperson,
-.role-sales {
-    background-color: #e8f5e8;
-    color: #2e7d32;
-}
-
-.setting-group {
-    margin-bottom: 25px;
-    padding: 15px;
-    border: 1px solid #e9ecef;
-    border-radius: 6px;
-    background: #fafafa;
-}
-
-.setting-group h6 {
-    margin-bottom: 15px;
-    color: #495057;
+.notification-header h5 {
+    margin: 0;
     font-weight: 600;
 }
 
-.form-check {
-    margin-bottom: 8px;
+.notification-body {
+    padding: 25px;
 }
 
-.test-btn {
-    margin-top: 10px;
+/* Роли */
+.role-badge {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: 600;
+    backdrop-filter: blur(5px);
 }
 
-.time-input {
-    max-width: 120px;
-}
-
-.number-input {
-    max-width: 100px;
-}
-
-.telegram-input {
-    font-family: monospace;
-    background-color: #f8f9fa;
-}
-
-.alert-success {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-    color: #155724;
-}
-
-.alert-danger {
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-    color: #721c24;
-}
-
+/* Статус сотрудника */
 .employee-status {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-top: 10px;
 }
 
 .status-indicator {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
 }
 
 .status-active {
-    background-color: #28a745;
+    background: #28a745;
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
 }
 
 .status-inactive {
-    background-color: #dc3545;
+    background: #dc3545;
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+}
+
+/* Группы настроек */
+.setting-group {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: none;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+}
+
+.setting-group h6 {
+    color: #495057;
+    font-weight: 700;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+/* Формы */
+.form-control, .form-select {
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    padding: 12px 15px;
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    transform: translateY(-1px);
+}
+
+.telegram-input {
+    font-family: 'SF Mono', Monaco, monospace;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+/* Чекбоксы */
+.form-check-input {
+    width: 1.5em;
+    height: 1.5em;
+    border-radius: 6px;
+    border: 2px solid #dee2e6;
+}
+
+.form-check-input:checked {
+    background-color: #667eea;
+    border-color: #667eea;
+}
+
+/* Алерты */
+.alert {
+    border: none;
+    border-radius: 15px;
+    padding: 20px 25px;
+    backdrop-filter: blur(10px);
+}
+
+.alert-info {
+    background: linear-gradient(135deg, rgba(91, 192, 222, 0.2), rgba(91, 192, 222, 0.1));
+    color: #0c5460;
+    border: 1px solid rgba(91, 192, 222, 0.3);
+}
+
+.alert-success {
+    background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(40, 167, 69, 0.1));
+    color: #155724;
+    border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.badge {
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+/* Анимации */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.notification-card {
+    animation: fadeInUp 0.5s ease forwards;
+}
+
+/* Пустое состояние */
+.empty-state {
+    text-align: center;
+    padding: 60px 40px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 20px;
+    opacity: 0.5;
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>{{ page_title }}</h1>
-    <div>
-        <button onclick="processQueue()" class="btn btn-primary">
-            <i class="fas fa-play"></i> Обработать очередь
-        </button>
-        <a href="/admin/notifications/queue" class="btn btn-outline-primary">
-            <i class="fas fa-list"></i> Очередь
-        </a>
-        <a href="/admin/notifications/log" class="btn btn-outline-secondary">
-            <i class="fas fa-history"></i> Лог
-        </a>
-        {% if current_user.role == 'owner' %}
-        <a href="/admin/permissions" class="btn btn-outline-success">
-            <i class="fas fa-shield-alt"></i> Управление правами
-        </a>
-        {% endif %}
+<!-- Главный заголовок -->
+<div class="main-header">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h1>🔔 {{ page_title }}</h1>
+            <p class="mb-0 text-muted">Управление уведомлениями сотрудников в Telegram</p>
+        </div>
+        <div class="d-flex gap-3">
+            <button onclick="processQueue()" class="btn btn-modern btn-primary">
+                <i class="fas fa-play"></i> Обработать очередь
+            </button>
+            {% if current_user.role == 'owner' %}
+            <a href="/admin/permissions" class="btn btn-modern btn-success">
+                <i class="fas fa-shield-alt"></i> Управление правами
+            </a>
+            {% endif %}
+        </div>
     </div>
 </div>
 
-<!-- Навигационные табы -->
-<ul class="nav nav-tabs mb-4">
+<!-- Современные навигационные табы -->
+<ul class="nav nav-tabs-modern">
     <li class="nav-item">
         <a class="nav-link active" href="/admin/notifications/settings">
-            <i class="fas fa-cog"></i> Настройки уведомлений
+            <i class="fas fa-users-cog"></i> Настройки сотрудников
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link" href="/admin/notifications/queue">
-            <i class="fas fa-list"></i> Очередь ({{ stats.pending if stats else 0 }})
+            <i class="fas fa-clock"></i> Очередь 
+            {% if stats and stats.pending > 0 %}
+            <span class="badge bg-warning ms-2">{{ stats.pending }}</span>
+            {% endif %}
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link" href="/admin/notifications/log">
-            <i class="fas fa-history"></i> История
+            <i class="fas fa-history"></i> История уведомлений
         </a>
     </li>
     {% if current_user.role == 'owner' %}
@@ -154,7 +353,7 @@
     </li>
     <li class="nav-item">
         <a class="nav-link" href="/admin/users">
-            <i class="fas fa-users"></i> Пользователи
+            <i class="fas fa-user-friends"></i> Пользователи
         </a>
     </li>
     {% endif %}
@@ -213,13 +412,13 @@
                     </small>
                 </div>
             </div>
-            <div>
-                <button type="button" class="btn btn-sm btn-outline-primary" onclick="testNotification({{ employee.id }})">
-                    <i class="fas fa-paper-plane"></i> Тест
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-modern btn-outline-primary btn-sm" onclick="testNotification({{ employee.id }})">
+                    <i class="fas fa-paper-plane"></i> Тестовое уведомление
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" 
+                <button type="button" class="btn btn-modern btn-primary btn-sm" data-bs-toggle="collapse" 
                         data-bs-target="#settings-{{ employee.id }}">
-                    <i class="fas fa-cog"></i> Настроить
+                    <i class="fas fa-cog"></i> Настроить уведомления
                 </button>
             </div>
         </div>
@@ -430,12 +629,12 @@
                 </div>
             </div>
             
-            <div class="d-flex justify-content-end gap-2">
-                <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" 
+            <div class="d-flex justify-content-end gap-3 mt-4">
+                <button type="button" class="btn btn-modern btn-outline-primary" data-bs-toggle="collapse" 
                         data-bs-target="#settings-{{ employee.id }}">
-                    Отмена
+                    <i class="fas fa-times"></i> Отмена
                 </button>
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-modern btn-success">
                     <i class="fas fa-save"></i> Сохранить настройки
                 </button>
             </div>
@@ -445,13 +644,20 @@
 {% endfor %}
 
 {% if not employees %}
-<div class="text-center py-5">
-    <i class="fas fa-users fa-3x text-muted mb-3"></i>
-    <h4>Нет сотрудников</h4>
-    <p class="text-muted">Сначала добавьте исполнителей и продажников в разделе "Пользователи"</p>
-    <a href="/admin/users" class="btn btn-primary">
-        <i class="fas fa-plus"></i> Управление пользователями
-    </a>
+<div class="empty-state">
+    <i class="fas fa-user-friends"></i>
+    <h3 class="mb-3">Сотрудники не найдены</h3>
+    <p class="mb-4">Добавьте исполнителей и продажников для настройки уведомлений</p>
+    <div class="d-flex gap-3 justify-content-center">
+        <a href="/admin/users" class="btn btn-modern btn-primary">
+            <i class="fas fa-user-plus"></i> Управление пользователями
+        </a>
+        {% if current_user.role == 'owner' %}
+        <a href="/admin/permissions" class="btn btn-modern btn-success">
+            <i class="fas fa-shield-alt"></i> Настройка ролей
+        </a>
+        {% endif %}
+    </div>
 </div>
 {% endif %}
 
