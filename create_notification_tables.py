@@ -108,7 +108,7 @@ def main():
                 -- Метаданные
                 entity_type VARCHAR(50),
                 entity_id VARCHAR(100),
-                metadata TEXT DEFAULT '{}',
+                notification_metadata TEXT DEFAULT '{}',
                 
                 -- Статус обработки
                 status VARCHAR(20) DEFAULT 'pending',

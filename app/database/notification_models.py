@@ -117,7 +117,7 @@ class NotificationQueue(Base):
     # Метаданные
     entity_type = Column(String(50), nullable=True)  # project, lead, deal, avito_chat
     entity_id = Column(String(100), nullable=True)  # ID сущности
-    metadata = Column(JSON, nullable=True)  # Дополнительные данные
+    notification_metadata = Column(JSON, nullable=True)  # Дополнительные данные
     
     # Статус обработки
     status = Column(String(20), default='pending')  # pending, sent, failed, cancelled

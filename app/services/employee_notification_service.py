@@ -113,7 +113,7 @@ class EmployeeNotificationService:
                                 notification_type: str, title: str, message: str,
                                 priority: str = 'normal', entity_type: str = None,
                                 entity_id: str = None, action_url: str = None,
-                                metadata: Dict = None, group_key: str = None,
+                                notification_metadata: Dict = None, group_key: str = None,
                                 admin_user_id: int = None, delay_minutes: int = 0):
         """Создать уведомление в очереди"""
         
@@ -132,7 +132,7 @@ class EmployeeNotificationService:
             action_url=action_url,
             entity_type=entity_type,
             entity_id=str(entity_id) if entity_id else None,
-            metadata=metadata or {},
+            notification_metadata=notification_metadata or {},
             group_key=group_key,
             scheduled_at=scheduled_at
         )
@@ -187,7 +187,7 @@ class EmployeeNotificationService:
             entity_type='project',
             entity_id=str(project_id),
             action_url=action_url,
-            metadata={
+            notification_metadata={
                 'project_title': project.title,
                 'project_cost': project.estimated_cost,
                 'project_hours': project.estimated_hours
@@ -238,7 +238,7 @@ class EmployeeNotificationService:
             entity_type='project',
             entity_id=str(project_id),
             action_url=f"http://147.45.215.199:8001/admin/projects/{project_id}",
-            metadata={
+            notification_metadata={
                 'project_title': project.title,
                 'old_status': old_status,
                 'new_status': new_status
@@ -321,7 +321,7 @@ class EmployeeNotificationService:
                 entity_id=chat_id,
                 action_url=action_url,
                 group_key=f"avito_chat_{chat_id}",
-                metadata={
+                notification_metadata={
                     'chat_id': chat_id,
                     'client_name': client_name,
                     'message_preview': preview_text,
@@ -384,7 +384,7 @@ class EmployeeNotificationService:
                 entity_id=chat_id,
                 action_url=action_url,
                 group_key=f"avito_reminder_{chat_id}",
-                metadata={
+                notification_metadata={
                     'chat_id': chat_id,
                     'client_name': client_name,
                     'unread_count': unread_count,
