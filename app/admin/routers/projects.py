@@ -21,6 +21,7 @@ from ...database.models import (
 from ...config.logging import get_logger
 from ...config.settings import settings
 from ...services.notification_service import NotificationService
+from ...services.employee_notification_service import employee_notification_service
 
 logger = get_logger(__name__)
 notification_service = NotificationService()
@@ -678,6 +679,38 @@ async def update_project(
         db.commit()
         db.refresh(project)
         
+        # Отправляем уведомление исполнителю при изменениях в проекте
+        if project.assigned_executor_id:
+            try:
+                # Уведомление об изменении статуса
+                if "status" in original_values:
+                    await employee_notification_service.notify_project_status_changed(
+                        db=db,
+                        project_id=project.id,
+                        executor_id=project.assigned_executor_id,
+                        project_title=project.title,
+                        old_status=original_values["status"],
+                        new_status=project.status,
+                        comment=project_data.comment if project_data.comment else None
+                    )
+                    logger.info(f"Уведомление об изменении статуса отправлено исполнителю {project.assigned_executor_id}")
+                
+                # Уведомление о назначении исполнителя (если изменился assigned_executor_id)
+                if "assigned_executor_id" in original_values and project.assigned_executor_id != original_values["assigned_executor_id"]:
+                    await employee_notification_service.notify_project_assigned(
+                        db=db,
+                        project_id=project.id,
+                        executor_id=project.assigned_executor_id,
+                        project_title=project.title,
+                        description=project.description,
+                        deadline=project.deadline,
+                        estimated_hours=project.estimated_hours
+                    )
+                    logger.info(f"Уведомление о назначении на проект отправлено исполнителю {project.assigned_executor_id}")
+                    
+            except Exception as e:
+                logger.error(f"Ошибка отправки уведомлений исполнителю: {e}")
+        
         # Отправляем уведомление клиенту (только если изменен статус)
         notification_sent = False
         if "status" in original_values:
@@ -985,6 +1018,22 @@ async def create_project(
         
         db.commit()
         db.refresh(project)
+        
+        # Отправляем уведомление исполнителю о назначении на проект
+        if project.assigned_executor_id:
+            try:
+                await employee_notification_service.notify_project_assigned(
+                    db=db,
+                    project_id=project.id,
+                    executor_id=project.assigned_executor_id,
+                    project_title=project.title,
+                    description=project.description,
+                    deadline=project.deadline,
+                    estimated_hours=project.estimated_hours
+                )
+                logger.info(f"Уведомление о назначении проекта отправлено исполнителю {project.assigned_executor_id}")
+            except Exception as e:
+                logger.error(f"Ошибка отправки уведомления исполнителю: {e}")
         
         # Отправляем уведомление клиенту (если у него есть Telegram ID)
         notification_sent = False

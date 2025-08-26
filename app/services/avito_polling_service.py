@@ -10,6 +10,8 @@ import json
 
 from ..services.avito_service import get_avito_service
 from ..services.notification_service import NotificationService
+from ..services.employee_notification_service import employee_notification_service
+from ..database.models import get_db_context
 from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -161,16 +163,37 @@ class AvitoPollingService:
                 message_text = message_text[:100] + "..."
             
             # Формируем уведомление
-            notification_text = f"""
+            notification_title = f"💬 Новое сообщение от {user_name}"
+            notification_text = f"""Получено новое сообщение в Avito:
+
+👤 От: {user_name}
+💬 Сообщение: {message_text}
+
+🔗 Ответить в админке: http://147.45.215.199:8001/admin/avito/"""
+            
+            # Отправляем уведомление через старый сервис (для владельца)
+            await self.notification_service.send_admin_notification(f"""
 🔔 <b>Новое сообщение Avito</b>
 
 👤 <b>От:</b> {user_name}
 💬 <b>Сообщение:</b> {message_text}
 
 🔗 <a href="http://147.45.215.199:8001/admin/avito/">Открыть чат</a>
-            """
+            """.strip())
             
-            await self.notification_service.send_admin_notification(notification_text.strip())
+            # Отправляем уведомления продажникам через новую систему
+            try:
+                with get_db_context() as db:
+                    await employee_notification_service.notify_avito_new_message(
+                        db=db,
+                        chat_id=str(chat.id),
+                        sender_name=user_name,
+                        message_text=message_text,
+                        chat_url="http://147.45.215.199:8001/admin/avito/"
+                    )
+                    logger.info(f"Уведомления продажникам о новом сообщении отправлены")
+            except Exception as e:
+                logger.error(f"Ошибка отправки уведомлений продажникам: {e}")
             
         except Exception as e:
             logger.error(f"Ошибка отправки Telegram уведомления: {e}")

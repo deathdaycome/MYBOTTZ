@@ -326,6 +326,15 @@ except ImportError as e:
     print(f"⚠️ Не удалось подключить роутер управления правами: {e}")
     permissions_router = None
 
+# Подключаем роутер уведомлений
+try:
+    from .routers.notifications import router as notifications_router
+    admin_router.include_router(notifications_router)
+    print("Роутер уведомлений подключен")
+except ImportError as e:
+    print(f"⚠️ Не удалось подключить роутер уведомлений: {e}")
+    notifications_router = None
+
 # Настройка шаблонов
 templates = Jinja2Templates(directory="app/admin/templates")
 

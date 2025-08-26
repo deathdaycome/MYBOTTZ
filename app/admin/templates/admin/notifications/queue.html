@@ -1,0 +1,418 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ page_title }} - Админка{% endblock %}
+
+{% block head %}
+<style>
+.queue-stats {
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card.pending {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+}
+
+.stat-card.sent {
+    background: linear-gradient(135deg, #55a3ff 0%, #003d82 100%);
+}
+
+.stat-card.failed {
+    background: linear-gradient(135deg, #ff7675 0%, #d63031 100%);
+}
+
+.stat-card.cancelled {
+    background: linear-gradient(135deg, #a29bfe 0%, #6c5ce7 100%);
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.queue-table {
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.status-pending {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-sent {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.status-failed {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-cancelled {
+    background-color: #e2e3e5;
+    color: #383d41;
+}
+
+.priority-high {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.priority-normal {
+    color: #6c757d;
+}
+
+.priority-low {
+    color: #28a745;
+}
+
+.notification-content {
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.filters {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.btn-refresh {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>{{ page_title }}</h1>
+    <div>
+        <button onclick="refreshQueue()" class="btn btn-outline-primary">
+            <i class="fas fa-sync-alt"></i> Обновить
+        </button>
+        <button onclick="processQueue()" class="btn btn-primary">
+            <i class="fas fa-play"></i> Обработать
+        </button>
+        <a href="/admin/notifications/settings" class="btn btn-outline-secondary">
+            <i class="fas fa-cog"></i> Настройки
+        </a>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="queue-stats">
+    <div class="row">
+        <div class="col-md-3">
+            <div class="stat-card pending">
+                <div class="stat-number">{{ stats.pending }}</div>
+                <div class="stat-label">В очереди</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card sent">
+                <div class="stat-number">{{ stats.sent }}</div>
+                <div class="stat-label">Отправлено</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card failed">
+                <div class="stat-number">{{ stats.failed }}</div>
+                <div class="stat-label">Ошибки</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card cancelled">
+                <div class="stat-number">{{ stats.cancelled }}</div>
+                <div class="stat-label">Отменено</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="filters">
+    <form method="GET" class="d-flex gap-3 align-items-end">
+        <div>
+            <label for="status" class="form-label">Статус</label>
+            <select name="status" id="status" class="form-select">
+                <option value="">Все статусы</option>
+                <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>В очереди</option>
+                <option value="sent" {% if status_filter == 'sent' %}selected{% endif %}>Отправлено</option>
+                <option value="failed" {% if status_filter == 'failed' %}selected{% endif %}>Ошибка</option>
+                <option value="cancelled" {% if status_filter == 'cancelled' %}selected{% endif %}>Отменено</option>
+            </select>
+        </div>
+        <div>
+            <label for="notification_type" class="form-label">Тип</label>
+            <select name="notification_type" id="notification_type" class="form-select">
+                <option value="">Все типы</option>
+                <option value="avito_new_message" {% if type_filter == 'avito_new_message' %}selected{% endif %}>Новое сообщение Avito</option>
+                <option value="avito_unread_reminder" {% if type_filter == 'avito_unread_reminder' %}selected{% endif %}>Напоминание Avito</option>
+                <option value="project_assigned" {% if type_filter == 'project_assigned' %}selected{% endif %}>Назначение проекта</option>
+                <option value="lead_assigned" {% if type_filter == 'lead_assigned' %}selected{% endif %}>Назначение лида</option>
+                <option value="test" {% if type_filter == 'test' %}selected{% endif %}>Тестовое</option>
+            </select>
+        </div>
+        <div>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Применить
+            </button>
+            <a href="/admin/notifications/queue" class="btn btn-outline-secondary">
+                <i class="fas fa-times"></i> Сбросить
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- Таблица уведомлений -->
+<div class="queue-table">
+    <table class="table table-hover mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>ID</th>
+                <th>Получатель</th>
+                <th>Тип</th>
+                <th>Приоритет</th>
+                <th>Заголовок</th>
+                <th>Запланировано</th>
+                <th>Статус</th>
+                <th>Попытки</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for notification in notifications %}
+            <tr>
+                <td>
+                    <span class="fw-bold">#{{ notification.id }}</span>
+                </td>
+                <td>
+                    <small class="text-muted">TG:</small> {{ notification.telegram_user_id }}
+                </td>
+                <td>
+                    <span class="badge bg-info">
+                        {% if notification.notification_type == 'avito_new_message' %}
+                            Avito сообщение
+                        {% elif notification.notification_type == 'avito_unread_reminder' %}
+                            Напоминание Avito
+                        {% elif notification.notification_type == 'project_assigned' %}
+                            Назначение проекта
+                        {% elif notification.notification_type == 'lead_assigned' %}
+                            Назначение лида
+                        {% elif notification.notification_type == 'test' %}
+                            Тестовое
+                        {% else %}
+                            {{ notification.notification_type }}
+                        {% endif %}
+                    </span>
+                </td>
+                <td>
+                    <span class="priority-{{ notification.priority }}">
+                        {% if notification.priority == 'high' %}🔴 Высокий
+                        {% elif notification.priority == 'normal' %}🟡 Обычный
+                        {% else %}🟢 Низкий{% endif %}
+                    </span>
+                </td>
+                <td>
+                    <div class="notification-content" title="{{ notification.title }}">
+                        {{ notification.title }}
+                    </div>
+                </td>
+                <td>
+                    <small>{{ notification.scheduled_at.strftime('%d.%m %H:%M') if notification.scheduled_at else '-' }}</small>
+                </td>
+                <td>
+                    <span class="status-badge status-{{ notification.status }}">
+                        {% if notification.status == 'pending' %}В очереди
+                        {% elif notification.status == 'sent' %}Отправлено
+                        {% elif notification.status == 'failed' %}Ошибка
+                        {% else %}{{ notification.status }}{% endif %}
+                    </span>
+                </td>
+                <td>
+                    {% if notification.retry_count > 0 %}
+                        <span class="text-warning">{{ notification.retry_count }}/{{ notification.max_retries }}</span>
+                    {% else %}
+                        <span class="text-muted">0/{{ notification.max_retries }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="btn-group btn-group-sm">
+                        {% if notification.status == 'pending' %}
+                        <button onclick="cancelNotification({{ notification.id }})" 
+                                class="btn btn-outline-danger btn-sm" title="Отменить">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        {% endif %}
+                        {% if notification.status == 'failed' %}
+                        <button onclick="retryNotification({{ notification.id }})" 
+                                class="btn btn-outline-warning btn-sm" title="Повторить">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                        {% endif %}
+                        <button onclick="viewNotification({{ notification.id }})" 
+                                class="btn btn-outline-info btn-sm" title="Просмотр">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            
+            {% if not notifications %}
+            <tr>
+                <td colspan="9" class="text-center py-5 text-muted">
+                    <i class="fas fa-inbox fa-2x mb-3"></i>
+                    <br>
+                    Очередь уведомлений пуста
+                </td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Пагинация -->
+{% if pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        {% if page > 1 %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page - 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&notification_type={{ type_filter }}{% endif %}">Назад</a>
+        </li>
+        {% endif %}
+        
+        {% for p in range(1, pages + 1) %}
+        <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="?page={{ p }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&notification_type={{ type_filter }}{% endif %}">{{ p }}</a>
+        </li>
+        {% endfor %}
+        
+        {% if page < pages %}
+        <li class="page-item">
+            <a class="page-link" href="?page={{ page + 1 }}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if type_filter %}&notification_type={{ type_filter }}{% endif %}">Далее</a>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+
+<!-- Модальное окно просмотра уведомления -->
+<div class="modal fade" id="notificationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Просмотр уведомления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="notificationContent">
+                <!-- Контент загружается через JS -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function refreshQueue() {
+    const btn = event.target;
+    const icon = btn.querySelector('i');
+    
+    icon.classList.add('btn-refresh');
+    
+    setTimeout(() => {
+        window.location.reload();
+    }, 1000);
+}
+
+async function processQueue() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обработка...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/admin/notifications/process-queue', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', 'Очередь обработана успешно!');
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            showAlert('danger', 'Ошибка: ' + result.error);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка обработки: ' + error.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+function viewNotification(id) {
+    // Здесь можно добавить загрузку детальной информации об уведомлении
+    const modal = new bootstrap.Modal(document.getElementById('notificationModal'));
+    document.getElementById('notificationContent').innerHTML = `
+        <p>Загрузка информации об уведомлении #${id}...</p>
+    `;
+    modal.show();
+}
+
+function showAlert(type, message) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x" 
+             style="z-index: 9999; margin-top: 20px;" role="alert">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
+    
+    setTimeout(() => {
+        const alert = document.querySelector('.alert');
+        if (alert) alert.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

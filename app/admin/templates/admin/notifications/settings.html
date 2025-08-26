@@ -1,0 +1,486 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ page_title }} - Админка{% endblock %}
+
+{% block head %}
+<style>
+.notification-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    background: #fff;
+}
+
+.notification-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 15px 20px;
+    border-radius: 8px 8px 0 0;
+}
+
+.notification-body {
+    padding: 20px;
+}
+
+.role-badge {
+    font-size: 0.8em;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.role-executor {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.role-salesperson {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+}
+
+.setting-group {
+    margin-bottom: 25px;
+    padding: 15px;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background: #fafafa;
+}
+
+.setting-group h6 {
+    margin-bottom: 15px;
+    color: #495057;
+    font-weight: 600;
+}
+
+.form-check {
+    margin-bottom: 8px;
+}
+
+.test-btn {
+    margin-top: 10px;
+}
+
+.time-input {
+    max-width: 120px;
+}
+
+.number-input {
+    max-width: 100px;
+}
+
+.telegram-input {
+    font-family: monospace;
+    background-color: #f8f9fa;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.employee-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.status-active {
+    background-color: #28a745;
+}
+
+.status-inactive {
+    background-color: #dc3545;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>{{ page_title }}</h1>
+    <div>
+        <button onclick="processQueue()" class="btn btn-primary">
+            <i class="fas fa-play"></i> Обработать очередь
+        </button>
+        <a href="/admin/notifications/queue" class="btn btn-outline-primary">
+            <i class="fas fa-list"></i> Очередь
+        </a>
+        <a href="/admin/notifications/log" class="btn btn-outline-secondary">
+            <i class="fas fa-history"></i> Лог
+        </a>
+    </div>
+</div>
+
+<!-- Уведомления -->
+{% if request.query_params.get('success') %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="fas fa-check-circle"></i> Настройки уведомлений успешно сохранены!
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if request.query_params.get('error') %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <i class="fas fa-exclamation-circle"></i> Ошибка: {{ request.query_params.get('error') }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Карточки сотрудников -->
+{% for employee in employees %}
+{% set settings = employee_settings.get(employee.id) %}
+<div class="notification-card">
+    <div class="notification-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h5 class="mb-1">
+                    {{ employee.full_name or employee.username }}
+                    <span class="role-badge role-{{ employee.role }}">
+                        {% if employee.role == 'executor' %}Исполнитель{% elif employee.role == 'salesperson' %}Продажник{% endif %}
+                    </span>
+                </h5>
+                <div class="employee-status">
+                    <div class="status-indicator {% if settings and settings.notifications_enabled %}status-active{% else %}status-inactive{% endif %}"></div>
+                    <small class="text-muted">
+                        {% if settings and settings.notifications_enabled %}
+                            Уведомления включены
+                        {% else %}
+                            Уведомления отключены
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-primary" onclick="testNotification({{ employee.id }})">
+                    <i class="fas fa-paper-plane"></i> Тест
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" 
+                        data-bs-target="#settings-{{ employee.id }}">
+                    <i class="fas fa-cog"></i> Настроить
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="collapse notification-body" id="settings-{{ employee.id }}">
+        <form method="POST" action="/admin/notifications/settings/{{ employee.id }}">
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Основные настройки -->
+                    <div class="setting-group">
+                        <h6><i class="fas fa-cog"></i> Основные настройки</h6>
+                        
+                        <div class="mb-3">
+                            <label for="telegram_user_id_{{ employee.id }}" class="form-label">Telegram ID</label>
+                            <input type="text" class="form-control telegram-input" 
+                                   id="telegram_user_id_{{ employee.id }}" name="telegram_user_id"
+                                   value="{{ settings.telegram_user_id if settings else '' }}" 
+                                   placeholder="Например: 123456789" required>
+                            <small class="form-text text-muted">ID пользователя в Telegram для отправки уведомлений</small>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="notifications_enabled" 
+                                   id="notifications_enabled_{{ employee.id }}"
+                                   {% if settings and settings.notifications_enabled %}checked{% endif %}>
+                            <label class="form-check-label" for="notifications_enabled_{{ employee.id }}">
+                                <strong>Включить уведомления</strong>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Рабочее время -->
+                    <div class="setting-group">
+                        <h6><i class="fas fa-clock"></i> Рабочее время</h6>
+                        
+                        <div class="row">
+                            <div class="col-6">
+                                <label for="work_hours_start_{{ employee.id }}" class="form-label">С</label>
+                                <input type="time" class="form-control time-input" 
+                                       id="work_hours_start_{{ employee.id }}" name="work_hours_start"
+                                       value="{{ settings.work_hours_start if settings else '09:00' }}">
+                            </div>
+                            <div class="col-6">
+                                <label for="work_hours_end_{{ employee.id }}" class="form-label">До</label>
+                                <input type="time" class="form-control time-input" 
+                                       id="work_hours_end_{{ employee.id }}" name="work_hours_end"
+                                       value="{{ settings.work_hours_end if settings else '18:00' }}">
+                            </div>
+                        </div>
+                        
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="weekend_notifications" 
+                                   id="weekend_notifications_{{ employee.id }}"
+                                   {% if settings and settings.weekend_notifications %}checked{% endif %}>
+                            <label class="form-check-label" for="weekend_notifications_{{ employee.id }}">
+                                Уведомления в выходные
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="urgent_notifications_always" 
+                                   id="urgent_notifications_always_{{ employee.id }}"
+                                   {% if not settings or settings.urgent_notifications_always %}checked{% endif %}>
+                            <label class="form-check-label" for="urgent_notifications_always_{{ employee.id }}">
+                                Срочные уведомления всегда
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    {% if employee.role == 'executor' %}
+                    <!-- Настройки для исполнителей -->
+                    <div class="setting-group">
+                        <h6><i class="fas fa-tasks"></i> Проекты</h6>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="project_assigned" 
+                                   id="project_assigned_{{ employee.id }}"
+                                   {% if not settings or settings.project_assigned %}checked{% endif %}>
+                            <label class="form-check-label" for="project_assigned_{{ employee.id }}">
+                                Назначение на проект
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="project_status_changed" 
+                                   id="project_status_changed_{{ employee.id }}"
+                                   {% if not settings or settings.project_status_changed %}checked{% endif %}>
+                            <label class="form-check-label" for="project_status_changed_{{ employee.id }}">
+                                Изменение статуса проекта
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="project_deadline_reminder" 
+                                   id="project_deadline_reminder_{{ employee.id }}"
+                                   {% if not settings or settings.project_deadline_reminder %}checked{% endif %}>
+                            <label class="form-check-label" for="project_deadline_reminder_{{ employee.id }}">
+                                Напоминания о дедлайнах
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="project_overdue" 
+                                   id="project_overdue_{{ employee.id }}"
+                                   {% if not settings or settings.project_overdue %}checked{% endif %}>
+                            <label class="form-check-label" for="project_overdue_{{ employee.id }}">
+                                Просрочка проекта
+                            </label>
+                        </div>
+                        
+                        <div class="mt-2">
+                            <label for="project_reminder_interval_{{ employee.id }}" class="form-label">
+                                Интервал напоминаний (мин)
+                            </label>
+                            <input type="number" class="form-control number-input" min="10" max="1440"
+                                   id="project_reminder_interval_{{ employee.id }}" name="project_reminder_interval"
+                                   value="{{ settings.project_reminder_interval if settings else 120 }}">
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if employee.role == 'salesperson' %}
+                    <!-- Настройки для продажников -->
+                    <div class="setting-group">
+                        <h6><i class="fab fa-avianex"></i> Avito</h6>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="avito_new_message" 
+                                   id="avito_new_message_{{ employee.id }}"
+                                   {% if not settings or settings.avito_new_message %}checked{% endif %}>
+                            <label class="form-check-label" for="avito_new_message_{{ employee.id }}">
+                                <strong>Новые сообщения Avito</strong>
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="avito_unread_reminder" 
+                                   id="avito_unread_reminder_{{ employee.id }}"
+                                   {% if not settings or settings.avito_unread_reminder %}checked{% endif %}>
+                            <label class="form-check-label" for="avito_unread_reminder_{{ employee.id }}">
+                                <strong>Напоминания о неотвеченных</strong>
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="avito_urgent_message" 
+                                   id="avito_urgent_message_{{ employee.id }}"
+                                   {% if not settings or settings.avito_urgent_message %}checked{% endif %}>
+                            <label class="form-check-label" for="avito_urgent_message_{{ employee.id }}">
+                                Срочные сообщения
+                            </label>
+                        </div>
+                        
+                        <div class="mt-2">
+                            <label for="avito_reminder_interval_{{ employee.id }}" class="form-label">
+                                Интервал напоминаний (мин)
+                            </label>
+                            <input type="number" class="form-control number-input" min="5" max="120"
+                                   id="avito_reminder_interval_{{ employee.id }}" name="avito_reminder_interval"
+                                   value="{{ settings.avito_reminder_interval if settings else 30 }}">
+                        </div>
+                    </div>
+
+                    <!-- CRM уведомления -->
+                    <div class="setting-group">
+                        <h6><i class="fas fa-users"></i> CRM</h6>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="lead_assigned" 
+                                   id="lead_assigned_{{ employee.id }}"
+                                   {% if not settings or settings.lead_assigned %}checked{% endif %}>
+                            <label class="form-check-label" for="lead_assigned_{{ employee.id }}">
+                                Назначение лида
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="lead_status_changed" 
+                                   id="lead_status_changed_{{ employee.id }}"
+                                   {% if not settings or settings.lead_status_changed %}checked{% endif %}>
+                            <label class="form-check-label" for="lead_status_changed_{{ employee.id }}">
+                                Изменение статуса лида
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="deal_assigned" 
+                                   id="deal_assigned_{{ employee.id }}"
+                                   {% if not settings or settings.deal_assigned %}checked{% endif %}>
+                            <label class="form-check-label" for="deal_assigned_{{ employee.id }}">
+                                Назначение сделки
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="deal_status_changed" 
+                                   id="deal_status_changed_{{ employee.id }}"
+                                   {% if not settings or settings.deal_status_changed %}checked{% endif %}>
+                            <label class="form-check-label" for="deal_status_changed_{{ employee.id }}">
+                                Изменение статуса сделки
+                            </label>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-secondary" data-bs-toggle="collapse" 
+                        data-bs-target="#settings-{{ employee.id }}">
+                    Отмена
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Сохранить настройки
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endfor %}
+
+{% if not employees %}
+<div class="text-center py-5">
+    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+    <h4>Нет сотрудников</h4>
+    <p class="text-muted">Сначала добавьте исполнителей и продажников в разделе "Пользователи"</p>
+    <a href="/admin/users" class="btn btn-primary">
+        <i class="fas fa-plus"></i> Управление пользователями
+    </a>
+</div>
+{% endif %}
+
+<script>
+async function testNotification(employeeId) {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch(`/admin/notifications/test/${employeeId}`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', 'Тестовое уведомление отправлено!');
+        } else {
+            showAlert('danger', 'Ошибка: ' + result.error);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка отправки: ' + error.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+async function processQueue() {
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Обработка...';
+    btn.disabled = true;
+    
+    try {
+        const response = await fetch('/admin/notifications/process-queue', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', 'Очередь уведомлений обработана!');
+        } else {
+            showAlert('danger', 'Ошибка: ' + result.error);
+        }
+    } catch (error) {
+        showAlert('danger', 'Ошибка обработки: ' + error.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+function showAlert(type, message) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'}"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('.container-fluid');
+    const existingAlert = container.querySelector('.alert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+    
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}
