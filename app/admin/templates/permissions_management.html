@@ -4,50 +4,180 @@
 
 {% block extra_head %}
 <style>
-    .permissions-container {
-        max-width: 1400px;
-        margin: 0 auto;
-    }
-    
-    .user-list {
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
-    
-    .user-item {
-        padding: 15px 20px;
-        border-bottom: 1px solid #eee;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-    
-    .user-item:hover {
-        background-color: #f8f9fa;
-    }
-    
-    .user-item.active {
-        background-color: #e3f2fd;
-        border-left: 4px solid #2196F3;
-    }
-    
-    .user-info h5 {
-        margin: 0 0 5px 0;
-        color: #333;
-    }
-    
-    .user-info small {
-        color: #666;
-    }
-    
-    .role-badge {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 500;
-        text-transform: uppercase;
+/* Основные стили в стиле glassmorphism */
+body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+}
+
+.permissions-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Главный заголовок */
+.main-header {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 25px;
+    margin-bottom: 30px;
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.main-header h1 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-weight: 700;
+    margin: 0;
+}
+
+/* Современные навигационные табы */
+.nav-tabs-modern {
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 10px;
+    margin-bottom: 30px;
+}
+
+.nav-tabs-modern .nav-item {
+    margin: 0 5px;
+}
+
+.nav-tabs-modern .nav-link {
+    border: none;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 600;
+    padding: 15px 25px;
+    transition: all 0.3s ease;
+    background: transparent;
+}
+
+.nav-tabs-modern .nav-link:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.nav-tabs-modern .nav-link.active {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Стильные кнопки */
+.btn-modern {
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    border: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-modern:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-modern:hover:before {
+    left: 100%;
+}
+
+.btn-modern:hover {
+    transform: translateY(-2px);
+}
+
+.btn-modern.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-modern.btn-success {
+    background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(86, 171, 47, 0.4);
+}
+
+.btn-modern.btn-outline-primary {
+    background: transparent;
+    border: 2px solid #667eea;
+    color: #667eea;
+}
+
+.btn-modern.btn-outline-primary:hover {
+    background: #667eea;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* Карточки пользователей */
+.user-list {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    margin-bottom: 30px;
+    overflow: hidden;
+}
+
+.user-item {
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.user-item:hover {
+    background: rgba(102, 126, 234, 0.1);
+    transform: translateX(5px);
+}
+
+.user-item.active {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+    border-left: 4px solid #667eea;
+    box-shadow: inset 0 0 20px rgba(102, 126, 234, 0.1);
+}
+
+.user-info h5 {
+    margin: 0 0 8px 0;
+    color: #333;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.user-info small {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+/* Роли */
+.role-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
     }
     
     .role-badge.owner { background-color: #ff5722; color: white; }
@@ -55,37 +185,56 @@
     .role-badge.executor { background-color: #2196f3; color: white; }
     
     .permissions-panel {
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        padding: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        padding: 30px;
         min-height: 600px;
+        transition: all 0.3s ease;
     }
     
     .module-card {
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        transition: all 0.2s;
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 15px;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .module-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
     }
     
     .module-card.enabled {
-        border-color: #4caf50;
-        box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);
+        border-color: rgba(76, 175, 80, 0.4);
+        box-shadow: 0 8px 25px rgba(76, 175, 80, 0.2);
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.1), rgba(255, 255, 255, 0.9));
     }
     
     .module-header {
-        padding: 15px 20px;
-        background: #f8f9fa;
-        border-bottom: 1px solid #ddd;
+        padding: 20px 25px;
+        background: linear-gradient(135deg, rgba(248, 249, 250, 0.8), rgba(233, 236, 239, 0.8));
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 15px 15px 0 0;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        transition: all 0.3s ease;
+    }
+    
+    .module-header:hover {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
     }
     
     .module-card.enabled .module-header {
-        background: #f1f8e9;
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(168, 230, 207, 0.2));
+        border-bottom-color: rgba(76, 175, 80, 0.2);
     }
     
     .module-title {
@@ -107,12 +256,27 @@
     }
     
     .module-body {
-        padding: 20px;
+        padding: 25px;
         display: none;
+        background: rgba(255, 255, 255, 0.5);
+        backdrop-filter: blur(5px);
+        border-radius: 0 0 15px 15px;
     }
     
     .module-card.expanded .module-body {
         display: block;
+        animation: fadeInDown 0.3s ease;
+    }
+    
+    @keyframes fadeInDown {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
     
     .permissions-grid {
@@ -123,9 +287,12 @@
     }
     
     .permissions-section {
-        border: 1px solid #e0e0e0;
-        border-radius: 6px;
-        padding: 15px;
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(224, 224, 224, 0.3);
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
     }
     
     .permissions-section h6 {
@@ -138,11 +305,35 @@
     .permission-item {
         display: flex;
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+    }
+    
+    .permission-item:hover {
+        background: rgba(102, 126, 234, 0.05);
+        transform: translateX(2px);
     }
     
     .permission-switch {
-        margin-right: 10px;
+        margin-right: 12px;
+        width: 18px;
+        height: 18px;
+        border-radius: 4px;
+        border: 2px solid #dee2e6;
+        transition: all 0.3s ease;
+    }
+    
+    .permission-switch:checked {
+        background-color: #667eea;
+        border-color: #667eea;
+        box-shadow: 0 0 10px rgba(102, 126, 234, 0.4);
+    }
+    
+    .permission-switch:hover {
+        border-color: #667eea;
+        transform: scale(1.05);
     }
     
     .data-access-controls {
@@ -156,64 +347,145 @@
     }
     
     .access-type-btn {
-        padding: 6px 12px;
-        border: 1px solid #ddd;
-        background: white;
-        border-radius: 4px;
+        padding: 8px 16px;
+        border: 1px solid rgba(221, 221, 221, 0.5);
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(5px);
+        border-radius: 20px;
         cursor: pointer;
         font-size: 12px;
-        transition: all 0.2s;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .access-type-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
     
     .access-type-btn.active {
-        background: #2196f3;
+        background: linear-gradient(135deg, #2196f3 0%, #21cbf3 100%);
         color: white;
-        border-color: #2196f3;
+        border-color: rgba(33, 150, 243, 0.5);
+        box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
     }
     
     .template-buttons {
-        margin-bottom: 20px;
+        margin-bottom: 25px;
     }
     
     .btn-template {
-        margin-right: 10px;
-        font-size: 12px;
-        padding: 6px 12px;
+        margin-right: 12px;
+        font-size: 13px;
+        padding: 10px 20px;
+        border-radius: 25px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .btn-template:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+    
+    .btn-template:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+    }
+    
+    .btn-template:hover:before {
+        left: 100%;
     }
     
     .save-button {
         position: sticky;
         bottom: 20px;
         width: 100%;
-        padding: 12px;
-        background: #4caf50;
+        padding: 15px 20px;
+        background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
         color: white;
         border: none;
-        border-radius: 6px;
+        border-radius: 50px;
         font-size: 16px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .save-button:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
     }
     
     .save-button:hover {
-        background: #45a049;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(76, 175, 80, 0.6);
+    }
+    
+    .save-button:hover:before {
+        left: 100%;
     }
     
     .save-button:disabled {
-        background: #ccc;
+        background: linear-gradient(135deg, #ccc 0%, #999 100%);
         cursor: not-allowed;
+        transform: none;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     }
     
     .loading {
         text-align: center;
-        padding: 40px;
-        color: #666;
+        padding: 50px 40px;
+        color: #6c757d;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(5px);
+        border-radius: 15px;
+    }
+    
+    .loading .spinner-border {
+        width: 3rem;
+        height: 3rem;
+        border-width: 0.3rem;
     }
     
     .no-user-selected {
         text-align: center;
-        padding: 60px 20px;
-        color: #999;
+        padding: 80px 40px;
+        color: #6c757d;
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(5px);
+        border-radius: 15px;
+        border: 2px dashed rgba(108, 117, 125, 0.3);
+    }
+    
+    .no-user-selected h4 {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: 700;
+        margin-bottom: 15px;
     }
     
     .module-icons {
@@ -246,12 +518,52 @@
 
 {% block content %}
 <div class="permissions-container">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>🔐 Управление правами доступа</h2>
-        <div>
-            <small class="text-muted">Настройка детальных прав для исполнителей и продажников</small>
+    <!-- Главный заголовок -->
+    <div class="main-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1>🛡️ Управление правами доступа</h1>
+                <p class="mb-0 text-muted">Настройка детальных прав для исполнителей и продажников</p>
+            </div>
+            <div class="d-flex gap-3">
+                <a href="/admin/notifications/settings" class="btn btn-modern btn-primary">
+                    <i class="fas fa-bell"></i> Настройки уведомлений
+                </a>
+                <a href="/admin/users" class="btn btn-modern btn-success">
+                    <i class="fas fa-user-friends"></i> Управление пользователями
+                </a>
+            </div>
         </div>
     </div>
+
+    <!-- Современные навигационные табы -->
+    <ul class="nav nav-tabs-modern">
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/notifications/settings">
+                <i class="fas fa-users-cog"></i> Настройки уведомлений
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link active" href="/admin/permissions">
+                <i class="fas fa-shield-alt"></i> Права доступа
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/users">
+                <i class="fas fa-user-friends"></i> Пользователи
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/notifications/queue">
+                <i class="fas fa-clock"></i> Очередь уведомлений
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="/admin/notifications/log">
+                <i class="fas fa-history"></i> История
+            </a>
+        </li>
+    </ul>
     
     <div class="row">
         <!-- Список пользователей -->
@@ -697,12 +1009,12 @@ function showNotification(message, type) {
 </script>
 
 <style>
-/* Переключатели */
+/* Современные переключатели */
 .switch {
     position: relative;
     display: inline-block;
-    width: 50px;
-    height: 24px;
+    width: 60px;
+    height: 30px;
 }
 
 .switch input {
@@ -718,35 +1030,47 @@ function showNotification(message, type) {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #ccc;
-    transition: .4s;
+    background: linear-gradient(135deg, #ddd 0%, #ccc 100%);
+    transition: all 0.4s ease;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .slider:before {
     position: absolute;
     content: "";
-    height: 18px;
-    width: 18px;
+    height: 24px;
+    width: 24px;
     left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: .4s;
+    top: 3px;
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+    transition: all 0.4s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 input:checked + .slider {
-    background-color: #4CAF50;
+    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.4);
 }
 
 input:checked + .slider:before {
-    transform: translateX(24px);
+    transform: translateX(30px);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 .slider.round {
-    border-radius: 24px;
+    border-radius: 30px;
 }
 
 .slider.round:before {
     border-radius: 50%;
+}
+
+.switch:hover .slider {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.15), 0 0 15px rgba(0, 0, 0, 0.1);
+}
+
+input:checked + .slider:hover {
+    box-shadow: 0 0 25px rgba(76, 175, 80, 0.6);
 }
 </style>
 {% endblock %}
