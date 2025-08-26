@@ -29,6 +29,7 @@ def get_navigation_items(role_or_path=None, db=None, user_role=None) -> list:
         {"name": "Документы", "url": "/admin/documents", "icon": "fas fa-file-alt", "roles": ["owner", "admin"]},
         {"name": "Финансы", "url": "/admin/finance", "icon": "fas fa-chart-bar", "roles": ["owner", "admin"]},
         {"name": "Пользователи", "url": "/admin/users", "icon": "fas fa-users", "roles": ["owner", "admin"]},
+        {"name": "Управление правами", "url": "/admin/permissions", "icon": "fas fa-shield-alt", "roles": ["owner"]},
         {"name": "Исполнители", "url": "/admin/contractors", "icon": "fas fa-user-tie", "roles": ["owner", "admin"]},
         {"name": "Сервисы", "url": "/admin/services", "icon": "fas fa-server", "roles": ["owner", "admin"]},
         {"name": "Аналитика", "url": "/admin/analytics", "icon": "fas fa-chart-area", "roles": ["owner", "admin"]},

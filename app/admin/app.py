@@ -317,6 +317,15 @@ if avito_router:
 if avito_oauth_router:
     admin_router.include_router(avito_oauth_router)
 
+# Подключаем роутер управления правами
+try:
+    from .routers.permissions_management import router as permissions_router
+    admin_router.include_router(permissions_router)
+    print("Роутер управления правами подключен")
+except ImportError as e:
+    print(f"⚠️ Не удалось подключить роутер управления правами: {e}")
+    permissions_router = None
+
 # Настройка шаблонов
 templates = Jinja2Templates(directory="app/admin/templates")
 

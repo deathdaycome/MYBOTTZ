@@ -1,0 +1,752 @@
+{% extends "base.html" %}
+
+{% block title %}Управление правами доступа{% endblock %}
+
+{% block extra_head %}
+<style>
+    .permissions-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .user-list {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+    
+    .user-item {
+        padding: 15px 20px;
+        border-bottom: 1px solid #eee;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .user-item:hover {
+        background-color: #f8f9fa;
+    }
+    
+    .user-item.active {
+        background-color: #e3f2fd;
+        border-left: 4px solid #2196F3;
+    }
+    
+    .user-info h5 {
+        margin: 0 0 5px 0;
+        color: #333;
+    }
+    
+    .user-info small {
+        color: #666;
+    }
+    
+    .role-badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+    }
+    
+    .role-badge.owner { background-color: #ff5722; color: white; }
+    .role-badge.salesperson { background-color: #4caf50; color: white; }
+    .role-badge.executor { background-color: #2196f3; color: white; }
+    
+    .permissions-panel {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 20px;
+        min-height: 600px;
+    }
+    
+    .module-card {
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        transition: all 0.2s;
+    }
+    
+    .module-card.enabled {
+        border-color: #4caf50;
+        box-shadow: 0 2px 8px rgba(76, 175, 80, 0.1);
+    }
+    
+    .module-header {
+        padding: 15px 20px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #ddd;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .module-card.enabled .module-header {
+        background: #f1f8e9;
+    }
+    
+    .module-title {
+        display: flex;
+        align-items: center;
+        margin: 0;
+    }
+    
+    .module-icon {
+        width: 20px;
+        height: 20px;
+        margin-right: 10px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: white;
+    }
+    
+    .module-body {
+        padding: 20px;
+        display: none;
+    }
+    
+    .module-card.expanded .module-body {
+        display: block;
+    }
+    
+    .permissions-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-top: 15px;
+    }
+    
+    .permissions-section {
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 15px;
+    }
+    
+    .permissions-section h6 {
+        margin: 0 0 15px 0;
+        color: #333;
+        font-size: 14px;
+        font-weight: 600;
+    }
+    
+    .permission-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .permission-switch {
+        margin-right: 10px;
+    }
+    
+    .data-access-controls {
+        margin-top: 15px;
+    }
+    
+    .access-type-selector {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .access-type-btn {
+        padding: 6px 12px;
+        border: 1px solid #ddd;
+        background: white;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+    
+    .access-type-btn.active {
+        background: #2196f3;
+        color: white;
+        border-color: #2196f3;
+    }
+    
+    .template-buttons {
+        margin-bottom: 20px;
+    }
+    
+    .btn-template {
+        margin-right: 10px;
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+    
+    .save-button {
+        position: sticky;
+        bottom: 20px;
+        width: 100%;
+        padding: 12px;
+        background: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .save-button:hover {
+        background: #45a049;
+    }
+    
+    .save-button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+    
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+    
+    .no-user-selected {
+        text-align: center;
+        padding: 60px 20px;
+        color: #999;
+    }
+    
+    .module-icons {
+        --dashboard-color: #ff9800;
+        --projects-color: #2196f3; 
+        --clients-color: #4caf50;
+        --leads-color: #ff5722;
+        --deals-color: #9c27b0;
+        --finance-color: #795548;
+        --documents-color: #607d8b;
+        --reports-color: #3f51b5;
+        --settings-color: #9e9e9e;
+        --users-color: #e91e63;
+        --avito-color: #f44336;
+    }
+    
+    .icon-dashboard { background-color: var(--dashboard-color); }
+    .icon-projects { background-color: var(--projects-color); }
+    .icon-clients { background-color: var(--clients-color); }
+    .icon-leads { background-color: var(--leads-color); }
+    .icon-deals { background-color: var(--deals-color); }
+    .icon-finance { background-color: var(--finance-color); }
+    .icon-documents { background-color: var(--documents-color); }
+    .icon-reports { background-color: var(--reports-color); }
+    .icon-settings { background-color: var(--settings-color); }
+    .icon-users { background-color: var(--users-color); }
+    .icon-avito { background-color: var(--avito-color); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="permissions-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🔐 Управление правами доступа</h2>
+        <div>
+            <small class="text-muted">Настройка детальных прав для исполнителей и продажников</small>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Список пользователей -->
+        <div class="col-md-4">
+            <div class="user-list">
+                <div class="p-3 border-bottom">
+                    <h5 class="mb-0">👥 Пользователи</h5>
+                    <small class="text-muted">Выберите пользователя для настройки прав</small>
+                </div>
+                
+                {% for user in users %}
+                <div class="user-item" data-user-id="{{ user.id }}" onclick="selectUser({{ user.id }})">
+                    <div class="user-info">
+                        <h5>{{ user.username }}</h5>
+                        <div>
+                            <span class="role-badge {{ user.role }}">{{ user.role }}</span>
+                            {% if user.email %}
+                            <small class="ms-2">{{ user.email }}</small>
+                            {% endif %}
+                        </div>
+                        {% if not user.is_active %}
+                        <small class="text-danger">⚠️ Заблокирован</small>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Панель настройки прав -->
+        <div class="col-md-8">
+            <div class="permissions-panel">
+                <div id="no-user-selected" class="no-user-selected">
+                    <h4>👆 Выберите пользователя</h4>
+                    <p>Выберите пользователя из списка слева для настройки его прав доступа</p>
+                </div>
+                
+                <div id="permissions-content" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h4 id="selected-user-title">Права доступа</h4>
+                            <small class="text-muted" id="selected-user-info"></small>
+                        </div>
+                        <div class="template-buttons">
+                            <button class="btn btn-outline-success btn-template" onclick="applyTemplate('salesperson')">
+                                📊 Продажник
+                            </button>
+                            <button class="btn btn-outline-primary btn-template" onclick="applyTemplate('executor')">
+                                ⚙️ Исполнитель
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="loading" class="loading" style="display: none;">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p>Загружаем права пользователя...</p>
+                    </div>
+                    
+                    <div id="modules-container">
+                        <!-- Модули будут загружены через JavaScript -->
+                    </div>
+                    
+                    <button class="save-button" onclick="savePermissions()" disabled>
+                        💾 Сохранить права доступа
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedUserId = null;
+let currentPermissions = null;
+
+function selectUser(userId) {
+    // Снимаем выделение с предыдущего пользователя
+    document.querySelectorAll('.user-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // Выделяем нового пользователя
+    document.querySelector(`[data-user-id="${userId}"]`).classList.add('active');
+    
+    selectedUserId = userId;
+    loadUserPermissions(userId);
+}
+
+async function loadUserPermissions(userId) {
+    const noUserDiv = document.getElementById('no-user-selected');
+    const contentDiv = document.getElementById('permissions-content');
+    const loadingDiv = document.getElementById('loading');
+    
+    noUserDiv.style.display = 'none';
+    contentDiv.style.display = 'block';
+    loadingDiv.style.display = 'block';
+    
+    try {
+        const response = await fetch(`/admin/permissions/user/${userId}`);
+        const data = await response.json();
+        
+        currentPermissions = data;
+        renderUserPermissions(data);
+        
+    } catch (error) {
+        console.error('Ошибка загрузки прав пользователя:', error);
+        showNotification('❌ Ошибка загрузки прав пользователя', 'error');
+    } finally {
+        loadingDiv.style.display = 'none';
+    }
+}
+
+function renderUserPermissions(data) {
+    // Обновляем заголовок
+    document.getElementById('selected-user-title').textContent = `Права доступа: ${data.user.username}`;
+    document.getElementById('selected-user-info').textContent = 
+        `${data.user.email || 'Email не указан'} • Роль: ${data.user.role}`;
+    
+    // Создаем модули
+    const container = document.getElementById('modules-container');
+    container.innerHTML = '';
+    
+    Object.entries(data.available_modules).forEach(([moduleKey, moduleConfig]) => {
+        const userModule = data.module_permissions[moduleKey];
+        const moduleCard = createModuleCard(moduleKey, moduleConfig, userModule);
+        container.appendChild(moduleCard);
+    });
+    
+    // Активируем кнопку сохранения
+    document.querySelector('.save-button').disabled = false;
+}
+
+function createModuleCard(moduleKey, moduleConfig, userModule) {
+    const card = document.createElement('div');
+    card.className = `module-card ${userModule.enabled ? 'enabled' : ''}`;
+    card.dataset.module = moduleKey;
+    
+    const icon = getModuleIcon(moduleKey);
+    const isEnabled = userModule.enabled;
+    
+    card.innerHTML = `
+        <div class="module-header" onclick="toggleModule('${moduleKey}')">
+            <div class="module-title">
+                <div class="module-icon icon-${moduleKey}">${icon}</div>
+                <div>
+                    <h5>${moduleConfig.name}</h5>
+                    <small class="text-muted">${moduleConfig.description}</small>
+                </div>
+            </div>
+            <div>
+                <label class="switch">
+                    <input type="checkbox" ${isEnabled ? 'checked' : ''} 
+                           onchange="toggleModuleEnabled('${moduleKey}', this.checked)">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+        
+        <div class="module-body">
+            <div class="permissions-grid">
+                <div class="permissions-section">
+                    <h6>🔑 Разрешения</h6>
+                    ${createPermissionsHTML(moduleKey, moduleConfig.permissions, userModule.permissions)}
+                </div>
+                
+                <div class="permissions-section">
+                    <h6>📊 Доступ к данным</h6>
+                    ${createDataAccessHTML(moduleKey, userModule.data_access)}
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return card;
+}
+
+function createPermissionsHTML(moduleKey, availablePermissions, userPermissions) {
+    return availablePermissions.map(perm => {
+        const isChecked = userPermissions[perm] || false;
+        const permLabel = getPermissionLabel(perm);
+        
+        return `
+            <div class="permission-item">
+                <input type="checkbox" class="permission-switch" 
+                       id="${moduleKey}-${perm}"
+                       ${isChecked ? 'checked' : ''}
+                       onchange="updatePermission('${moduleKey}', '${perm}', this.checked)">
+                <label for="${moduleKey}-${perm}">${permLabel}</label>
+            </div>
+        `;
+    }).join('');
+}
+
+function createDataAccessHTML(moduleKey, dataAccess) {
+    const accessTypes = [
+        {key: 'none', label: 'Нет доступа', desc: 'Нет доступа к данным'},
+        {key: 'own', label: 'Свои', desc: 'Только свои записи'},
+        {key: 'team', label: 'Команды', desc: 'Записи команды'},
+        {key: 'all', label: 'Все', desc: 'Все записи'}
+    ];
+    
+    const accessButtons = accessTypes.map(type => 
+        `<button class="access-type-btn ${dataAccess.type === type.key ? 'active' : ''}"
+                 onclick="setAccessType('${moduleKey}', '${type.key}')"
+                 title="${type.desc}">
+            ${type.label}
+        </button>`
+    ).join('');
+    
+    return `
+        <div class="access-type-selector">
+            ${accessButtons}
+        </div>
+        
+        <div class="data-access-controls" ${dataAccess.type === 'none' ? 'style="display:none"' : ''}>
+            <div class="permission-item">
+                <input type="checkbox" id="${moduleKey}-view" 
+                       ${dataAccess.can_view ? 'checked' : ''}
+                       onchange="updateDataAccess('${moduleKey}', 'can_view', this.checked)">
+                <label for="${moduleKey}-view">👁️ Просмотр</label>
+            </div>
+            
+            <div class="permission-item">
+                <input type="checkbox" id="${moduleKey}-edit"
+                       ${dataAccess.can_edit ? 'checked' : ''}
+                       onchange="updateDataAccess('${moduleKey}', 'can_edit', this.checked)">
+                <label for="${moduleKey}-edit">✏️ Редактирование</label>
+            </div>
+            
+            <div class="permission-item">
+                <input type="checkbox" id="${moduleKey}-delete"
+                       ${dataAccess.can_delete ? 'checked' : ''}
+                       onchange="updateDataAccess('${moduleKey}', 'can_delete', this.checked)">
+                <label for="${moduleKey}-delete">🗑️ Удаление</label>
+            </div>
+            
+            <div class="permission-item">
+                <input type="checkbox" id="${moduleKey}-export"
+                       ${dataAccess.can_export ? 'checked' : ''}
+                       onchange="updateDataAccess('${moduleKey}', 'can_export', this.checked)">
+                <label for="${moduleKey}-export">📤 Экспорт</label>
+            </div>
+        </div>
+    `;
+}
+
+function getModuleIcon(moduleKey) {
+    const icons = {
+        dashboard: '📊',
+        projects: '📋',
+        clients: '👥',
+        leads: '🎯',
+        deals: '🤝',
+        finance: '💰',
+        documents: '📄',
+        reports: '📈',
+        settings: '⚙️',
+        users: '👤',
+        avito: '🏠'
+    };
+    return icons[moduleKey] || '📦';
+}
+
+function getPermissionLabel(perm) {
+    const labels = {
+        view: '👁️ Просмотр',
+        create: '➕ Создание',
+        edit: '✏️ Редактирование', 
+        delete: '🗑️ Удаление',
+        export: '📤 Экспорт',
+        assign: '👤 Назначение',
+        contact: '📞 Контакты',
+        convert: '🔄 Конвертация',
+        close: '✅ Закрытие',
+        reports: '📊 Отчеты',
+        generate: '📝 Генерация',
+        sign: '✍️ Подпись',
+        schedule: '📅 Планирование',
+        'system.manage': '🔧 Системные',
+        'widgets.manage': '📊 Виджеты',
+        'permissions.manage': '🔐 Права',
+        'messages.send': '💬 Сообщения',
+        'chats.manage': '💬 Чаты',
+        'settings.edit': '⚙️ Настройки'
+    };
+    return labels[perm] || perm;
+}
+
+function toggleModule(moduleKey) {
+    const card = document.querySelector(`[data-module="${moduleKey}"]`);
+    card.classList.toggle('expanded');
+}
+
+function toggleModuleEnabled(moduleKey, enabled) {
+    const card = document.querySelector(`[data-module="${moduleKey}"]`);
+    
+    if (enabled) {
+        card.classList.add('enabled');
+    } else {
+        card.classList.remove('enabled');
+        // Сбрасываем все права при отключении модуля
+        card.querySelectorAll('input[type="checkbox"]').forEach(input => {
+            if (!input.onchange.toString().includes('toggleModuleEnabled')) {
+                input.checked = false;
+            }
+        });
+    }
+    
+    // Обновляем данные в currentPermissions
+    if (currentPermissions) {
+        currentPermissions.module_permissions[moduleKey].enabled = enabled;
+        
+        if (!enabled) {
+            // Отключаем все права при отключении модуля
+            Object.keys(currentPermissions.module_permissions[moduleKey].permissions).forEach(perm => {
+                currentPermissions.module_permissions[moduleKey].permissions[perm] = false;
+            });
+            
+            currentPermissions.module_permissions[moduleKey].data_access = {
+                type: 'none',
+                can_view: false,
+                can_edit: false,
+                can_delete: false,
+                can_export: false
+            };
+        }
+    }
+}
+
+function updatePermission(moduleKey, permission, enabled) {
+    if (currentPermissions) {
+        currentPermissions.module_permissions[moduleKey].permissions[permission] = enabled;
+    }
+}
+
+function setAccessType(moduleKey, accessType) {
+    // Обновляем UI
+    const card = document.querySelector(`[data-module="${moduleKey}"]`);
+    const buttons = card.querySelectorAll('.access-type-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    
+    const activeButton = card.querySelector(`[onclick*="'${accessType}'"]`);
+    if (activeButton) activeButton.classList.add('active');
+    
+    // Показываем/скрываем контролы доступа к данным
+    const controls = card.querySelector('.data-access-controls');
+    if (accessType === 'none') {
+        controls.style.display = 'none';
+    } else {
+        controls.style.display = 'block';
+    }
+    
+    // Обновляем данные
+    if (currentPermissions) {
+        currentPermissions.module_permissions[moduleKey].data_access.type = accessType;
+        
+        if (accessType === 'none') {
+            currentPermissions.module_permissions[moduleKey].data_access = {
+                type: 'none',
+                can_view: false,
+                can_edit: false,
+                can_delete: false,
+                can_export: false
+            };
+        }
+    }
+}
+
+function updateDataAccess(moduleKey, accessRight, enabled) {
+    if (currentPermissions) {
+        currentPermissions.module_permissions[moduleKey].data_access[accessRight] = enabled;
+    }
+}
+
+async function applyTemplate(roleName) {
+    if (!selectedUserId) return;
+    
+    try {
+        const response = await fetch(`/admin/permissions/role/${roleName}/template`);
+        const template = await response.json();
+        
+        // Применяем шаблон
+        if (currentPermissions) {
+            currentPermissions.module_permissions = template.modules;
+            renderUserPermissions(currentPermissions);
+            showNotification(`✅ Применен шаблон: ${template.name}`, 'success');
+        }
+        
+    } catch (error) {
+        console.error('Ошибка применения шаблона:', error);
+        showNotification('❌ Ошибка применения шаблона', 'error');
+    }
+}
+
+async function savePermissions() {
+    if (!selectedUserId || !currentPermissions) return;
+    
+    const saveButton = document.querySelector('.save-button');
+    saveButton.disabled = true;
+    saveButton.textContent = '💾 Сохранение...';
+    
+    try {
+        const response = await fetch(`/admin/permissions/user/${selectedUserId}/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                module_permissions: currentPermissions.module_permissions
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showNotification('✅ Права пользователя успешно сохранены', 'success');
+        } else {
+            throw new Error(result.detail || 'Ошибка сохранения');
+        }
+        
+    } catch (error) {
+        console.error('Ошибка сохранения прав:', error);
+        showNotification('❌ Ошибка сохранения прав: ' + error.message, 'error');
+    } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = '💾 Сохранить права доступа';
+    }
+}
+
+function showNotification(message, type) {
+    // Простая функция показа уведомлений
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : 'success'} position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+</script>
+
+<style>
+/* Переключатели */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+}
+
+input:checked + .slider {
+    background-color: #4CAF50;
+}
+
+input:checked + .slider:before {
+    transform: translateX(24px);
+}
+
+.slider.round {
+    border-radius: 24px;
+}
+
+.slider.round:before {
+    border-radius: 50%;
+}
+</style>
+{% endblock %}
