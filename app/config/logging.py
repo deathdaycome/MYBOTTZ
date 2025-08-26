@@ -12,7 +12,8 @@ def setup_logging():
     
     # Генерируем имя файла с датой и временем
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_filename = logs_dir / f"app_{timestamp}.log"
+    main_log_filename = logs_dir / f"app_{timestamp}.log"
+    avito_log_filename = logs_dir / f"avito_{timestamp}.log"
     
     # Настройка форматирования
     log_format = logging.Formatter(
@@ -21,29 +22,49 @@ def setup_logging():
     )
     
     # Настройка основного логгера
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
     
     # Очищаем существующие хендлеры
-    for handler in logger.handlers[:]:
-        logger.removeHandler(handler)
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
     
-    # Хендлер для файла
-    file_handler = logging.FileHandler(
-        log_filename, 
+    # Хендлер для главного лог-файла
+    main_file_handler = logging.FileHandler(
+        main_log_filename, 
         encoding='utf-8'
     )
-    file_handler.setFormatter(log_format)
-    file_handler.setLevel(logging.DEBUG)
+    main_file_handler.setFormatter(log_format)
+    main_file_handler.setLevel(logging.DEBUG)
     
-    # Хендлер для консоли
+    # Хендлер для консоли (только важные сообщения)
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(log_format)
-    console_handler.setLevel(logging.INFO)
+    console_handler.setLevel(logging.WARNING)  # Только WARNING и ERROR в консоль
     
-    # Добавляем хендлеры
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    # Добавляем хендлеры к root логгеру
+    root_logger.addHandler(main_file_handler)
+    root_logger.addHandler(console_handler)
+    
+    # Настройка отдельного логгера для Avito сервиса
+    avito_logger = logging.getLogger("app.services.avito_service")
+    avito_logger.setLevel(logging.INFO)
+    avito_logger.propagate = False  # Не передавать в root logger
+    
+    # Хендлер для Avito логов
+    avito_file_handler = logging.FileHandler(
+        avito_log_filename,
+        encoding='utf-8'
+    )
+    avito_file_handler.setFormatter(log_format)
+    avito_file_handler.setLevel(logging.DEBUG)
+    avito_logger.addHandler(avito_file_handler)
+    
+    # Настройка отдельного логгера для Avito polling
+    avito_polling_logger = logging.getLogger("app.services.avito_polling_service")
+    avito_polling_logger.setLevel(logging.INFO)
+    avito_polling_logger.propagate = False
+    avito_polling_logger.addHandler(avito_file_handler)
     
     # Настройка логгеров для внешних библиотек
     logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -52,11 +73,12 @@ def setup_logging():
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     
     # Логируем старт сессии
-    logger.info(f"=== НАЧАЛО СЕССИИ ЛОГИРОВАНИЯ ===")
-    logger.info(f"Лог файл: {log_filename}")
-    logger.info(f"Время запуска: {datetime.now()}")
+    root_logger.info(f"=== НАЧАЛО СЕССИИ ЛОГИРОВАНИЯ ===")
+    root_logger.info(f"Главный лог файл: {main_log_filename}")
+    root_logger.info(f"Avito лог файл: {avito_log_filename}")
+    root_logger.info(f"Время запуска: {datetime.now()}")
     
-    return logger
+    return root_logger
 
 # Создаем основной логгер
 bot_logger = setup_logging()

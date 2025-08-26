@@ -46,7 +46,7 @@ async def users_page(
         raise HTTPException(status_code=403, detail="Недостаточно прав для просмотра пользователей")
     
     # Получаем элементы навигации
-    from ..app import get_navigation_items
+    from ..navigation import get_navigation_items
     navigation_items = get_navigation_items(current_user.get("role", "admin") if isinstance(current_user, dict) else current_user.role)
     
     # Получаем список пользователей

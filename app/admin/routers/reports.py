@@ -24,7 +24,7 @@ async def reports_page(
 ):
     """Страница отчетов"""
     # Импортируем функцию get_navigation_items
-    from ..app import get_navigation_items
+    from ..navigation import get_navigation_items
     
     user_role = current_user.get("role", "owner") if isinstance(current_user, dict) else current_user.role
     navigation_items = get_navigation_items(user_role)
