@@ -22,6 +22,11 @@ from ...services.employee_notification_service import employee_notification_serv
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
+@router.get("/", response_class=HTMLResponse)
+async def notifications_main(request: Request):
+    """Главная страница уведомлений - редирект на настройки"""
+    return RedirectResponse(url="/admin/notifications/settings", status_code=302)
+
 @router.get("/settings", response_class=HTMLResponse)
 async def notification_settings_page(
     request: Request,
@@ -30,9 +35,9 @@ async def notification_settings_page(
 ):
     """Страница настроек уведомлений"""
     
-    # Получаем всех сотрудников
+    # Получаем всех сотрудников (включая sales и executor)
     employees = db.query(AdminUser).filter(
-        AdminUser.role.in_(['executor', 'salesperson'])
+        AdminUser.role.in_(['executor', 'salesperson', 'sales'])
     ).all()
     
     # Получаем настройки уведомлений для каждого сотрудника
@@ -41,11 +46,19 @@ async def notification_settings_page(
         settings = employee_notification_service.get_employee_settings(db, employee.id)
         employee_settings[employee.id] = settings
     
+    # Получаем статистику очереди
+    stats = {
+        'pending': db.query(NotificationQueue).filter(NotificationQueue.status == 'pending').count(),
+        'sent': db.query(NotificationQueue).filter(NotificationQueue.status == 'sent').count(),
+        'failed': db.query(NotificationQueue).filter(NotificationQueue.status == 'failed').count(),
+    }
+    
     return templates.TemplateResponse("admin/notifications/settings.html", {
         "request": request,
         "current_user": current_user,
         "employees": employees,
         "employee_settings": employee_settings,
+        "stats": stats,
         "page_title": "Настройки уведомлений"
     })
 

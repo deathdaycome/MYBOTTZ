@@ -33,7 +33,8 @@
     color: #1976d2;
 }
 
-.role-salesperson {
+.role-salesperson,
+.role-sales {
     background-color: #e8f5e8;
     color: #2e7d32;
 }
@@ -120,7 +121,54 @@
         <a href="/admin/notifications/log" class="btn btn-outline-secondary">
             <i class="fas fa-history"></i> Лог
         </a>
+        {% if current_user.role == 'owner' %}
+        <a href="/admin/permissions" class="btn btn-outline-success">
+            <i class="fas fa-shield-alt"></i> Управление правами
+        </a>
+        {% endif %}
     </div>
+</div>
+
+<!-- Навигационные табы -->
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link active" href="/admin/notifications/settings">
+            <i class="fas fa-cog"></i> Настройки уведомлений
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="/admin/notifications/queue">
+            <i class="fas fa-list"></i> Очередь ({{ stats.pending if stats else 0 }})
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="/admin/notifications/log">
+            <i class="fas fa-history"></i> История
+        </a>
+    </li>
+    {% if current_user.role == 'owner' %}
+    <li class="nav-item">
+        <a class="nav-link" href="/admin/permissions">
+            <i class="fas fa-shield-alt"></i> Права доступа
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="/admin/users">
+            <i class="fas fa-users"></i> Пользователи
+        </a>
+    </li>
+    {% endif %}
+</ul>
+
+<!-- Отладочная информация -->
+<div class="alert alert-info mb-3">
+    <strong>Текущий пользователь:</strong> {{ current_user.username }} 
+    <strong>Роль:</strong> {{ current_user.role }}
+    {% if current_user.role == 'owner' %}
+    <span class="badge bg-success">Полный доступ</span>
+    {% else %}
+    <span class="badge bg-warning">Ограниченный доступ</span>
+    {% endif %}
 </div>
 
 <!-- Уведомления -->
@@ -148,7 +196,10 @@
                 <h5 class="mb-1">
                     {{ employee.full_name or employee.username }}
                     <span class="role-badge role-{{ employee.role }}">
-                        {% if employee.role == 'executor' %}Исполнитель{% elif employee.role == 'salesperson' %}Продажник{% endif %}
+                        {% if employee.role == 'executor' %}Исполнитель
+                        {% elif employee.role == 'salesperson' %}Продажник
+                        {% elif employee.role == 'sales' %}Продажник
+                        {% else %}{{ employee.role }}{% endif %}
                     </span>
                 </h5>
                 <div class="employee-status">
@@ -293,7 +344,7 @@
                     </div>
                     {% endif %}
 
-                    {% if employee.role == 'salesperson' %}
+                    {% if employee.role in ['salesperson', 'sales'] %}
                     <!-- Настройки для продажников -->
                     <div class="setting-group">
                         <h6><i class="fab fa-avianex"></i> Avito</h6>
