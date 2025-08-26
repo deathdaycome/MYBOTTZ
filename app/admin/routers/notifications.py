@@ -11,7 +11,8 @@ from typing import Optional, Dict, Any, List
 import json
 from datetime import datetime, timedelta
 
-from ..dependencies import get_db, get_current_admin_user, templates
+from ..middleware.auth import get_current_admin_user
+from ...database.database import get_db
 from ...database.models import AdminUser
 from ...database.notification_models import (
     EmployeeNotificationSettings,
@@ -19,6 +20,9 @@ from ...database.notification_models import (
     NotificationLog
 )
 from ...services.employee_notification_service import employee_notification_service
+
+# Настройка шаблонов
+templates = Jinja2Templates(directory="app/admin/templates")
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 

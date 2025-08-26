@@ -10,7 +10,8 @@ import json
 
 from ..services.avito_service import get_avito_service
 from ..services.employee_notification_service import employee_notification_service
-from ..database.models import get_db_context, Project, AdminUser
+from ..database.database import get_db_context
+from ..database.models import Project, AdminUser
 from ..database.notification_models import EmployeeNotificationSettings
 from ..config.settings import settings
 

@@ -11,7 +11,7 @@ import json
 from ..services.avito_service import get_avito_service
 from ..services.notification_service import NotificationService
 from ..services.employee_notification_service import employee_notification_service
-from ..database.models import get_db_context
+from ..database.database import get_db_context
 from ..config.settings import settings
 
 logger = logging.getLogger(__name__)
