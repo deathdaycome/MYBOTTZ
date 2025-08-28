@@ -636,6 +636,15 @@ async def create_lead_from_chat(
         if not messages:
             raise HTTPException(status_code=404, detail="Сообщения не найдены")
         
+        # Получаем информацию о чате для получения имени пользователя Avito
+        chat_info = await avito_service.get_chat_info(chat_id)
+        avito_user_name = ""
+        if hasattr(chat_info, 'user') and chat_info.user:
+            if hasattr(chat_info.user, 'name'):
+                avito_user_name = chat_info.user.name
+            elif hasattr(chat_info.user, 'display_name'):
+                avito_user_name = chat_info.user.display_name
+        
         # Подготавливаем контекст для AI
         conversation_text = []
         current_user_id = 216012096  # ID текущего пользователя
@@ -650,29 +659,41 @@ async def create_lead_from_chat(
                 else:
                     conversation_text.append(f"Клиент: {content}")
         
-        conversation_context = "\n".join(conversation_text[-20:])  # Последние 20 сообщений
+        conversation_context = "\n".join(conversation_text[-25:])  # Последние 25 сообщений
         
         # AI анализ для извлечения данных клиента
         from ...services.openai_service import OpenAIService
         ai_service = OpenAIService()
         
         analysis_prompt = f"""
-Проанализируй диалог между менеджером IT-компании и клиентом. Извлеки следующую информацию о клиенте:
+Ты - эксперт по анализу диалогов с клиентами. Проанализируй диалог между менеджером IT-компании и клиентом с Avito. 
+
+ИМЯ ПОЛЬЗОВАТЕЛЯ AVITO: {avito_user_name if avito_user_name else "Не указано"}
 
 ДИАЛОГ:
 {conversation_context}
 
-Ответь в JSON формате:
+Извлеки максимально точно следующую информацию о клиенте:
+
+1. ИМЯ: Сначала проверь имя из профиля Avito выше, затем ищи представления в диалоге ("Меня зовут...", "Я - ...", подписи)
+2. ТЕЛЕФОН: Ищи любые номера телефонов (+7, 8, 9ХХ формат), нормализуй к +7XXXXXXXXXX  
+3. TELEGRAM: Ищи @username, ники телеграма, ссылки t.me
+4. EMAIL: Ищи email адреса в любом формате
+5. ТРЕБОВАНИЯ: Анализируй ЧТО именно клиент хочет заказать (бот, сайт, автоматизация, и т.д.) и КАКИЕ у него требования
+
+Ответь строго в JSON формате:
 {{
-    "name": "имя клиента (если указано)",
-    "phone": "номер телефона (если указан, в формате +7XXXXXXXXXX)",
-    "telegram": "telegram username (если указан, без @)",
-    "email": "email адрес (если указан)",
-    "requirements": "краткое описание требований/пожеланий клиента (что хочет заказать)"
+    "name": "полное имя клиента или имя из Avito",
+    "phone": "нормализованный телефон +7XXXXXXXXXX", 
+    "telegram": "username без @",
+    "email": "email адрес",
+    "requirements": "подробное описание того, что хочет заказать клиент и его требования",
+    "budget": "упомянутый бюджет в рублях (только цифра или 0)",
+    "urgency": "срочность проекта (высокая/средняя/низкая/не указана)",
+    "project_type": "тип проекта (telegram_bot/website/mobile_app/automation/other)"
 }}
 
-ВАЖНО: Если информация не найдена, оставь поле пустым (""). Телефон нормализуй к формату +7XXXXXXXXXX.
-"""
+ВАЖНО: Если информация не найдена, оставь поле пустым (""). Будь внимательным к деталям и контексту."""
         
         try:
             ai_response = await ai_service.generate_response_with_model(
@@ -695,8 +716,15 @@ async def create_lead_from_chat(
                     "phone": "",
                     "telegram": "",
                     "email": "",
-                    "requirements": ""
+                    "requirements": "",
+                    "budget": "0",
+                    "urgency": "",
+                    "project_type": ""
                 }
+            
+            # Если имя не извлечено из диалога, используем имя из Avito
+            if not analysis_data.get("name") and avito_user_name:
+                analysis_data["name"] = avito_user_name
                 
         except Exception as ai_error:
             logger.error(f"AI analysis error: {ai_error}")
@@ -709,8 +737,23 @@ async def create_lead_from_chat(
                 "requirements": ""
             }
         
-        # Создаём лид в базе данных
-        lead_name = analysis_data.get("name") or "Лид Avito"
+        # Создаём лид в базе данных  
+        lead_name = analysis_data.get("name") or avito_user_name or "Лид Avito"
+        budget = 0
+        try:
+            budget = float(analysis_data.get("budget", "0") or "0")
+        except (ValueError, TypeError):
+            budget = 0
+            
+        # Создаём заголовок лида на основе типа проекта
+        project_types = {
+            "telegram_bot": "Разработка Telegram бота",
+            "website": "Разработка веб-сайта", 
+            "mobile_app": "Разработка мобильного приложения",
+            "automation": "Автоматизация бизнес-процессов",
+            "other": "IT-услуги"
+        }
+        lead_title = project_types.get(analysis_data.get("project_type", ""), f"Проект для {lead_name}")
         
         # Проверяем, не существует ли уже лид с таким chat_id
         from ...database.crm_models import Lead, LeadStatus
@@ -720,7 +763,7 @@ async def create_lead_from_chat(
         if existing_lead:
             # Обновляем существующий лид
             lead = existing_lead
-            lead.title = lead_name
+            lead.title = lead_title
             lead.contact_name = lead_name
             if analysis_data.get("phone"):
                 lead.contact_phone = analysis_data["phone"]
@@ -730,18 +773,41 @@ async def create_lead_from_chat(
                 lead.contact_telegram = analysis_data["telegram"]
             if analysis_data.get("requirements"):
                 lead.description = analysis_data["requirements"]
+            if budget > 0:
+                lead.budget = budget
+            
+            # Обновляем заметки с дополнительной информацией
+            ai_info = []
+            if analysis_data.get("urgency"):
+                ai_info.append(f"Срочность: {analysis_data['urgency']}")
+            if analysis_data.get("project_type"):
+                ai_info.append(f"Тип проекта: {analysis_data['project_type']}")
+            if budget > 0:
+                ai_info.append(f"Бюджет: {budget:,.0f} ₽")
+            
+            lead.notes = f"Обновлен из Avito чата {chat_id}.\n" + "\n".join(ai_info)
+            
         else:
             # Создаём новый лид
+            ai_notes = []
+            if analysis_data.get("urgency"):
+                ai_notes.append(f"Срочность: {analysis_data['urgency']}")
+            if analysis_data.get("project_type"):
+                ai_notes.append(f"Тип проекта: {analysis_data['project_type']}")
+            if budget > 0:
+                ai_notes.append(f"Предполагаемый бюджет: {budget:,.0f} ₽")
+                
             lead = Lead(
-                title=lead_name,
+                title=lead_title,
                 contact_name=lead_name,
                 contact_phone=analysis_data.get("phone"),
                 contact_email=analysis_data.get("email"), 
                 contact_telegram=analysis_data.get("telegram"),
                 source=source_identifier,
                 status=LeadStatus.NEW,
-                description=analysis_data.get("requirements", "Требования не указаны"),
-                notes=f"Создан из Avito чата {chat_id}. Требования: {analysis_data.get('requirements', 'Не указаны')}"
+                description=analysis_data.get("requirements", "Требования будут уточнены"),
+                budget=budget,
+                notes=f"Создан из Avito чата {chat_id} с AI анализом.\n" + "\n".join(ai_notes)
             )
             db.add(lead)
         
@@ -766,9 +832,18 @@ async def create_lead_from_chat(
         
         return JSONResponse({
             "status": "success",
-            "message": "Лид успешно создан/обновлен",
+            "message": "Лид успешно создан/обновлен с AI анализом",
             "lead_id": lead.id,
+            "is_new": not existing_lead,
+            "ai_analysis": {
+                "extracted_name": analysis_data.get("name"),
+                "avito_name": avito_user_name,
+                "project_type": analysis_data.get("project_type"),
+                "urgency": analysis_data.get("urgency"),
+                "budget": budget
+            },
             "lead_data": {
+                "title": lead.title,
                 "name": lead.contact_name,
                 "phone": lead.contact_phone,
                 "email": lead.contact_email,
