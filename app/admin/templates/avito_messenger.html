@@ -175,6 +175,32 @@
     </div>
 </div>
 
+<!-- Мобильная навигация (показывается только на мобильных) -->
+<div class="mobile-nav d-md-none">
+    <button class="mobile-nav-btn" onclick="showChatsList()">
+        <i class="fas fa-comments"></i>
+        <span>Чаты</span>
+        <span class="badge bg-danger rounded-pill" id="mobileUnreadBadge" style="position: absolute; top: -5px; right: 15px; font-size: 10px; display: none;"></span>
+    </button>
+    <button class="mobile-nav-btn" onclick="toggleAutoResponse()">
+        <i class="fas fa-robot"></i>
+        <span>AI</span>
+    </button>
+    <button class="mobile-nav-btn" onclick="showSettings()">
+        <i class="fas fa-cog"></i>
+        <span>Настройки</span>
+    </button>
+    <button class="mobile-nav-btn" onclick="refreshChats()">
+        <i class="fas fa-sync-alt"></i>
+        <span>Обновить</span>
+    </button>
+</div>
+
+<!-- Кнопка возврата к чатам (показывается только на мобильных) -->
+<button class="back-to-chats d-md-none" onclick="hideChatAndShowList()" style="display: none;">
+    <i class="fas fa-arrow-left"></i>
+</button>
+
 <!-- Модальное окно настроек -->
 <div class="modal fade" id="settingsModal" tabindex="-1">
     <div class="modal-dialog">
@@ -439,6 +465,219 @@
     }
     30% {
         transform: translateY(-10px);
+    }
+}
+
+/* Мобильные стили */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+    
+    /* Компактный заголовок на мобильных */
+    .d-flex.justify-content-between.align-items-center.mb-4 {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 15px;
+    }
+    
+    .d-flex.align-items-center.gap-3 {
+        flex-direction: column;
+        gap: 10px !important;
+    }
+    
+    /* AI автоответы в мобильной версии */
+    .form-check {
+        justify-content: center;
+        text-align: center;
+    }
+    
+    .btn-group {
+        width: 100%;
+        display: flex !important;
+    }
+    
+    .btn-group .btn {
+        flex: 1;
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+    
+    /* Мобильная сетка чатов */
+    .row.g-3 {
+        --bs-gutter-x: 0.5rem;
+    }
+    
+    .col-md-4.col-lg-3 {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        z-index: 1000;
+        background: white;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        display: none;
+    }
+    
+    .col-md-4.col-lg-3.show-mobile {
+        transform: translateX(0);
+        display: block !important;
+    }
+    
+    .col-md-8.col-lg-9 {
+        width: 100% !important;
+        flex: none !important;
+        max-width: none !important;
+    }
+    
+    /* Мобильные кнопки навигации */
+    .mobile-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 1px solid #dee2e6;
+        padding: 10px;
+        z-index: 999;
+        display: flex;
+        justify-content: space-around;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .mobile-nav-btn {
+        background: none;
+        border: none;
+        color: #6c757d;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 5px 10px;
+        border-radius: 8px;
+        transition: all 0.2s;
+        min-width: 60px;
+    }
+    
+    .mobile-nav-btn:hover, .mobile-nav-btn.active {
+        background: #e7f3ff;
+        color: #007bff;
+    }
+    
+    .mobile-nav-btn i {
+        font-size: 18px;
+        margin-bottom: 3px;
+    }
+    
+    /* Заголовок чата на мобильных */
+    .card-header .d-flex {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .btn-group .btn-sm {
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+    
+    /* Сообщения на мобильных */
+    .messages-container {
+        height: calc(100vh - 300px) !important;
+        margin-bottom: 80px; /* Место для mobile-nav */
+    }
+    
+    .message-bubble {
+        max-width: 85% !important;
+        font-size: 14px;
+        padding: 10px 14px;
+    }
+    
+    .message-image {
+        max-width: 250px !important;
+        max-height: 250px !important;
+    }
+    
+    /* Форма отправки сообщения */
+    .message-form {
+        position: fixed;
+        bottom: 60px; /* Над mobile-nav */
+        left: 10px;
+        right: 10px;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        padding: 10px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        z-index: 998;
+    }
+    
+    /* AI ассистент на мобильных */
+    .card-footer {
+        position: fixed;
+        bottom: 120px; /* Над формой и nav */
+        left: 10px;
+        right: 10px;
+        border-radius: 10px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        z-index: 997;
+    }
+    
+    /* Список чатов на мобильных */
+    .chat-item {
+        padding: 12px 15px !important;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .chat-item .d-flex {
+        align-items: center !important;
+    }
+    
+    .avatar-circle {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 16px !important;
+    }
+    
+    /* Скрываем боковую панель по умолчанию на мобильных */
+    .mobile-hide-sidebar .col-md-4.col-lg-3 {
+        display: none !important;
+    }
+    
+    /* Кнопка возврата к списку чатов */
+    .back-to-chats {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1001;
+        background: rgba(255,255,255,0.9);
+        border: 1px solid #dee2e6;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+}
+
+/* Стили для десктопных устройств */
+@media (min-width: 769px) {
+    .mobile-nav,
+    .back-to-chats,
+    .mobile-chat-header {
+        display: none !important;
+    }
+    
+    .message-form,
+    .card-footer {
+        position: relative !important;
+        bottom: auto !important;
+        left: auto !important;
+        right: auto !important;
     }
 }
 </style>
@@ -1929,6 +2168,114 @@ async function setupWebhook() {
         showNotification('❌ Ошибка подключения к серверу', 'error');
     }
 }
+
+// === МОБИЛЬНАЯ НАВИГАЦИЯ ===
+
+// Показать список чатов на мобильных
+function showChatsList() {
+    const sidebar = document.querySelector('.col-md-4.col-lg-3');
+    const chatArea = document.querySelector('.col-md-8.col-lg-9');
+    const backButton = document.querySelector('.back-to-chats');
+    
+    if (window.innerWidth <= 768) {
+        sidebar.classList.add('show-mobile');
+        chatArea.style.display = 'none';
+        backButton.style.display = 'none';
+    }
+}
+
+// Скрыть чаты и показать список
+function hideChatAndShowList() {
+    const sidebar = document.querySelector('.col-md-4.col-lg-3');
+    const chatArea = document.querySelector('.col-md-8.col-lg-9');
+    const backButton = document.querySelector('.back-to-chats');
+    
+    if (window.innerWidth <= 768) {
+        sidebar.classList.remove('show-mobile');
+        chatArea.style.display = 'block';
+        backButton.style.display = 'none';
+        
+        // Скрываем активный чат
+        const chatAreaElement = document.getElementById('chatArea');
+        chatAreaElement.style.display = 'none';
+        currentChatId = null;
+    }
+}
+
+// Показать чат на мобильных
+function showChatOnMobile() {
+    if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.col-md-4.col-lg-3');
+        const chatArea = document.querySelector('.col-md-8.col-lg-9');
+        const backButton = document.querySelector('.back-to-chats');
+        
+        sidebar.classList.remove('show-mobile');
+        chatArea.style.display = 'block';
+        backButton.style.display = 'flex';
+    }
+}
+
+// Переключить автоответы с мобильной панели
+function toggleAutoResponse() {
+    const checkbox = document.getElementById('mainAutoResponseMode');
+    checkbox.checked = !checkbox.checked;
+    toggleAutoResponseMode();
+    
+    // Обновляем кнопку в мобильной навигации
+    const mobileBtn = event.target.closest('.mobile-nav-btn');
+    if (checkbox.checked) {
+        mobileBtn.classList.add('active');
+    } else {
+        mobileBtn.classList.remove('active');
+    }
+}
+
+// Обновить счетчик непрочитанных на мобильной панели
+function updateMobileUnreadBadge(count) {
+    const badge = document.getElementById('mobileUnreadBadge');
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
+// Инициализация мобильной версии
+function initMobileVersion() {
+    // Обновляем функцию selectChat для мобильных
+    const originalSelectChat = window.selectChat;
+    window.selectChat = function(chatId, element) {
+        originalSelectChat(chatId, element);
+        showChatOnMobile();
+    };
+    
+    // Обновляем счетчики при изменении
+    const originalUpdateUnreadCount = window.updateUnreadCount || function() {};
+    window.updateUnreadCount = function(count) {
+        originalUpdateUnreadCount(count);
+        updateMobileUnreadBadge(count);
+    };
+}
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    initMobileVersion();
+    
+    // Обработка изменения размера окна
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            // Возврат к десктопной версии
+            const sidebar = document.querySelector('.col-md-4.col-lg-3');
+            const chatArea = document.querySelector('.col-md-8.col-lg-9');
+            const backButton = document.querySelector('.back-to-chats');
+            
+            sidebar.classList.remove('show-mobile');
+            chatArea.style.display = 'block';
+            backButton.style.display = 'none';
+        }
+    });
+});
 
 </script>
 {% endblock %}
