@@ -585,8 +585,9 @@
     
     /* Сообщения на мобильных */
     .messages-container {
-        height: calc(100vh - 300px) !important;
-        margin-bottom: 80px; /* Место для mobile-nav */
+        height: calc(100vh - 200px) !important;
+        padding-bottom: 100px;
+        overflow-y: auto;
     }
     
     .message-bubble {
@@ -600,29 +601,32 @@
         max-height: 250px !important;
     }
     
-    /* Форма отправки сообщения */
-    .message-form {
+    /* Форма отправки сообщения на мобильных */
+    #chatArea .card-footer:last-child {
         position: fixed;
-        bottom: 60px; /* Над mobile-nav */
+        bottom: 70px; /* Над mobile-nav */
         left: 10px;
         right: 10px;
         background: white;
         border: 1px solid #dee2e6;
         border-radius: 10px;
         padding: 10px;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
         z-index: 998;
+        margin: 0;
     }
     
     /* AI ассистент на мобильных */
-    .card-footer {
-        position: fixed;
-        bottom: 120px; /* Над формой и nav */
+    #aiAssistant {
+        position: fixed !important;
+        bottom: 140px; /* Над формой и nav */
         left: 10px;
         right: 10px;
         border-radius: 10px;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-        z-index: 997;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
+        z-index: 999;
+        margin: 0;
+        background: white;
     }
     
     /* Список чатов на мобильных */
@@ -641,43 +645,63 @@
         font-size: 16px !important;
     }
     
-    /* Скрываем боковую панель по умолчанию на мобильных */
-    .mobile-hide-sidebar .col-md-4.col-lg-3 {
-        display: none !important;
+    /* Основной контент на полную ширину на мобильных */
+    .col-md-8.col-lg-9 {
+        width: 100% !important;
+        flex: none !important;
+        max-width: none !important;
+        padding-bottom: 80px; /* Место для mobile-nav */
+    }
+    
+    /* Показываем список чатов по умолчанию на мобильных при отсутствии выбранного чата */
+    .col-md-4.col-lg-3:not(.show-mobile) {
+        display: none;
     }
     
     /* Кнопка возврата к списку чатов */
     .back-to-chats {
         position: fixed;
-        top: 20px;
-        left: 20px;
+        top: 15px;
+        left: 15px;
         z-index: 1001;
-        background: rgba(255,255,255,0.9);
-        border: 1px solid #dee2e6;
+        background: rgba(99, 102, 241, 0.9);
+        color: white;
+        border: none;
         border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        display: flex;
+        width: 45px;
+        height: 45px;
+        display: none;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        font-size: 18px;
     }
 }
 
 /* Стили для десктопных устройств */
 @media (min-width: 769px) {
     .mobile-nav,
-    .back-to-chats,
-    .mobile-chat-header {
+    .back-to-chats {
         display: none !important;
     }
     
-    .message-form,
-    .card-footer {
+    #chatArea .card-footer,
+    #aiAssistant {
         position: relative !important;
         bottom: auto !important;
         left: auto !important;
         right: auto !important;
+        width: auto !important;
+        z-index: auto !important;
+        box-shadow: none !important;
+        margin: auto !important;
+    }
+    
+    .col-md-4.col-lg-3 {
+        display: block !important;
+        position: relative !important;
+        width: auto !important;
+        height: auto !important;
     }
 }
 </style>
@@ -2143,6 +2167,7 @@ function updateCrmDropdown(chatId, clientId) {
     </div>
 </div>
 
+<script>
 // Настройка webhook для уведомлений
 async function setupWebhook() {
     try {
@@ -2173,31 +2198,49 @@ async function setupWebhook() {
 
 // Показать список чатов на мобильных
 function showChatsList() {
-    const sidebar = document.querySelector('.col-md-4.col-lg-3');
-    const chatArea = document.querySelector('.col-md-8.col-lg-9');
-    const backButton = document.querySelector('.back-to-chats');
-    
     if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.col-md-4.col-lg-3');
+        const chatArea = document.querySelector('.col-md-8.col-lg-9');
+        const noChatSelected = document.getElementById('noChatSelected');
+        const chatAreaElement = document.getElementById('chatArea');
+        const backButton = document.querySelector('.back-to-chats');
+        
+        // Показываем список чатов
+        sidebar.style.display = 'block';
         sidebar.classList.add('show-mobile');
+        
+        // Скрываем область чата
         chatArea.style.display = 'none';
-        backButton.style.display = 'none';
+        
+        // Скрываем кнопку возврата
+        if (backButton) backButton.style.display = 'none';
     }
 }
 
-// Скрыть чаты и показать список
+// Скрыть список чатов и показать выбор чата
 function hideChatAndShowList() {
-    const sidebar = document.querySelector('.col-md-4.col-lg-3');
-    const chatArea = document.querySelector('.col-md-8.col-lg-9');
-    const backButton = document.querySelector('.back-to-chats');
-    
     if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.col-md-4.col-lg-3');
+        const chatArea = document.querySelector('.col-md-8.col-lg-9');
+        const noChatSelected = document.getElementById('noChatSelected');
+        const chatAreaElement = document.getElementById('chatArea');
+        const backButton = document.querySelector('.back-to-chats');
+        
+        // Скрываем список чатов
+        sidebar.style.display = 'none';
         sidebar.classList.remove('show-mobile');
+        
+        // Показываем область выбора чата
         chatArea.style.display = 'block';
-        backButton.style.display = 'none';
+        noChatSelected.style.display = 'block';
         
         // Скрываем активный чат
-        const chatAreaElement = document.getElementById('chatArea');
         chatAreaElement.style.display = 'none';
+        
+        // Скрываем кнопку возврата
+        if (backButton) backButton.style.display = 'none';
+        
+        // Сбрасываем текущий чат
         currentChatId = null;
     }
 }
@@ -2209,73 +2252,55 @@ function showChatOnMobile() {
         const chatArea = document.querySelector('.col-md-8.col-lg-9');
         const backButton = document.querySelector('.back-to-chats');
         
+        // Скрываем список чатов
+        sidebar.style.display = 'none';
         sidebar.classList.remove('show-mobile');
+        
+        // Показываем область чата
         chatArea.style.display = 'block';
-        backButton.style.display = 'flex';
+        
+        // Показываем кнопку возврата
+        if (backButton) backButton.style.display = 'flex';
     }
 }
 
 // Переключить автоответы с мобильной панели
 function toggleAutoResponse() {
     const checkbox = document.getElementById('mainAutoResponseMode');
-    checkbox.checked = !checkbox.checked;
-    toggleAutoResponseMode();
-    
-    // Обновляем кнопку в мобильной навигации
-    const mobileBtn = event.target.closest('.mobile-nav-btn');
-    if (checkbox.checked) {
-        mobileBtn.classList.add('active');
-    } else {
-        mobileBtn.classList.remove('active');
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        toggleAutoResponseMode();
+        
+        // Обновляем кнопку в мобильной навигации
+        const mobileBtn = event.target.closest('.mobile-nav-btn');
+        if (mobileBtn) {
+            if (checkbox.checked) {
+                mobileBtn.classList.add('active');
+            } else {
+                mobileBtn.classList.remove('active');
+            }
+        }
     }
 }
 
 // Обновить счетчик непрочитанных на мобильной панели
 function updateMobileUnreadBadge(count) {
     const badge = document.getElementById('mobileUnreadBadge');
-    if (count > 0) {
-        badge.textContent = count;
-        badge.style.display = 'block';
-    } else {
-        badge.style.display = 'none';
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+    
+    // Также обновляем основной счетчик
+    const mainBadge = document.getElementById('unreadCount');
+    if (mainBadge) {
+        mainBadge.textContent = count || 0;
     }
 }
-
-// Инициализация мобильной версии
-function initMobileVersion() {
-    // Обновляем функцию selectChat для мобильных
-    const originalSelectChat = window.selectChat;
-    window.selectChat = function(chatId, element) {
-        originalSelectChat(chatId, element);
-        showChatOnMobile();
-    };
-    
-    // Обновляем счетчики при изменении
-    const originalUpdateUnreadCount = window.updateUnreadCount || function() {};
-    window.updateUnreadCount = function(count) {
-        originalUpdateUnreadCount(count);
-        updateMobileUnreadBadge(count);
-    };
-}
-
-// Инициализация при загрузке
-document.addEventListener('DOMContentLoaded', function() {
-    initMobileVersion();
-    
-    // Обработка изменения размера окна
-    window.addEventListener('resize', function() {
-        if (window.innerWidth > 768) {
-            // Возврат к десктопной версии
-            const sidebar = document.querySelector('.col-md-4.col-lg-3');
-            const chatArea = document.querySelector('.col-md-8.col-lg-9');
-            const backButton = document.querySelector('.back-to-chats');
-            
-            sidebar.classList.remove('show-mobile');
-            chatArea.style.display = 'block';
-            backButton.style.display = 'none';
-        }
-    });
-});
 
 </script>
 {% endblock %}
