@@ -301,6 +301,133 @@ body {
     margin-bottom: 20px;
     opacity: 0.5;
 }
+
+/* Мобильные стили */
+@media (max-width: 768px) {
+    .main-header {
+        padding: 20px 15px;
+        margin-bottom: 20px;
+        border-radius: 15px;
+    }
+    
+    .main-header h1 {
+        font-size: 24px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+    
+    .stat-card {
+        padding: 15px;
+    }
+    
+    .stat-number {
+        font-size: 24px;
+    }
+    
+    .employee-card {
+        margin-bottom: 15px;
+        padding: 15px;
+    }
+    
+    .employee-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .settings-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+    
+    .settings-section {
+        padding: 15px;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .btn-modern {
+        padding: 10px 20px;
+        font-size: 12px;
+    }
+    
+    .toggle-switch {
+        transform: scale(0.8);
+    }
+    
+    .management-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .management-actions .btn {
+        width: 100%;
+        margin: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-header {
+        padding: 15px 10px;
+        margin-bottom: 15px;
+    }
+    
+    .main-header h1 {
+        font-size: 20px;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    
+    .stat-card {
+        padding: 10px;
+    }
+    
+    .stat-number {
+        font-size: 20px;
+    }
+    
+    .employee-card {
+        padding: 10px;
+    }
+    
+    .settings-section {
+        padding: 10px;
+    }
+    
+    .settings-section h4 {
+        font-size: 14px;
+    }
+    
+    .form-group label {
+        font-size: 12px;
+    }
+    
+    .form-control {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+    
+    .btn-modern {
+        padding: 8px 16px;
+        font-size: 11px;
+    }
+    
+    .empty-state h3 {
+        font-size: 18px;
+    }
+    
+    .empty-state .fas {
+        font-size: 2.5rem;
+    }
+}
 </style>
 {% endblock %}
 

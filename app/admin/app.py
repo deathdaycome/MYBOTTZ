@@ -322,7 +322,7 @@ if avito_oauth_router:
 # Подключаем роутер управления правами
 try:
     from .routers.permissions_management import router as permissions_router
-    admin_router.include_router(permissions_router)
+    admin_router.include_router(permissions_router, prefix="/permissions")
     print("Роутер управления правами подключен")
 except ImportError as e:
     print(f"⚠️ Не удалось подключить роутер управления правами: {e}")

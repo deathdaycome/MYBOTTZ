@@ -1,0 +1,2306 @@
+{% extends "base.html" %}
+
+{% block title %}Авито Мессенджер - Админ панель{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0 text-primary">
+            <i class="fas fa-comments me-2"></i>Авито Мессенджер
+        </h1>
+        <div class="d-flex align-items-center gap-3">
+            <!-- AI Автоответы -->
+            <div class="d-flex align-items-center">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="mainAutoResponseMode" onchange="toggleAutoResponseMode()" style="transform: scale(1.3);">
+                    <label class="form-check-label fw-bold text-primary ms-2" for="mainAutoResponseMode">
+                        <i class="fas fa-robot me-2"></i>AI Автоответы
+                        <span id="mainAutoResponseStatus" class="badge bg-secondary ms-2">ВЫКЛ</span>
+                    </label>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-outline-primary" onclick="refreshChats()">
+                    <i class="fas fa-sync-alt me-2"></i>Обновить
+                </button>
+                <button class="btn btn-primary" onclick="showSettings()">
+                    <i class="fas fa-cog me-2"></i>Настройки
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <!-- Список чатов -->
+        <div class="col-md-4 col-lg-3">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-gradient bg-primary text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Чаты</h5>
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="badge bg-white text-primary fs-6" id="unreadCount">0</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Фильтр чатов -->
+                    <div class="p-3 border-bottom">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="searchChats" placeholder="Поиск...">
+                            <button class="btn btn-outline-secondary" type="button">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="showUnreadOnly">
+                            <label class="form-check-label" for="showUnreadOnly">
+                                Только непрочитанные
+                            </label>
+                        </div>
+                    </div>
+                    <!-- Список чатов -->
+                    <div class="chat-list" id="chatList" style="max-height: 600px; overflow-y: auto;">
+                        <div class="text-center p-4 text-muted">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <p>Загрузка чатов...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Область чата -->
+        <div class="col-md-8 col-lg-9">
+            <div class="card shadow-sm h-100">
+                <div id="noChatSelected" class="text-center p-5">
+                    <i class="fas fa-comments fa-5x text-muted mb-3"></i>
+                    <h4 class="text-muted">Выберите чат для начала общения</h4>
+                </div>
+
+                <div id="chatArea" style="display: none;">
+                    <!-- Заголовок чата -->
+                    <div class="card-header bg-white border-bottom">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <div class="avatar-circle me-3">
+                                    <span id="chatAvatar">?</span>
+                                </div>
+                                <div>
+                                    <h5 class="mb-0" id="chatUserName">Имя пользователя</h5>
+                                    <small class="text-muted" id="chatItemInfo"></small>
+                                </div>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-outline-success btn-sm" onclick="createLeadFromChat()" title="Добавить как лид">
+                                    <i class="fas fa-star"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="showChatInfo()" title="Информация">
+                                    <i class="fas fa-info-circle"></i>
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="blockUser()" title="Заблокировать">
+                                    <i class="fas fa-ban"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Сообщения -->
+                    <div class="card-body messages-container" id="messagesContainer" style="height: 500px; overflow-y: auto;">
+                        <div class="text-center p-4">
+                            <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        </div>
+                    </div>
+
+                    <!-- AI Ассистент -->
+                    <div class="card-footer bg-light border-top-0" id="aiAssistant" style="display: none;">
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                            <i class="fas fa-robot text-primary"></i>
+                            <small class="text-muted"><strong>AI Ассистент</strong> анализирует контекст чата</small>
+                            <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="hideAiAssistant()">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div id="aiSuggestion" class="border rounded p-3 mb-2 bg-white">
+                            <div class="text-center p-2">
+                                <i class="fas fa-spinner fa-spin"></i> Генерирую ответ...
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success btn-sm" onclick="useAiSuggestion()">
+                                <i class="fas fa-check"></i> Использовать
+                            </button>
+                            <button class="btn btn-info btn-sm" onclick="regenerateAiSuggestion()">
+                                <i class="fas fa-sync-alt"></i> Новый вариант
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Форма отправки сообщения -->
+                    <div class="card-footer bg-white">
+                        <form id="messageForm" onsubmit="sendMessage(event)">
+                            <div class="input-group">
+                                <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('imageUpload').click()">
+                                    <i class="fas fa-image"></i>
+                                </button>
+                                <input type="file" id="imageUpload" accept="image/*" style="display: none;" onchange="uploadImage(this)">
+                                <input type="text" class="form-control" id="messageInput" placeholder="Введите сообщение..." required>
+                                <button class="btn btn-outline-info" type="button" onclick="showAiAssistant()" title="AI Ассистент">
+                                    <i class="fas fa-robot"></i>
+                                </button>
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown" title="CRM действия">
+                                        <i class="fas fa-user-plus"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="#" onclick="createLeadFromChat()">
+                                            <i class="fas fa-star me-2 text-warning"></i>Создать лид
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="showStatusModal()">
+                                            <i class="fas fa-tag me-2 text-primary"></i>Статус клиента
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="#" onclick="exportChatDialog()">
+                                            <i class="fas fa-download me-2 text-info"></i>Экспорт чата
+                                        </a></li>
+                                    </ul>
+                                </div>
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-paper-plane"></i> Отправить
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Мобильная навигация (показывается только на мобильных) -->
+<div class="mobile-nav d-md-none">
+    <button class="mobile-nav-btn" onclick="showChatsList()">
+        <i class="fas fa-comments"></i>
+        <span>Чаты</span>
+        <span class="badge bg-danger rounded-pill" id="mobileUnreadBadge" style="position: absolute; top: -5px; right: 15px; font-size: 10px; display: none;"></span>
+    </button>
+    <button class="mobile-nav-btn" onclick="toggleAutoResponse()">
+        <i class="fas fa-robot"></i>
+        <span>AI</span>
+    </button>
+    <button class="mobile-nav-btn" onclick="showSettings()">
+        <i class="fas fa-cog"></i>
+        <span>Настройки</span>
+    </button>
+    <button class="mobile-nav-btn" onclick="refreshChats()">
+        <i class="fas fa-sync-alt"></i>
+        <span>Обновить</span>
+    </button>
+</div>
+
+<!-- Кнопка возврата к чатам (показывается только на мобильных) -->
+<button class="back-to-chats d-md-none" onclick="hideChatAndShowList()" style="display: none;">
+    <i class="fas fa-arrow-left"></i>
+</button>
+
+<!-- Модальное окно настроек -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Настройки Авито</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="settingsForm">
+                    <div class="mb-3">
+                        <label for="avitoUserId" class="form-label">User ID Авито</label>
+                        <input type="text" class="form-control" id="avitoUserId" required>
+                        <small class="text-muted">ID вашего аккаунта на Авито</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telegram уведомления</label>
+                        <div>
+                            <button type="button" class="btn btn-success" onclick="setupWebhook()">
+                                <i class="fas fa-bell me-2"></i>Настроить уведомления
+                            </button>
+                            <small class="text-muted d-block mt-2">
+                                Настройте webhook для получения уведомлений в Telegram о новых сообщениях
+                            </small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно информации о чате -->
+<div class="modal fade" id="chatInfoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Информация о чате</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="chatInfoContent">
+                <!-- Информация загружается динамически -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления клиента -->
+<div class="modal fade" id="addClientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-star me-2"></i>Добавить лид из диалога
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="alert alert-info">
+                        <i class="fas fa-robot me-2"></i>
+                        <strong>AI анализирует диалог...</strong> Извлекаем контактные данные и требования клиента.
+                    </div>
+                </div>
+                
+                <div id="clientAnalysisContent">
+                    <div class="text-center p-4">
+                        <i class="fas fa-spinner fa-spin fa-2x"></i>
+                        <p class="mt-3">Анализируем диалог для создания карточки клиента...</p>
+                    </div>
+                </div>
+
+                <form id="addClientForm" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientName" class="form-label">Имя клиента *</label>
+                                <input type="text" class="form-control" id="clientName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientPhone" class="form-label">Телефон</label>
+                                <input type="tel" class="form-control" id="clientPhone">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientTelegram" class="form-label">Telegram</label>
+                                <input type="text" class="form-control" id="clientTelegram">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="clientEmail">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="clientRequirements" class="form-label">Требования/Пожелания</label>
+                        <textarea class="form-control" id="clientRequirements" rows="4"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientSource" class="form-label">Источник</label>
+                                <select class="form-select" id="clientSource">
+                                    <option value="avito">Avito</option>
+                                    <option value="telegram">Telegram</option>
+                                    <option value="website">Сайт</option>
+                                    <option value="referral">Рекомендация</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="clientType" class="form-label">Тип клиента</label>
+                                <select class="form-select" id="clientType">
+                                    <option value="individual">Физическое лицо</option>
+                                    <option value="company">Компания</option>
+                                    <option value="ip">ИП</option>
+                                    <option value="self_employed">Самозанятый</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" id="saveClientBtn" onclick="saveClient()" style="display: none;">
+                    <i class="fas fa-save"></i> Сохранить клиента
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.chat-list .chat-item {
+    padding: 15px;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.chat-list .chat-item:hover {
+    background-color: #f8f9fa;
+}
+
+.chat-list .chat-item.active {
+    background-color: #e7f3ff;
+    border-left: 3px solid #007bff;
+}
+
+.chat-list .chat-item.unread {
+    font-weight: bold;
+    background-color: #fff9e6;
+}
+
+.avatar-circle {
+    width: 45px;
+    height: 45px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.message {
+    margin-bottom: 20px;
+    display: flex;
+    animation: fadeIn 0.3s;
+}
+
+.message.own {
+    justify-content: flex-end;
+}
+
+.message-bubble {
+    max-width: 70%;
+    padding: 12px 16px;
+    border-radius: 18px;
+    position: relative;
+}
+
+.message.own .message-bubble {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.message:not(.own) .message-bubble {
+    background-color: #f1f3f5;
+    color: #333;
+}
+
+.message-time {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 5px;
+}
+
+.message.own .message-time {
+    text-align: right;
+}
+
+.message-image {
+    max-width: 300px;
+    max-height: 300px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.typing-indicator {
+    display: inline-block;
+    padding: 10px 15px;
+    background-color: #f1f3f5;
+    border-radius: 18px;
+}
+
+.typing-indicator span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #999;
+    border-radius: 50%;
+    margin: 0 2px;
+    animation: typing 1.4s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-10px);
+    }
+}
+
+/* Мобильные стили */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+    
+    /* Компактный заголовок на мобильных */
+    .d-flex.justify-content-between.align-items-center.mb-4 {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 15px;
+    }
+    
+    .d-flex.align-items-center.gap-3 {
+        flex-direction: column;
+        gap: 10px !important;
+    }
+    
+    /* AI автоответы в мобильной версии */
+    .form-check {
+        justify-content: center;
+        text-align: center;
+    }
+    
+    .btn-group {
+        width: 100%;
+        display: flex !important;
+    }
+    
+    .btn-group .btn {
+        flex: 1;
+        font-size: 14px;
+        padding: 8px 12px;
+    }
+    
+    /* Мобильная сетка чатов */
+    .row.g-3 {
+        --bs-gutter-x: 0.5rem;
+    }
+    
+    .col-md-4.col-lg-3 {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100vh;
+        z-index: 1000;
+        background: white;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        display: none;
+    }
+    
+    .col-md-4.col-lg-3.show-mobile {
+        transform: translateX(0);
+        display: block !important;
+    }
+    
+    .col-md-8.col-lg-9 {
+        width: 100% !important;
+        flex: none !important;
+        max-width: none !important;
+    }
+    
+    /* Мобильные кнопки навигации */
+    .mobile-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 1px solid #dee2e6;
+        padding: 10px;
+        z-index: 999;
+        display: flex;
+        justify-content: space-around;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .mobile-nav-btn {
+        background: none;
+        border: none;
+        color: #6c757d;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 5px 10px;
+        border-radius: 8px;
+        transition: all 0.2s;
+        min-width: 60px;
+    }
+    
+    .mobile-nav-btn:hover, .mobile-nav-btn.active {
+        background: #e7f3ff;
+        color: #007bff;
+    }
+    
+    .mobile-nav-btn i {
+        font-size: 18px;
+        margin-bottom: 3px;
+    }
+    
+    /* Заголовок чата на мобильных */
+    .card-header .d-flex {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .btn-group .btn-sm {
+        font-size: 12px;
+        padding: 4px 8px;
+    }
+    
+    /* Сообщения на мобильных */
+    .messages-container {
+        height: calc(100vh - 200px) !important;
+        padding-bottom: 100px;
+        overflow-y: auto;
+    }
+    
+    .message-bubble {
+        max-width: 85% !important;
+        font-size: 14px;
+        padding: 10px 14px;
+    }
+    
+    .message-image {
+        max-width: 250px !important;
+        max-height: 250px !important;
+    }
+    
+    /* Форма отправки сообщения на мобильных */
+    #chatArea .card-footer:last-child {
+        position: fixed;
+        bottom: 70px; /* Над mobile-nav */
+        left: 10px;
+        right: 10px;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        padding: 10px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
+        z-index: 998;
+        margin: 0;
+    }
+    
+    /* AI ассистент на мобильных */
+    #aiAssistant {
+        position: fixed !important;
+        bottom: 140px; /* Над формой и nav */
+        left: 10px;
+        right: 10px;
+        border-radius: 10px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.15);
+        z-index: 999;
+        margin: 0;
+        background: white;
+    }
+    
+    /* Список чатов на мобильных */
+    .chat-item {
+        padding: 12px 15px !important;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .chat-item .d-flex {
+        align-items: center !important;
+    }
+    
+    .avatar-circle {
+        width: 40px !important;
+        height: 40px !important;
+        font-size: 16px !important;
+    }
+    
+    /* Основной контент на полную ширину на мобильных */
+    .col-md-8.col-lg-9 {
+        width: 100% !important;
+        flex: none !important;
+        max-width: none !important;
+        padding-bottom: 80px; /* Место для mobile-nav */
+    }
+    
+    /* Показываем список чатов по умолчанию на мобильных при отсутствии выбранного чата */
+    .col-md-4.col-lg-3:not(.show-mobile) {
+        display: none;
+    }
+    
+    /* Кнопка возврата к списку чатов */
+    .back-to-chats {
+        position: fixed;
+        top: 15px;
+        left: 15px;
+        z-index: 1001;
+        background: rgba(99, 102, 241, 0.9);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        font-size: 18px;
+    }
+}
+
+/* Стили для десктопных устройств */
+@media (min-width: 769px) {
+    .mobile-nav,
+    .back-to-chats {
+        display: none !important;
+    }
+    
+    #chatArea .card-footer,
+    #aiAssistant {
+        position: relative !important;
+        bottom: auto !important;
+        left: auto !important;
+        right: auto !important;
+        width: auto !important;
+        z-index: auto !important;
+        box-shadow: none !important;
+        margin: auto !important;
+    }
+    
+    .col-md-4.col-lg-3 {
+        display: block !important;
+        position: relative !important;
+        width: auto !important;
+        height: auto !important;
+    }
+}
+</style>
+
+<script>
+let currentChatId = null;
+let ws = null;
+let chatsData = {};
+let currentUserId = null;
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация переключателей автоответов
+    const toggle = document.getElementById('autoResponseMode');
+    const debugToggle = document.getElementById('debugAutoResponseMode');
+    
+    checkConfiguration();
+    loadChats(); // Загружаем чаты сразу
+    setInterval(loadChats, 30000); // Обновление каждые 30 секунд
+});
+
+// Проверка конфигурации при загрузке
+async function checkConfiguration() {
+    try {
+        // Сначала пробуем загрузить чаты
+        const response = await fetch('/admin/avito/chats');
+        if (response.ok) {
+            // Если успешно - конфигурация есть
+            loadChats();
+        } else if (response.status === 400) {
+            // Если 400 - нужна конфигурация
+            const errorData = await response.json();
+            if (errorData.detail && errorData.detail.includes('not configured')) {
+                showSettings();
+            }
+        }
+    } catch (error) {
+        console.error('Configuration check failed:', error);
+        loadChats(); // Пытаемся загрузить в любом случае
+    }
+}
+
+// Загрузка списка чатов
+async function loadChats() {
+    const chatList = document.getElementById('chatList');
+    
+    try {
+        // Показываем индикатор загрузки
+        chatList.innerHTML = `
+            <div class="text-center p-4 text-muted">
+                <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                <p>Загрузка чатов...</p>
+            </div>
+        `;
+        
+        const showUnreadOnlyEl = document.getElementById('showUnreadOnly');
+        const showUnreadOnly = showUnreadOnlyEl ? showUnreadOnlyEl.checked : false;
+        const response = await fetch(`/admin/avito/chats?unread_only=${showUnreadOnly}`);
+        
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+            let errorData;
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                errorData = { detail: `HTTP ${response.status}` };
+            }
+            
+            console.error('API Error:', errorData);
+            
+            if (response.status === 400) {
+                if (errorData.detail && errorData.detail.includes('not configured')) {
+                    showSettings();
+                } else {
+                    showAuthorizationMessage();
+                }
+                return;
+            } else if (response.status === 403 || response.status === 401) {
+                showAuthorizationMessage();
+                return;
+            }
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Received chats data:', data);
+        console.log('data.chats type:', typeof data.chats);
+        console.log('data.chats is array:', Array.isArray(data.chats));
+        console.log('data.chats length:', data.chats ? data.chats.length : 'undefined');
+        
+        if (data && data.chats) {
+            // Устанавливаем текущий User ID если он пришёл в ответе
+            if (data.current_user_id) {
+                currentUserId = data.current_user_id;
+                console.log('Set currentUserId to:', currentUserId);
+            }
+            console.log('About to display chats. Data structure:', data);
+            displayChats(data.chats);
+            updateUnreadCount(data.chats);
+        } else {
+            console.error('Invalid response format:', data);
+            throw new Error('Неверный формат ответа от сервера');
+        }
+    } catch (error) {
+        console.error('Error loading chats:', error);
+        chatList.innerHTML = `
+            <div class="text-center p-4 text-danger">
+                <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+                <h5>Ошибка загрузки чатов</h5>
+                <p>${error.message}</p>
+                <button class="btn btn-primary mt-2" onclick="loadChats()">
+                    <i class="fas fa-sync-alt"></i> Попробовать снова
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Показать сообщение об авторизации
+function showAuthorizationMessage() {
+    const chatList = document.getElementById('chatList');
+    chatList.innerHTML = `
+        <div class="text-center p-4">
+            <i class="fas fa-lock fa-3x mb-3 text-warning"></i>
+            <h5>Требуется авторизация</h5>
+            <p class="text-muted">Для доступа к чатам Avito необходимо авторизоваться</p>
+            <a href="/admin/avito/oauth/login" class="btn btn-primary mt-3">
+                <i class="fas fa-sign-in-alt me-2"></i>Авторизоваться в Avito
+            </a>
+        </div>
+    `;
+}
+
+// Отображение списка чатов
+function displayChats(chats) {
+    const chatList = document.getElementById('chatList');
+    console.log('displayChats called with:', chats);
+    console.log('Displaying chats:', chats ? chats.length : 'chats is null/undefined', 'chats');
+    
+    if (!chats || chats.length === 0) {
+        chatList.innerHTML = `
+            <div class="text-center p-4 text-muted">
+                <i class="fas fa-inbox fa-3x mb-3"></i>
+                <p>Нет доступных чатов</p>
+                <small>Возможно, у вас действительно нет активных чатов в Avito</small>
+                <a href="/admin/avito/oauth/login" class="btn btn-sm btn-outline-primary mt-3">
+                    <i class="fas fa-sync-alt me-2"></i>Переавторизоваться
+                </a>
+            </div>
+        `;
+        return;
+    }
+    
+    chatList.innerHTML = '';
+    
+    chats.forEach((chat, index) => {
+        console.log(`Processing chat ${index + 1}:`, chat);
+        chatsData[chat.id] = chat;
+        
+        const chatItem = document.createElement('div');
+        chatItem.className = `chat-item ${chat.unread_count > 0 ? 'unread' : ''} ${chat.id === currentChatId ? 'active' : ''}`;
+        chatItem.onclick = () => selectChat(chat.id);
+        
+        // Используем currentUserId если он есть, иначе fallback
+        const userIdToExclude = currentUserId || 216012096;
+        const otherUser = chat.users ? chat.users.find(u => u.id !== userIdToExclude) : null;
+        const userName = otherUser?.name || otherUser?.id?.toString() || 'Неизвестный';
+        const lastMessageText = chat.last_message?.content?.text || 'Нет сообщений';
+        const lastMessageTime = chat.last_message ? formatTime(chat.last_message.created) : '';
+        
+        console.log(`Chat ${chat.id}: userName=${userName}, lastMessage=${lastMessageText}`);
+        
+        chatItem.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between">
+                        <strong>${userName}</strong>
+                        ${chat.unread_count > 0 ? `<span class="badge bg-primary">${chat.unread_count}</span>` : ''}
+                    </div>
+                    <div class="text-muted text-truncate" style="max-width: 250px;">
+                        ${lastMessageText}
+                    </div>
+                </div>
+                <small class="text-muted">${lastMessageTime}</small>
+            </div>
+        `;
+        
+        chatList.appendChild(chatItem);
+    });
+    
+    console.log('Chats displayed successfully');
+}
+
+// Обновление счетчика непрочитанных
+function updateUnreadCount(chats) {
+    const totalUnread = chats.reduce((sum, chat) => sum + (chat.unread_count || 0), 0);
+    document.getElementById('unreadCount').textContent = totalUnread;
+}
+
+// Выбор чата
+async function selectChat(chatId) {
+    currentChatId = chatId;
+    
+    // Обновляем активный элемент в списке
+    document.querySelectorAll('.chat-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    event.currentTarget?.classList.add('active');
+    
+    // Показываем область чата
+    document.getElementById('noChatSelected').style.display = 'none';
+    document.getElementById('chatArea').style.display = 'block';
+    
+    // Загружаем информацию о чате
+    const chat = chatsData[chatId];
+    if (chat) {
+        const userIdToExclude = currentUserId || 216012096;
+        const otherUser = chat.users.find(u => u.id !== userIdToExclude);
+        const userName = otherUser?.name || otherUser?.id?.toString() || 'Неизвестный';
+        document.getElementById('chatUserName').textContent = userName;
+        document.getElementById('chatAvatar').textContent = userName.charAt(0).toUpperCase();
+        
+        if (chat.context?.type === 'item') {
+            const item = chat.context.value;
+            document.getElementById('chatItemInfo').textContent = `${item.title || ''} - ${item.price || 0} руб.`;
+        }
+    }
+    
+    // Загружаем сообщения
+    await loadMessages(chatId);
+    
+    // Подключаемся к WebSocket
+    connectWebSocket(chatId);
+}
+
+// Загрузка сообщений
+async function loadMessages(chatId) {
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML = '<div class="text-center p-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${chatId}/messages`);
+        const data = await response.json();
+        
+        displayMessages(data.messages);
+        
+        // Отмечаем чат как прочитанный
+        await fetch(`/admin/avito/chats/${chatId}/read`, { method: 'POST' });
+        
+    } catch (error) {
+        console.error('Error loading messages:', error);
+        container.innerHTML = '<div class="text-center p-4 text-danger">Ошибка загрузки сообщений</div>';
+    }
+}
+
+// Отображение сообщений
+function displayMessages(messages) {
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML = '';
+    
+    // Сортируем сообщения по времени
+    messages.sort((a, b) => a.created - b.created);
+    
+    messages.forEach(msg => {
+        const messageEl = createMessageElement(msg);
+        container.appendChild(messageEl);
+    });
+    
+    // Прокручиваем вниз
+    container.scrollTop = container.scrollHeight;
+}
+
+// Создание элемента сообщения
+function createMessageElement(msg) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${msg.direction === 'out' ? 'own' : ''}`;
+    
+    let content = '';
+    
+    if (msg.type === 'text') {
+        content = `<div class="message-bubble">
+            <div>${escapeHtml(msg.content.text || '')}</div>
+            <div class="message-time">${formatTime(msg.created)}</div>
+        </div>`;
+    } else if (msg.type === 'image') {
+        const imageUrl = msg.content.image?.['640x480'] || msg.content.image?.['1280x960'] || '';
+        content = `<div class="message-bubble p-1">
+            <img src="${imageUrl}" class="message-image" onclick="openImage('${imageUrl}')">
+            <div class="message-time">${formatTime(msg.created)}</div>
+        </div>`;
+    } else if (msg.type === 'deleted') {
+        content = `<div class="message-bubble">
+            <div class="text-muted"><i>Сообщение удалено</i></div>
+            <div class="message-time">${formatTime(msg.created)}</div>
+        </div>`;
+    } else if (msg.type === 'system') {
+        content = `<div class="message-bubble">
+            <div class="text-info"><i class="fas fa-robot me-1"></i>${msg.content.text || 'Системное сообщение'}</div>
+            <div class="message-time">${formatTime(msg.created)}</div>
+        </div>`;
+    }
+    
+    messageDiv.innerHTML = content;
+    return messageDiv;
+}
+
+// Отправка сообщения
+async function sendMessage(event) {
+    event.preventDefault();
+    
+    const input = document.getElementById('messageInput');
+    const text = input.value.trim();
+    
+    if (!text || !currentChatId) return;
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/messages`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ text })
+        });
+        
+        if (!response.ok) throw new Error('Failed to send message');
+        
+        const message = await response.json();
+        
+        // Добавляем сообщение в чат
+        const container = document.getElementById('messagesContainer');
+        const messageEl = createMessageElement(message);
+        container.appendChild(messageEl);
+        container.scrollTop = container.scrollHeight;
+        
+        // Очищаем поле ввода
+        input.value = '';
+        
+    } catch (error) {
+        console.error('Error sending message:', error);
+        showNotification('Ошибка отправки сообщения', 'error');
+    }
+}
+
+// Загрузка изображения
+async function uploadImage(input) {
+    const file = input.files[0];
+    if (!file || !currentChatId) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/images`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (!response.ok) throw new Error('Failed to upload image');
+        
+        const message = await response.json();
+        
+        // Добавляем сообщение в чат
+        const container = document.getElementById('messagesContainer');
+        const messageEl = createMessageElement(message);
+        container.appendChild(messageEl);
+        container.scrollTop = container.scrollHeight;
+        
+        // Очищаем input
+        input.value = '';
+        
+    } catch (error) {
+        console.error('Error uploading image:', error);
+        showNotification('Ошибка загрузки изображения', 'error');
+    }
+}
+
+// WebSocket подключение
+function connectWebSocket(chatId) {
+    // Закрываем старое соединение
+    if (ws) {
+        ws.close();
+    }
+    
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${window.location.host}/admin/avito/ws/${chatId}`);
+    
+    ws.onopen = () => {
+        console.log('WebSocket connected');
+    };
+    
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'new_message') {
+            // Добавляем новое сообщение
+            const container = document.getElementById('messagesContainer');
+            const messageEl = createMessageElement(data.message);
+            container.appendChild(messageEl);
+            container.scrollTop = container.scrollHeight;
+            
+            // Воспроизводим звук уведомления
+            playNotificationSound();
+            
+            // Обрабатываем автоматический ответ если включен режим
+            if (autoResponseEnabled && data.message) {
+                processAutoResponse(currentChatId, data.message);
+            }
+        }
+    };
+    
+    ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+        console.log('WebSocket disconnected');
+    };
+}
+
+// Создание лида из чата
+async function createLeadFromChat() {
+    if (!currentChatId) return;
+    
+    if (!confirm('Добавить собеседника как лид?')) return;
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/create-lead`, {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'exists') {
+            showNotification('Клиент уже существует в базе', 'info');
+        } else {
+            showNotification(`Клиент "${data.client_name}" успешно добавлен`, 'success');
+            
+            // Показываем AI-сводку
+            if (data.summary) {
+                alert(`AI-сводка диалога:\n\n${data.summary}`);
+            }
+        }
+        
+    } catch (error) {
+        console.error('Error creating client:', error);
+        showNotification('Ошибка создания клиента', 'error');
+    }
+}
+
+// Показать настройки
+function showSettings() {
+    const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+    modal.show();
+}
+
+// Сохранить настройки
+async function saveSettings() {
+    const userId = document.getElementById('avitoUserId').value;
+    
+    if (!userId) {
+        showNotification('Введите User ID', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/admin/avito/configure', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ user_id: userId })
+        });
+        
+        if (!response.ok) throw new Error('Failed to save settings');
+        
+        localStorage.setItem('avitoUserId', userId);
+        
+        // Закрываем модальное окно
+        bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
+        
+        showNotification('Настройки сохранены', 'success');
+        
+        // Перезагружаем чаты
+        loadChats();
+        
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        showNotification('Ошибка сохранения настроек', 'error');
+    }
+}
+
+// Обновить чаты
+function refreshChats() {
+    loadChats();
+    showNotification('Чаты обновлены', 'success');
+}
+
+// Показать информацию о чате
+async function showChatInfo() {
+    if (!currentChatId) return;
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}`);
+        const chat = await response.json();
+        
+        const content = document.getElementById('chatInfoContent');
+        content.innerHTML = `
+            <div class="mb-3">
+                <strong>ID чата:</strong> ${chat.id}
+            </div>
+            <div class="mb-3">
+                <strong>Создан:</strong> ${new Date(chat.created * 1000).toLocaleString()}
+            </div>
+            <div class="mb-3">
+                <strong>Обновлен:</strong> ${new Date(chat.updated * 1000).toLocaleString()}
+            </div>
+            ${chat.context?.type === 'item' ? `
+                <div class="mb-3">
+                    <strong>Объявление:</strong> ${chat.context.value.title || 'Без названия'}
+                    <br><strong>Цена:</strong> ${chat.context.value.price || 0} руб.
+                </div>
+            ` : ''}
+            <div class="mb-3">
+                <strong>Участники:</strong>
+                <ul>
+                    ${chat.users.map(u => `<li>${u.name} (ID: ${u.id})</li>`).join('')}
+                </ul>
+            </div>
+        `;
+        
+        const modal = new bootstrap.Modal(document.getElementById('chatInfoModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Error loading chat info:', error);
+        showNotification('Ошибка загрузки информации', 'error');
+    }
+}
+
+// Блокировка пользователя
+async function blockUser() {
+    if (!currentChatId) return;
+    
+    if (!confirm('Заблокировать пользователя?')) return;
+    
+    showNotification('Функция в разработке', 'info');
+}
+
+// Вспомогательные функции
+function formatTime(timestamp) {
+    const date = new Date(timestamp * 1000);
+    const now = new Date();
+    
+    if (date.toDateString() === now.toDateString()) {
+        return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+function showNotification(message, type = 'info') {
+    // Используем SweetAlert2 если доступен
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            text: message,
+            icon: type,
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 3000
+        });
+    } else {
+        alert(message);
+    }
+}
+
+function playNotificationSound() {
+    // Воспроизведение звука уведомления
+    const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBCl+zOzsh0EGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAg+ltrzxnkpBCl+zOzslEAGHmS24+yfTg0PVqzn77BdGAgAAAA==');
+    audio.play().catch(e => console.log('Could not play notification sound'));
+}
+
+function openImage(url) {
+    window.open(url, '_blank');
+}
+
+// Поиск чатов
+document.getElementById('searchChats').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const chatItems = document.querySelectorAll('.chat-item');
+    
+    chatItems.forEach(item => {
+        const text = item.textContent.toLowerCase();
+        item.style.display = text.includes(searchTerm) ? 'block' : 'none';
+    });
+});
+
+// Фильтр непрочитанных
+document.getElementById('showUnreadOnly').addEventListener('change', function() {
+    loadChats();
+});
+
+// === AI АССИСТЕНТ ===
+
+let currentAiSuggestion = '';
+
+// Показать AI ассистента
+async function showAiAssistant() {
+    if (!currentChatId) {
+        showNotification('Выберите чат для генерации ответа', 'warning');
+        return;
+    }
+    
+    const aiAssistant = document.getElementById('aiAssistant');
+    const aiSuggestion = document.getElementById('aiSuggestion');
+    
+    // Показываем панель
+    aiAssistant.style.display = 'block';
+    
+    // Показываем индикатор загрузки
+    aiSuggestion.innerHTML = `
+        <div class="text-center p-2">
+            <i class="fas fa-spinner fa-spin text-primary"></i>
+            <small class="text-muted d-block mt-1">Анализирую контекст чата...</small>
+        </div>
+    `;
+    
+    try {
+        await generateAiResponse();
+    } catch (error) {
+        console.error('Error generating AI response:', error);
+        aiSuggestion.innerHTML = `
+            <div class="text-center p-2 text-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                <small class="d-block mt-1">Ошибка генерации ответа</small>
+            </div>
+        `;
+    }
+}
+
+// Скрыть AI ассистента
+function hideAiAssistant() {
+    document.getElementById('aiAssistant').style.display = 'none';
+    currentAiSuggestion = '';
+}
+
+// Генерировать AI ответ
+async function generateAiResponse() {
+    const aiSuggestion = document.getElementById('aiSuggestion');
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/ai-suggest`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.suggestion) {
+            currentAiSuggestion = data.suggestion;
+            
+            aiSuggestion.innerHTML = `
+                <div class="mb-2">
+                    <small class="text-muted">💡 Предлагаемый ответ:</small>
+                </div>
+                <div class="p-2 border-start border-primary border-3">
+                    ${escapeHtml(data.suggestion)}
+                </div>
+                ${data.reasoning ? `
+                    <details class="mt-2">
+                        <summary class="text-muted small" style="cursor: pointer;">🧠 Логика AI</summary>
+                        <small class="text-muted d-block mt-1">${escapeHtml(data.reasoning)}</small>
+                    </details>
+                ` : ''}
+            `;
+        } else {
+            throw new Error('No suggestion received');
+        }
+        
+    } catch (error) {
+        console.error('AI generation error:', error);
+        aiSuggestion.innerHTML = `
+            <div class="text-center p-3">
+                <i class="fas fa-exclamation-triangle text-warning"></i>
+                <div class="small text-muted mt-1">
+                    Не удалось сгенерировать ответ.<br>
+                    Проверьте подключение к AI сервису.
+                </div>
+                <button class="btn btn-sm btn-outline-primary mt-2" onclick="generateAiResponse()">
+                    <i class="fas fa-retry"></i> Попробовать ещё раз
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Повторно сгенерировать ответ
+async function regenerateAiSuggestion() {
+    const aiSuggestion = document.getElementById('aiSuggestion');
+    
+    aiSuggestion.innerHTML = `
+        <div class="text-center p-2">
+            <i class="fas fa-sync-alt fa-spin text-info"></i>
+            <small class="text-muted d-block mt-1">Генерирую новый вариант...</small>
+        </div>
+    `;
+    
+    await generateAiResponse();
+}
+
+// Использовать предложенный ответ
+function useAiSuggestion() {
+    if (!currentAiSuggestion) {
+        showNotification('Нет предложенного ответа', 'warning');
+        return;
+    }
+    
+    // Вставляем предложенный ответ в поле ввода
+    const messageInput = document.getElementById('messageInput');
+    messageInput.value = currentAiSuggestion;
+    
+    // Скрываем AI панель
+    hideAiAssistant();
+    
+    // Фокусируемся на поле ввода
+    messageInput.focus();
+    
+    showNotification('Ответ добавлен в поле ввода', 'success');
+}
+
+// === ДОБАВЛЕНИЕ КЛИЕНТА ===
+
+// Показать модальное окно добавления клиента
+async function showAddClientModal() {
+    if (!currentChatId) {
+        showNotification('Выберите чат для анализа клиента', 'warning');
+        return;
+    }
+    
+    // Показываем модальное окно
+    const modal = new bootstrap.Modal(document.getElementById('addClientModal'));
+    modal.show();
+    
+    // Запускаем AI анализ диалога
+    await analyzeClientFromChat();
+}
+
+// AI анализ диалога для извлечения данных клиента
+async function analyzeClientFromChat() {
+    if (!currentChatId) return;
+    
+    const analysisContent = document.getElementById('clientAnalysisContent');
+    const clientForm = document.getElementById('addClientForm');
+    const saveBtn = document.getElementById('saveClientBtn');
+    
+    try {
+        // Показываем индикатор загрузки
+        analysisContent.innerHTML = `
+            <div class="text-center p-4">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <p class="mt-3">Анализируем диалог для создания карточки клиента...</p>
+            </div>
+        `;
+        
+        // Отправляем запрос на анализ диалога
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/analyze-client`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Ошибка анализа диалога');
+        }
+        
+        const analysis = await response.json();
+        
+        // Показываем результат анализа
+        analysisContent.innerHTML = `
+            <div class="alert alert-success">
+                <i class="fas fa-check-circle me-2"></i>
+                <strong>Анализ завершен!</strong> Найдена следующая информация:
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">Извлеченные данные:</h6>
+                    <ul class="mb-0">
+                        ${analysis.name ? `<li><strong>Имя:</strong> ${analysis.name}</li>` : ''}
+                        ${analysis.phone ? `<li><strong>Телефон:</strong> ${analysis.phone}</li>` : ''}
+                        ${analysis.telegram ? `<li><strong>Telegram:</strong> ${analysis.telegram}</li>` : ''}
+                        ${analysis.email ? `<li><strong>Email:</strong> ${analysis.email}</li>` : ''}
+                        ${analysis.requirements ? `<li><strong>Требования:</strong> ${analysis.requirements}</li>` : ''}
+                    </ul>
+                </div>
+            </div>
+        `;
+        
+        // Заполняем форму
+        document.getElementById('clientName').value = analysis.name || '';
+        document.getElementById('clientPhone').value = analysis.phone || '';
+        document.getElementById('clientTelegram').value = analysis.telegram || '';
+        document.getElementById('clientEmail').value = analysis.email || '';
+        document.getElementById('clientRequirements').value = analysis.requirements || '';
+        document.getElementById('clientSource').value = 'avito';
+        
+        // Показываем форму и кнопку сохранения
+        clientForm.style.display = 'block';
+        saveBtn.style.display = 'block';
+        
+    } catch (error) {
+        console.error('Error analyzing client:', error);
+        
+        analysisContent.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Не удалось автоматически извлечь данные.</strong> 
+                Заполните форму вручную.
+            </div>
+        `;
+        
+        // Показываем пустую форму
+        clientForm.style.display = 'block';
+        saveBtn.style.display = 'block';
+        
+        // Устанавливаем источник как Avito
+        document.getElementById('clientSource').value = 'avito';
+    }
+}
+
+// Сохранить клиента
+async function saveClient() {
+    const form = document.getElementById('addClientForm');
+    const formData = new FormData(form);
+    
+    // Собираем данные формы
+    const clientData = {
+        name: document.getElementById('clientName').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim(),
+        telegram: document.getElementById('clientTelegram').value.trim(),
+        email: document.getElementById('clientEmail').value.trim(),
+        description: document.getElementById('clientRequirements').value.trim(),
+        source: document.getElementById('clientSource').value,
+        type: document.getElementById('clientType').value,
+        avito_chat_id: currentChatId
+    };
+    
+    // Валидация
+    if (!clientData.name) {
+        showNotification('Имя клиента обязательно', 'error');
+        return;
+    }
+    
+    if (!clientData.phone && !clientData.telegram && !clientData.email) {
+        showNotification('Укажите хотя бы один способ связи', 'warning');
+        return;
+    }
+    
+    try {
+        const saveBtn = document.getElementById('saveClientBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохраняем...';
+        
+        const response = await fetch('/admin/clients/api', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(clientData)
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Ошибка сохранения клиента');
+        }
+        
+        // Закрываем модальное окно
+        const modal = bootstrap.Modal.getInstance(document.getElementById('addClientModal'));
+        modal.hide();
+        
+        // Показываем уведомление с ссылкой
+        showNotification(
+            `Клиент "${clientData.name}" успешно добавлен! <a href="/admin/clients/${result.client.id}" target="_blank" class="btn btn-sm btn-light ms-2">Открыть карточку</a>`, 
+            'success'
+        );
+        
+        // Очищаем форму
+        form.reset();
+        
+    } catch (error) {
+        console.error('Error saving client:', error);
+        showNotification(error.message || 'Ошибка сохранения клиента', 'error');
+    } finally {
+        const saveBtn = document.getElementById('saveClientBtn');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Сохранить клиента';
+    }
+}
+
+// === АВТОМАТИЧЕСКИЕ ОТВЕТЫ AI ===
+
+let autoResponseEnabled = false;
+
+// Переключение режима автоответов
+async function toggleAutoResponseMode() {
+    const checkbox = document.getElementById('mainAutoResponseMode');
+    const statusBadge = document.getElementById('mainAutoResponseStatus');
+    
+    if (!checkbox || !statusBadge) return;
+    
+    try {
+        // Отправляем запрос на сервер
+        const response = await fetch('/admin/avito/auto-response/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ enabled: checkbox.checked })
+        });
+        
+        const result = await response.json();
+        
+        if (result.status === 'success') {
+            autoResponseEnabled = result.enabled;
+            
+            const statusText = autoResponseEnabled ? 'ВКЛ' : 'ВЫКЛ';
+            const statusClass = autoResponseEnabled ? 'bg-success' : 'bg-secondary';
+            
+            statusBadge.textContent = statusText;
+            statusBadge.className = `badge ${statusClass} ms-2`;
+            
+            showNotification(result.message, 'success');
+            localStorage.setItem('avito_auto_response', autoResponseEnabled.toString());
+        } else {
+            showNotification('Ошибка переключения автоответов: ' + result.message, 'error');
+            // Возвращаем checkbox в исходное состояние
+            checkbox.checked = !checkbox.checked;
+        }
+    } catch (error) {
+        console.error('Error toggling auto response:', error);
+        showNotification('Ошибка соединения с сервером', 'error');
+        // Возвращаем checkbox в исходное состояние
+        checkbox.checked = !checkbox.checked;
+    }
+}
+
+// Загрузка состояния автоответов при инициализации
+async function loadAutoResponseState() {
+    try {
+        // Загружаем актуальное состояние с сервера
+        const response = await fetch('/admin/avito/polling/status');
+        const status = await response.json();
+        
+        const checkbox = document.getElementById('mainAutoResponseMode');
+        const statusBadge = document.getElementById('mainAutoResponseStatus');
+        
+        if (checkbox && statusBadge) {
+            checkbox.checked = status.auto_response_enabled;
+            autoResponseEnabled = status.auto_response_enabled;
+            
+            const statusText = autoResponseEnabled ? 'ВКЛ' : 'ВЫКЛ';
+            const statusClass = autoResponseEnabled ? 'bg-success' : 'bg-secondary';
+            
+            statusBadge.textContent = statusText;
+            statusBadge.className = `badge ${statusClass} ms-2`;
+        }
+        
+        // Показываем статус мониторинга
+        if (status.polling_active) {
+            showNotification('🔄 Мониторинг новых сообщений активен', 'info');
+        }
+        
+    } catch (error) {
+        console.error('Error loading auto response state:', error);
+        // Fallback к localStorage
+        const saved = localStorage.getItem('avito_auto_response');
+        const checkbox = document.getElementById('mainAutoResponseMode');
+        if (saved === 'true' && checkbox) {
+            checkbox.checked = true;
+        }
+    }
+}
+
+// Автоматическая отправка ответа при получении нового сообщения
+async function processAutoResponse(chatId, message) {
+    if (!autoResponseEnabled) return;
+    
+    // Проверяем что это сообщение от клиента (не от нас)
+    const currentUserId = 216012096;
+    if (message.author_id === currentUserId) return;
+    
+    // Проверяем что сообщение содержит текст
+    const messageText = message.content?.text;
+    if (!messageText) return;
+    
+    try {
+        logger.info(`Auto-responding to message in chat ${chatId}`);
+        
+        // Генерируем автоматический ответ через AI
+        const response = await fetch(`/admin/avito/chats/${chatId}/ai-suggest`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            logger.error('Failed to generate auto-response');
+            return;
+        }
+        
+        const aiResponse = await response.json();
+        const generatedText = aiResponse.suggestion;
+        
+        if (!generatedText) {
+            logger.warning('No AI suggestion generated for auto-response');
+            return;
+        }
+        
+        // Небольшая задержка для имитации человека (2-5 секунд)
+        const delay = 2000 + Math.random() * 3000;
+        
+        setTimeout(async () => {
+            try {
+                // Отправляем автоматический ответ
+                const sendResponse = await fetch(`/admin/avito/chats/${chatId}/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: generatedText,
+                        auto_generated: true
+                    })
+                });
+                
+                if (sendResponse.ok) {
+                    logger.info(`Auto-response sent to chat ${chatId}`);
+                    showNotification('🤖 Автоматический ответ отправлен', 'info');
+                } else {
+                    logger.error('Failed to send auto-response');
+                }
+                
+            } catch (error) {
+                logger.error('Error sending auto-response:', error);
+            }
+        }, delay);
+        
+    } catch (error) {
+        logger.error('Error in processAutoResponse:', error);
+    }
+}
+
+// Автообновление чатов каждые 30 секунд
+let autoRefreshInterval;
+
+function startAutoRefresh() {
+    // Обновляем чаты каждые 30 секунд
+    autoRefreshInterval = setInterval(() => {
+        console.log('Автообновление чатов...');
+        loadChats();
+    }, 30000);
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
+
+// WebSocket для real-time обновлений
+let wsReconnectInterval = null;
+let wsReconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+
+function connectWebSocket() {
+    try {
+        // Определяем URL WebSocket
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/admin/avito/ws`;
+        
+        console.log('Подключаемся к WebSocket:', wsUrl);
+        
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = function(event) {
+            console.log('WebSocket подключен');
+            wsReconnectAttempts = 0;
+            
+            // Очищаем интервал переподключения
+            if (wsReconnectInterval) {
+                clearInterval(wsReconnectInterval);
+                wsReconnectInterval = null;
+            }
+            
+            // Показываем статус подключения только при первом подключении
+            if (wsReconnectAttempts === 0) {
+                showNotification('🔗 Real-time обновления включены', 'success');
+            }
+            
+            // Останавливаем автообновление по таймеру
+            stopAutoRefresh();
+            
+            // Отправляем ping каждые 30 секунд для поддержания соединения
+            setInterval(() => {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send('ping');
+                }
+            }, 30000);
+        };
+        
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                
+                // Обрабатываем разные типы событий
+                if (data.type === 'new_message') {
+                    handleNewMessageEvent(data);
+                } else if (data.type === 'chat_update') {
+                    handleChatUpdateEvent(data);
+                } else if (event.data === 'pong') {
+                    // Ответ на ping - ничего не делаем
+                    return;
+                }
+                
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+        
+        ws.onclose = function(event) {
+            console.log('WebSocket отключен:', event);
+            ws = null;
+            
+            // Показываем уведомление только после нескольких неудачных попыток
+            if (event.code !== 1000 && wsReconnectAttempts > 2) {
+                showNotification('🔌 Проблемы с real-time обновлениями', 'warning');
+            }
+            
+            // Возобновляем автообновление по таймеру
+            startAutoRefresh();
+            
+            // Пытаемся переподключиться
+            scheduleReconnect();
+        };
+        
+        ws.onerror = function(error) {
+            console.error('WebSocket ошибка:', error);
+        };
+        
+    } catch (error) {
+        console.error('Ошибка создания WebSocket:', error);
+        // Fallback к автообновлению
+        startAutoRefresh();
+    }
+}
+
+function scheduleReconnect() {
+    if (wsReconnectAttempts >= maxReconnectAttempts) {
+        console.log('Превышено максимальное количество попыток переподключения');
+        console.log('❌ Максимальные попытки переподключения исчерпаны, используется обычное обновление');
+        return;
+    }
+    
+    if (wsReconnectInterval) return; // Уже переподключаемся
+    
+    const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts), 30000); // Exponential backoff, max 30s
+    
+    wsReconnectInterval = setTimeout(() => {
+        wsReconnectAttempts++;
+        console.log(`Попытка переподключения ${wsReconnectAttempts}/${maxReconnectAttempts}`);
+        
+        wsReconnectInterval = null;
+        connectWebSocket();
+    }, delay);
+}
+
+function handleNewMessageEvent(data) {
+    console.log('Получено новое сообщение через WebSocket:', data);
+    
+    const { chat_id, message } = data;
+    
+    // Воспроизводим звук уведомления
+    playNotificationSound();
+    
+    // Если это текущий чат, обновляем сообщения
+    if (currentChatId === chat_id) {
+        loadMessages(chat_id);
+    }
+    
+    // Обновляем список чатов (новое сообщение может изменить порядок)
+    loadChats();
+    
+    // Показываем уведомление
+    const messageText = message.content?.text || 'Новое сообщение';
+    const shortText = messageText.length > 50 ? messageText.substring(0, 50) + '...' : messageText;
+    
+    showNotification(`📩 Новое сообщение: ${shortText}`, 'info');
+    
+    // Обрабатываем автоответ если включен
+    if (autoResponseEnabled && currentChatId !== chat_id) {
+        processAutoResponse(chat_id, message);
+    }
+}
+
+function handleChatUpdateEvent(data) {
+    console.log('Получено обновление чата через WebSocket:', data);
+    
+    // Обновляем список чатов
+    loadChats();
+    
+    // Если это текущий чат, обновляем его
+    if (currentChatId === data.chat_id) {
+        loadMessages(data.chat_id);
+    }
+}
+
+function closeWebSocket() {
+    if (ws) {
+        ws.close(1000, 'Page unload'); // Код 1000 - нормальное закрытие
+        ws = null;
+    }
+    
+    if (wsReconnectInterval) {
+        clearTimeout(wsReconnectInterval);
+        wsReconnectInterval = null;
+    }
+}
+
+// Инициализация при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    loadAutoResponseState();
+    
+    // Подключаем WebSocket для real-time обновлений
+    connectWebSocket();
+    
+    // Останавливаем соединение при закрытии страницы
+    window.addEventListener('beforeunload', function() {
+        stopAutoRefresh();
+        closeWebSocket();
+    });
+});
+
+// CRM Integration Functions  
+async function createLeadFromChat(chatId) {
+    if (!chatId) {
+        chatId = currentChatId;
+    }
+    
+    if (!chatId) {
+        showNotification('Выберите чат для создания клиента', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${chatId}/create-lead`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка создания клиента');
+        }
+        
+        const client = await response.json();
+        showNotification(`✅ Клиент "${client.name}" создан успешно`, 'success');
+        
+        // Обновляем dropdown для показа новых действий
+        updateCrmDropdown(chatId, client.id);
+        
+    } catch (error) {
+        console.error('Error creating client:', error);
+        showNotification('Ошибка создания клиента: ' + error.message, 'error');
+    }
+}
+
+function showStatusModal(clientId, chatId) {
+    if (!clientId || !chatId) {
+        showNotification('Ошибка: не удалось определить клиента или чат', 'error');
+        return;
+    }
+    
+    // Устанавливаем данные модального окна
+    document.getElementById('modalClientId').value = clientId;
+    document.getElementById('modalChatId').value = chatId;
+    
+    // Показываем модальное окно
+    const modal = new bootstrap.Modal(document.getElementById('statusModal'));
+    modal.show();
+}
+
+async function updateClientStatus() {
+    const clientId = document.getElementById('modalClientId').value;
+    const chatId = document.getElementById('modalChatId').value;
+    const newStatus = document.getElementById('newStatus').value;
+    const notes = document.getElementById('statusNotes').value;
+    
+    if (!clientId || !newStatus) {
+        showNotification('Выберите статус для обновления', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/avito/clients/${clientId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                status: newStatus,
+                notes: notes
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка обновления статуса');
+        }
+        
+        showNotification('✅ Статус клиента обновлен', 'success');
+        
+        // Закрываем модальное окно
+        const modal = bootstrap.Modal.getInstance(document.getElementById('statusModal'));
+        modal.hide();
+        
+        // Обновляем dropdown
+        updateCrmDropdown(chatId, clientId);
+        
+    } catch (error) {
+        console.error('Error updating status:', error);
+        showNotification('Ошибка обновления статуса: ' + error.message, 'error');
+    }
+}
+
+async function exportChatDialog(chatId) {
+    if (!chatId) {
+        chatId = currentChatId;
+    }
+    
+    if (!chatId) {
+        showNotification('Выберите чат для экспорта', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${chatId}/export`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Ошибка экспорта');
+        }
+        
+        const result = await response.json();
+        
+        // Скачиваем файл
+        if (result.download_url) {
+            const link = document.createElement('a');
+            link.href = result.download_url;
+            link.download = result.filename || 'chat_export.txt';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        showNotification('✅ Переписка экспортирована', 'success');
+        
+    } catch (error) {
+        console.error('Error exporting chat:', error);
+        showNotification('Ошибка экспорта: ' + error.message, 'error');
+    }
+}
+
+function updateCrmDropdown(chatId, clientId) {
+    // Обновляем CRM dropdown после изменений
+    const dropdown = document.querySelector(`[data-chat-id="${chatId}"] .dropdown-menu`);
+    if (dropdown && clientId) {
+        // Заменяем "Создать клиента" на действия с существующим клиентом
+        dropdown.innerHTML = `
+            <li><a class="dropdown-item" href="#" onclick="showStatusModal('${clientId}', '${chatId}')">
+                <i class="fas fa-edit me-2"></i>Изменить статус
+            </a></li>
+            <li><a class="dropdown-item" href="#" onclick="exportChatDialog('${chatId}')">
+                <i class="fas fa-download me-2"></i>Экспорт переписки
+            </a></li>
+        `;
+    }
+}
+</script>
+
+<!-- Модальное окно для изменения статуса клиента -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusModalLabel">
+                    <i class="fas fa-user-edit me-2"></i>Изменить статус клиента
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="modalClientId" />
+                <input type="hidden" id="modalChatId" />
+                
+                <div class="mb-3">
+                    <label for="newStatus" class="form-label">
+                        <i class="fas fa-flag me-2"></i>Новый статус
+                    </label>
+                    <select class="form-select" id="newStatus" required>
+                        <option value="">Выберите статус...</option>
+                        <option value="hot_lead">🔥 Горячий лид</option>
+                        <option value="warm_contact">🟡 Теплый контакт</option>
+                        <option value="cold_contact">🔵 Холодный контакт</option>
+                        <option value="deal_closed">✅ Завершенная сделка</option>
+                        <option value="rejected">❌ Отклонен</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="statusNotes" class="form-label">
+                        <i class="fas fa-sticky-note me-2"></i>Заметки
+                    </label>
+                    <textarea class="form-control" id="statusNotes" rows="3" 
+                              placeholder="Добавьте заметки о клиенте..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i>Отмена
+                </button>
+                <button type="button" class="btn btn-primary" onclick="updateClientStatus()">
+                    <i class="fas fa-save me-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Настройка webhook для уведомлений
+async function setupWebhook() {
+    try {
+        showNotification('Настраиваем webhook...', 'info');
+        
+        const response = await fetch('/admin/avito/setup-webhook', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification('✅ Webhook настроен! Уведомления будут приходить в Telegram', 'success');
+        } else {
+            showNotification(`❌ Ошибка настройки: ${data.message}`, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error setting up webhook:', error);
+        showNotification('❌ Ошибка подключения к серверу', 'error');
+    }
+}
+
+// === МОБИЛЬНАЯ НАВИГАЦИЯ ===
+
+// Показать список чатов на мобильных
+function showChatsList() {
+    if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.col-md-4.col-lg-3');
+        const chatArea = document.querySelector('.col-md-8.col-lg-9');
+        const noChatSelected = document.getElementById('noChatSelected');
+        const chatAreaElement = document.getElementById('chatArea');
+        const backButton = document.querySelector('.back-to-chats');
+        
+        // Показываем список чатов
+        sidebar.style.display = 'block';
+        sidebar.classList.add('show-mobile');
+        
+        // Скрываем область чата
+        chatArea.style.display = 'none';
+        
+        // Скрываем кнопку возврата
+        if (backButton) backButton.style.display = 'none';
+    }
+}
+
+// Скрыть список чатов и показать выбор чата
+function hideChatAndShowList() {
+    if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.col-md-4.col-lg-3');
+        const chatArea = document.querySelector('.col-md-8.col-lg-9');
+        const noChatSelected = document.getElementById('noChatSelected');
+        const chatAreaElement = document.getElementById('chatArea');
+        const backButton = document.querySelector('.back-to-chats');
+        
+        // Скрываем список чатов
+        sidebar.style.display = 'none';
+        sidebar.classList.remove('show-mobile');
+        
+        // Показываем область выбора чата
+        chatArea.style.display = 'block';
+        noChatSelected.style.display = 'block';
+        
+        // Скрываем активный чат
+        chatAreaElement.style.display = 'none';
+        
+        // Скрываем кнопку возврата
+        if (backButton) backButton.style.display = 'none';
+        
+        // Сбрасываем текущий чат
+        currentChatId = null;
+    }
+}
+
+// Показать чат на мобильных
+function showChatOnMobile() {
+    if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.col-md-4.col-lg-3');
+        const chatArea = document.querySelector('.col-md-8.col-lg-9');
+        const backButton = document.querySelector('.back-to-chats');
+        
+        // Скрываем список чатов
+        sidebar.style.display = 'none';
+        sidebar.classList.remove('show-mobile');
+        
+        // Показываем область чата
+        chatArea.style.display = 'block';
+        
+        // Показываем кнопку возврата
+        if (backButton) backButton.style.display = 'flex';
+    }
+}
+
+// Переключить автоответы с мобильной панели
+function toggleAutoResponse() {
+    const checkbox = document.getElementById('mainAutoResponseMode');
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        toggleAutoResponseMode();
+        
+        // Обновляем кнопку в мобильной навигации
+        const mobileBtn = event.target.closest('.mobile-nav-btn');
+        if (mobileBtn) {
+            if (checkbox.checked) {
+                mobileBtn.classList.add('active');
+            } else {
+                mobileBtn.classList.remove('active');
+            }
+        }
+    }
+}
+
+// Обновить счетчик непрочитанных на мобильной панели
+function updateMobileUnreadBadge(count) {
+    const badge = document.getElementById('mobileUnreadBadge');
+    if (badge) {
+        if (count > 0) {
+            badge.textContent = count;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+    
+    // Также обновляем основной счетчик
+    const mainBadge = document.getElementById('unreadCount');
+    if (mainBadge) {
+        mainBadge.textContent = count || 0;
+    }
+}
+
+</script>
+{% endblock %}

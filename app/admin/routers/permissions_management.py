@@ -19,7 +19,7 @@ from ..middleware.auth import get_current_admin_user
 from ..navigation import get_navigation_items
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/permissions", tags=["permissions"])
+router = APIRouter(tags=["permissions"])
 templates = Jinja2Templates(directory="app/admin/templates")
 
 # Определяем все доступные модули и их права
@@ -81,7 +81,7 @@ AVAILABLE_MODULES = {
     }
 }
 
-@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
 async def permissions_page(
     request: Request,
     current_user: AdminUser = Depends(get_current_admin_user),
