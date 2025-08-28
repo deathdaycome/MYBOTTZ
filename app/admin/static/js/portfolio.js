@@ -1,7 +1,7 @@
 // Управление портфолио в админке
 class PortfolioManager {
     constructor() {
-        this.apiUrl = '/admin/portfolio';
+        this.apiUrl = '/admin/api/portfolio';
         this.init();
     }
 
@@ -31,6 +31,12 @@ class PortfolioManager {
                 this.deletePortfolio(e.target.dataset.id);
             } else if (e.target.classList.contains('toggle-featured')) {
                 this.toggleFeatured(e.target.dataset.id);
+            } else if (e.target.classList.contains('publish-portfolio')) {
+                this.publishToTelegram(e.target.dataset.id);
+            } else if (e.target.classList.contains('update-published')) {
+                this.updatePublished(e.target.dataset.id);
+            } else if (e.target.classList.contains('unpublish-portfolio')) {
+                this.unpublishFromTelegram(e.target.dataset.id);
             }
         });
     }
@@ -39,7 +45,11 @@ class PortfolioManager {
         try {
             const response = await fetch(`${this.apiUrl}/`);
             const data = await response.json();
-            this.renderPortfolio(data);
+            console.log('API response:', data);
+            
+            // Проверяем структуру данных - API возвращает {success: true, data: [...]}
+            const portfolioData = data.data || data.items || data || [];
+            this.renderPortfolio(portfolioData);
         } catch (error) {
             console.error('Ошибка загрузки портфолио:', error);
             this.showError('Не удалось загрузить портфолио');
@@ -50,19 +60,26 @@ class PortfolioManager {
         const container = document.getElementById('portfolioList');
         if (!container) return;
 
+        // Диагностика данных
+        console.log('Portfolio data:', portfolio);
+        if (portfolio.length > 0) {
+            console.log('First item fields:', Object.keys(portfolio[0]));
+            console.log('is_published field:', portfolio[0].is_published);
+        }
+
         container.innerHTML = portfolio.map(item => `
             <div class="portfolio-item" data-id="${item.id}">
                 <div class="portfolio-image">
-                    <img src="${item.image_url || '/static/images/placeholder.jpg'}" 
+                    <img src="${item.main_image || '/static/images/placeholder.jpg'}" 
                          alt="${item.title}" loading="lazy">
-                    ${item.featured ? '<span class="featured-badge">Рекомендуемый</span>' : ''}
+                    ${item.is_featured ? '<span class="featured-badge">Рекомендуемый</span>' : ''}
                 </div>
                 <div class="portfolio-content">
                     <h3>${item.title}</h3>
                     <p class="portfolio-category">${item.category || 'Без категории'}</p>
                     <p class="portfolio-description">${item.description.substring(0, 100)}...</p>
                     <div class="portfolio-meta">
-                        <span class="status status-${item.status}">${this.getStatusText(item.status)}</span>
+                        <span class="status status-${item.project_status}">${this.getStatusText(item.project_status)}</span>
                         <span class="technologies">${item.technologies || ''}</span>
                     </div>
                     <div class="portfolio-actions">
@@ -70,8 +87,19 @@ class PortfolioManager {
                             <i class="fas fa-edit"></i> Редактировать
                         </button>
                         <button class="btn btn-sm btn-success toggle-featured" data-id="${item.id}">
-                            <i class="fas fa-star"></i> ${item.featured ? 'Убрать из рекомендуемых' : 'Сделать рекомендуемым'}
+                            <i class="fas fa-star"></i> ${item.is_featured ? 'Убрать из рекомендуемых' : 'Сделать рекомендуемым'}
                         </button>
+                        ${item.is_published ? 
+                            `<button class="btn btn-sm btn-warning update-published" data-id="${item.id}" title="Обновить в канале">
+                                <i class="fab fa-telegram"></i> Обновить
+                            </button>
+                            <button class="btn btn-sm btn-secondary unpublish-portfolio" data-id="${item.id}" title="Убрать из канала">
+                                <i class="fas fa-times"></i> Убрать
+                            </button>` :
+                            `<button class="btn btn-sm btn-info publish-portfolio" data-id="${item.id}" title="Опубликовать в Telegram канал">
+                                <i class="fab fa-telegram"></i> Опубликовать
+                            </button>`
+                        }
                         <button class="btn btn-sm btn-danger delete-portfolio" data-id="${item.id}">
                             <i class="fas fa-trash"></i> Удалить
                         </button>
@@ -204,8 +232,8 @@ class PortfolioManager {
 
         // Обновляем предварительный просмотр изображения
         const preview = document.getElementById('imagePreview');
-        if (preview && data.image_url) {
-            preview.src = data.image_url;
+        if (preview && data.main_image) {
+            preview.src = data.main_image;
             preview.style.display = 'block';
         }
     }
@@ -227,10 +255,12 @@ class PortfolioManager {
         const statusMap = {
             'active': 'Активный',
             'completed': 'Завершен',
-            'in_progress': 'В процессе',
-            'paused': 'Приостановлен'
+            'in_progress': 'В процессе', 
+            'paused': 'Приостановлен',
+            'draft': 'Черновик',
+            'published': 'Опубликован'
         };
-        return statusMap[status] || status;
+        return statusMap[status] || status || 'Не указан';
     }
 
     showSuccess(message) {
@@ -261,6 +291,84 @@ class PortfolioManager {
                 document.body.removeChild(notification);
             }, 300);
         }, 3000);
+    }
+
+    // Методы для публикации в Telegram
+    async publishToTelegram(portfolioId) {
+        if (!confirm('Опубликовать проект в Telegram канал?')) return;
+
+        try {
+            const response = await fetch(`${this.apiUrl}/${portfolioId}/publish`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Basic ${btoa('admin:qwerty123')}`
+                }
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showSuccess('Проект успешно опубликован в Telegram канал!');
+                this.loadPortfolio(); // Обновляем список
+            } else {
+                this.showError(result.error || 'Ошибка публикации');
+            }
+        } catch (error) {
+            console.error('Ошибка публикации:', error);
+            this.showError('Не удалось опубликовать проект в Telegram канал');
+        }
+    }
+
+    async updatePublished(portfolioId) {
+        if (!confirm('Обновить проект в Telegram канале?')) return;
+
+        try {
+            const response = await fetch(`${this.apiUrl}/${portfolioId}/update-published`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Basic ${btoa('admin:qwerty123')}`
+                }
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showSuccess('Проект в канале обновлен!');
+            } else {
+                this.showError(result.error || 'Ошибка обновления');
+            }
+        } catch (error) {
+            console.error('Ошибка обновления:', error);
+            this.showError('Не удалось обновить проект в канале');
+        }
+    }
+
+    async unpublishFromTelegram(portfolioId) {
+        if (!confirm('Удалить проект из Telegram канала?')) return;
+
+        try {
+            const response = await fetch(`${this.apiUrl}/${portfolioId}/unpublish`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Basic ${btoa('admin:qwerty123')}`
+                }
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                this.showSuccess('Проект удален из Telegram канала!');
+                this.loadPortfolio(); // Обновляем список
+            } else {
+                this.showError(result.error || 'Ошибка удаления');
+            }
+        } catch (error) {
+            console.error('Ошибка удаления из канала:', error);
+            this.showError('Не удалось удалить проект из канала');
+        }
     }
 }
 

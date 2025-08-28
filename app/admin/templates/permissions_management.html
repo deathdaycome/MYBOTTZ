@@ -4,8 +4,54 @@
 
 {% block extra_head %}
 <style>
-/* Принудительное обновление стилей - v1.1 */
+/* Принудительное обновление стилей - v2.0 */
 /* Основные стили в стиле glassmorphism */
+
+/* Анимации появления */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(50px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.permissions-container {
+    animation: fadeInUp 0.6s ease;
+}
+
+.user-list {
+    animation: slideInLeft 0.8s ease;
+}
+
+.permissions-panel {
+    animation: slideInRight 0.8s ease;
+}
 body {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
@@ -15,6 +61,8 @@ body {
     max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
+    position: relative;
+    z-index: 1;
 }
 
 /* Главный заголовок */
@@ -129,61 +177,283 @@ body {
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
-/* Карточки пользователей */
+/* Современные карточки пользователей */
 .user-list {
     background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(10px);
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+    backdrop-filter: blur(15px);
+    border-radius: 25px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 10px 40px rgba(31, 38, 135, 0.4);
     margin-bottom: 30px;
-    overflow: hidden;
+    overflow: visible;
+    position: relative;
+    z-index: 2;
+    max-height: 80vh;
 }
 
-.user-item {
+.user-list::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    border-radius: 25px 25px 0 0;
+}
+
+.user-list-header {
+    position: relative;
+    z-index: 2;
     padding: 20px 25px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    cursor: pointer;
-    transition: all 0.3s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    background: inherit;
+    border-radius: 25px 25px 0 0;
+}
+
+.user-list-content {
+    max-height: calc(80vh - 80px);
+    overflow-y: auto;
     position: relative;
 }
 
-.user-item:hover {
-    background: rgba(102, 126, 234, 0.1);
-    transform: translateX(5px);
+.user-list-header h5 {
+    margin: 0;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    font-size: 1.3rem;
 }
 
-.user-item.active {
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
-    border-left: 4px solid #667eea;
-    box-shadow: inset 0 0 20px rgba(102, 126, 234, 0.1);
+.user-list-header small {
+    color: #6c757d;
+    font-weight: 500;
 }
 
-.user-info h5 {
+.user-item {
+    padding: 0;
+    margin: 0;
+    border: none;
+    cursor: pointer;
+    transition: all 0.4s ease;
+    position: relative;
+    background: transparent;
+}
+
+.user-item-content {
+    padding: 20px 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.4s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.user-item-content:hover {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.08), rgba(118, 75, 162, 0.08));
+    transform: translateX(8px);
+    padding-left: 35px;
+    box-shadow: inset 4px 0 0 rgba(102, 126, 234, 0.3);
+}
+
+.user-item.active .user-item-content {
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.15), rgba(118, 75, 162, 0.15));
+    box-shadow: inset 6px 0 0 #667eea, 0 4px 20px rgba(102, 126, 234, 0.2);
+    transform: translateX(8px);
+    padding-left: 35px;
+}
+
+.user-item.active .user-item-content::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(102, 126, 234, 0.1), transparent);
+    pointer-events: none;
+}
+
+.user-item:last-child .user-item-content {
+    border-bottom: none;
+}
+
+/* Анимация появления карточек пользователей */
+.user-item {
+    animation: fadeInUp 0.5s ease;
+    animation-fill-mode: both;
+}
+
+.user-item:nth-child(1) { animation-delay: 0.1s; }
+.user-item:nth-child(2) { animation-delay: 0.2s; }
+.user-item:nth-child(3) { animation-delay: 0.3s; }
+.user-item:nth-child(4) { animation-delay: 0.4s; }
+.user-item:nth-child(5) { animation-delay: 0.5s; }
+.user-item:nth-child(6) { animation-delay: 0.6s; }
+.user-item:nth-child(7) { animation-delay: 0.7s; }
+.user-item:nth-child(8) { animation-delay: 0.8s; }
+
+/* Дополнительные улучшения */
+.permissions-panel::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #667eea, #764ba2, #667eea);
+    border-radius: 22px;
+    z-index: -1;
+    opacity: 0.1;
+    animation: borderGlow 3s ease-in-out infinite;
+}
+
+@keyframes borderGlow {
+    0%, 100% { opacity: 0.1; }
+    50% { opacity: 0.3; }
+}
+
+/* Улучшенные тени */
+.main-header {
+    animation: fadeInUp 0.4s ease;
+}
+
+.nav-tabs-modern {
+    animation: fadeInUp 0.5s ease;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.user-details h5 {
     margin: 0 0 8px 0;
-    color: #333;
-    font-weight: 600;
+    color: #2d3748;
+    font-weight: 700;
     font-size: 1.1rem;
+    transition: color 0.3s ease;
 }
 
-.user-info small {
+.user-item.active .user-details h5 {
+    color: #667eea;
+}
+
+.user-details small {
     color: #6c757d;
     font-size: 0.9rem;
+    font-weight: 500;
 }
 
-/* Роли */
+.user-avatar {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    transition: all 0.3s ease;
+    margin-left: 15px;
+}
+
+.user-item:hover .user-avatar {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.user-item.active .user-avatar {
+    transform: scale(1.1);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+}
+
+/* Современные роли */
 .role-badge {
     display: inline-block;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 0.8rem;
-    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 25px;
+    font-size: 0.75rem;
+    font-weight: 700;
     text-transform: uppercase;
-    }
-    
-    .role-badge.owner { background-color: #ff5722; color: white; }
-    .role-badge.salesperson { background-color: #4caf50; color: white; }
-    .role-badge.executor { background-color: #2196f3; color: white; }
+    letter-spacing: 0.5px;
+    margin-top: 8px;
+    border: 2px solid transparent;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.role-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s;
+}
+
+.role-badge:hover::before {
+    left: 100%;
+}
+
+.role-badge.owner {
+    background: linear-gradient(135deg, #ff5722 0%, #e64a19 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 87, 34, 0.3);
+}
+
+.role-badge.salesperson, .role-badge.sales {
+    background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.role-badge.executor {
+    background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3);
+}
+
+.role-badge:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.user-status {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #28a745;
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+}
+
+.status-dot.inactive {
+    background: #dc3545;
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+}
+
+.status-text {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: 500;
+}
     
     .permissions-panel {
         background: rgba(255, 255, 255, 0.95);
@@ -193,7 +463,11 @@ body {
         box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
         padding: 30px;
         min-height: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
         transition: all 0.3s ease;
+        position: relative;
+        z-index: 2;
     }
     
     .module-card {
@@ -472,12 +746,54 @@ body {
     
     .no-user-selected {
         text-align: center;
-        padding: 80px 40px;
+        padding: 60px 40px;
         color: #6c757d;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(5px);
-        border-radius: 15px;
-        border: 2px dashed rgba(108, 117, 125, 0.3);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 2px dashed rgba(102, 126, 234, 0.2);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .no-user-selected::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: conic-gradient(from 0deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+        animation: rotate 10s linear infinite;
+        z-index: 1;
+    }
+    
+    .no-user-selected > * {
+        position: relative;
+        z-index: 2;
+    }
+    
+    @keyframes rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    .empty-state-icon {
+        margin-bottom: 25px;
+        opacity: 0.7;
+    }
+    
+    .empty-state-icon i {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { opacity: 0.7; }
+        50% { opacity: 1; }
     }
     
     .no-user-selected h4 {
@@ -487,6 +803,32 @@ body {
         background-clip: text;
         font-weight: 700;
         margin-bottom: 15px;
+        font-size: 1.5rem;
+    }
+    
+    .no-user-selected p {
+        font-size: 1.1rem;
+        margin-bottom: 25px;
+        opacity: 0.8;
+    }
+    
+    .empty-state-hint {
+        background: rgba(102, 126, 234, 0.1);
+        backdrop-filter: blur(5px);
+        padding: 12px 20px;
+        border-radius: 25px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        color: #667eea;
+        font-weight: 600;
+        animation: bounce 2s ease-in-out infinite;
+    }
+    
+    @keyframes bounce {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-5px); }
     }
     
     .module-icons {
@@ -570,27 +912,45 @@ body {
         <!-- Список пользователей -->
         <div class="col-md-4">
             <div class="user-list">
-                <div class="p-3 border-bottom">
-                    <h5 class="mb-0">👥 Пользователи</h5>
-                    <small class="text-muted">Выберите пользователя для настройки прав</small>
+                <div class="user-list-header">
+                    <h5>👥 Пользователи</h5>
+                    <small>Выберите пользователя для настройки прав доступа</small>
                 </div>
                 
-                {% for user in users %}
-                <div class="user-item" data-user-id="{{ user.id }}" onclick="selectUser({{ user.id }})">
-                    <div class="user-info">
-                        <h5>{{ user.username }}</h5>
-                        <div>
-                            <span class="role-badge {{ user.role }}">{{ user.role }}</span>
-                            {% if user.email %}
-                            <small class="ms-2">{{ user.email }}</small>
-                            {% endif %}
+                <div class="user-list-content">
+                    {% for user in users %}
+                    <div class="user-item" data-user-id="{{ user.id }}" onclick="selectUser({{ user.id }})">
+                        <div class="user-item-content">
+                            <div class="user-info">
+                                <div class="user-details">
+                                    <h5>{{ user.username }}</h5>
+                                    <div class="user-meta">
+                                        {% if user.email %}
+                                        <small>{{ user.email }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="role-badge {{ user.role }}">
+                                        {% if user.role == 'executor' %}Исполнитель
+                                        {% elif user.role == 'salesperson' %}Продажник
+                                        {% elif user.role == 'sales' %}Продажник
+                                        {% elif user.role == 'owner' %}Владелец
+                                        {% else %}{{ user.role }}{% endif %}
+                                    </div>
+                                    <div class="user-status">
+                                        <div class="status-dot {% if not user.is_active %}inactive{% endif %}"></div>
+                                        <span class="status-text">
+                                            {% if user.is_active %}Активен{% else %}Заблокирован{% endif %}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="user-avatar">
+                                    {{ user.username[0] if user.username else 'U' }}
+                                </div>
+                            </div>
                         </div>
-                        {% if not user.is_active %}
-                        <small class="text-danger">⚠️ Заблокирован</small>
-                        {% endif %}
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
             </div>
         </div>
         
@@ -598,8 +958,15 @@ body {
         <div class="col-md-8">
             <div class="permissions-panel">
                 <div id="no-user-selected" class="no-user-selected">
+                    <div class="empty-state-icon">
+                        <i class="fas fa-user-shield fa-3x"></i>
+                    </div>
                     <h4>👆 Выберите пользователя</h4>
                     <p>Выберите пользователя из списка слева для настройки его прав доступа</p>
+                    <div class="empty-state-hint">
+                        <i class="fas fa-mouse-pointer"></i>
+                        Кликните на любого пользователя слева
+                    </div>
                 </div>
                 
                 <div id="permissions-content" style="display: none;">
@@ -614,6 +981,12 @@ body {
                             </button>
                             <button class="btn btn-outline-primary btn-template" onclick="applyTemplate('executor')">
                                 ⚙️ Исполнитель
+                            </button>
+                            <button class="btn btn-outline-warning btn-template" onclick="resetUserPermissions()">
+                                🔄 Сбросить все
+                            </button>
+                            <button class="btn btn-outline-info btn-template" onclick="showPermissionsStatistics()">
+                                📈 Статистика
                             </button>
                         </div>
                     </div>
@@ -994,17 +1367,363 @@ async function savePermissions() {
     }
 }
 
+async function resetUserPermissions() {
+    if (!selectedUserId) {
+        showNotification('❌ Сначала выберите пользователя', 'error');
+        return;
+    }
+    
+    if (!confirm('Вы уверены, что хотите сбросить все права этого пользователя? This действие необратимо!')) return;
+    
+    try {
+        const response = await fetch(`/admin/permissions/user/${selectedUserId}/reset`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            showNotification('✅ Права пользователя успешно сброшены', 'success');
+            loadUserPermissions(selectedUserId); // Обновляем интерфейс
+        } else {
+            throw new Error(result.detail || 'Ошибка сброса прав');
+        }
+        
+    } catch (error) {
+        console.error('Ошибка сброса прав:', error);
+        showNotification('❌ Ошибка сброса прав: ' + error.message, 'error');
+    }
+}
+
+async function showPermissionsStatistics() {
+    try {
+        const response = await fetch('/admin/permissions/statistics');
+        const stats = await response.json();
+        
+        if (response.ok) {
+            // Создаем модальное окно со статистикой
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content statistics-modal">
+                    <div class="modal-header">
+                        <h3>📈 Статистика прав доступа</h3>
+                        <button class="btn-close" onclick="this.closest('.modal-overlay').remove()">×</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <h4>👥 Пользователи</h4>
+                                <div class="stat-value">${stats.users.total}</div>
+                                <div class="stat-details">
+                                    Активных: ${stats.users.active} | Неактивных: ${stats.users.inactive}
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card">
+                                <h4>🎭 Роли</h4>
+                                <div class="role-stats">
+                                    ${Object.entries(stats.users.by_role).map(([role, count]) => 
+                                        `<div class="role-stat">
+                                            <span class="role-name">${role}:</span>
+                                            <span class="role-count">${count}</span>
+                                        </div>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card">
+                                <h4>📊 Модули</h4>
+                                <div class="module-stats">
+                                    ${Object.entries(stats.modules).map(([module, count]) => 
+                                        `<div class="module-stat">
+                                            <span class="module-name">${getModuleDisplayName(module)}:</span>
+                                            <span class="module-count">${count}</span>
+                                        </div>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="stat-card">
+                                <h4>🔐 Разрешения</h4>
+                                <div class="stat-value">${stats.permissions.total_permissions}</div>
+                                <div class="stat-details">
+                                    Активных правил: ${stats.permissions.active_rules}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" onclick="this.closest('.modal-overlay').remove()">
+                            Закрыть
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Добавляем стили для модального окна если их еще нет
+            if (!document.getElementById('modal-styles')) {
+                const styles = document.createElement('style');
+                styles.id = 'modal-styles';
+                styles.textContent = `
+                    .modal-overlay {
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.5);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        z-index: 10000;
+                    }
+                    
+                    .modal-content {
+                        background: white;
+                        border-radius: 15px;
+                        max-width: 800px;
+                        width: 90%;
+                        max-height: 80vh;
+                        overflow-y: auto;
+                        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+                    }
+                    
+                    .modal-header {
+                        padding: 20px 25px;
+                        border-bottom: 1px solid #eee;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    }
+                    
+                    .modal-header h3 {
+                        margin: 0;
+                        color: #333;
+                    }
+                    
+                    .btn-close {
+                        background: none;
+                        border: none;
+                        font-size: 24px;
+                        cursor: pointer;
+                        color: #999;
+                    }
+                    
+                    .modal-body {
+                        padding: 25px;
+                    }
+                    
+                    .stats-grid {
+                        display: grid;
+                        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                        gap: 20px;
+                    }
+                    
+                    .stat-card {
+                        background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+                        border-radius: 10px;
+                        padding: 20px;
+                        text-align: center;
+                    }
+                    
+                    .stat-card h4 {
+                        margin: 0 0 15px 0;
+                        color: #495057;
+                        font-size: 1.1rem;
+                    }
+                    
+                    .stat-value {
+                        font-size: 2.5rem;
+                        font-weight: bold;
+                        color: #667eea;
+                        margin-bottom: 10px;
+                    }
+                    
+                    .stat-details {
+                        color: #6c757d;
+                        font-size: 0.9rem;
+                    }
+                    
+                    .role-stats, .module-stats {
+                        text-align: left;
+                    }
+                    
+                    .role-stat, .module-stat {
+                        display: flex;
+                        justify-content: space-between;
+                        margin-bottom: 8px;
+                        padding: 5px 0;
+                        border-bottom: 1px solid rgba(0,0,0,0.05);
+                    }
+                    
+                    .role-name, .module-name {
+                        color: #495057;
+                        font-weight: 500;
+                    }
+                    
+                    .role-count, .module-count {
+                        color: #667eea;
+                        font-weight: bold;
+                    }
+                    
+                    .modal-footer {
+                        padding: 15px 25px;
+                        border-top: 1px solid #eee;
+                        text-align: right;
+                    }
+                `;
+                document.head.appendChild(styles);
+            }
+            
+        } else {
+            throw new Error('Ошибка получения статистики');
+        }
+        
+    } catch (error) {
+        console.error('Ошибка получения статистики:', error);
+        showNotification('❌ Ошибка получения статистики', 'error');
+    }
+}
+
+function getModuleDisplayName(module) {
+    const displayNames = {
+        dashboard: 'Дашборд',
+        projects: 'Проекты',
+        clients: 'Клиенты',
+        leads: 'Лиды',
+        deals: 'Сделки',
+        finance: 'Финансы',
+        documents: 'Документы',
+        reports: 'Отчеты',
+        settings: 'Настройки',
+        users: 'Пользователи',
+        avito: 'Avito'
+    };
+    return displayNames[module] || module;
+}
+
 function showNotification(message, type) {
-    // Простая функция показа уведомлений
+    // Улучшенная функция показа уведомлений
     const notification = document.createElement('div');
-    notification.className = `alert alert-${type === 'error' ? 'danger' : 'success'} position-fixed`;
-    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
-    notification.textContent = message;
+    notification.className = `notification notification-${type}`;
+    
+    // Определяем иконку по типу
+    const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+    
+    notification.innerHTML = `
+        <div class="notification-content">
+            <span class="notification-icon">${icons[type] || 'ℹ️'}</span>
+            <span class="notification-message">${message}</span>
+            <button class="notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        </div>
+    `;
+    
+    // Добавляем стили если их еще нет
+    if (!document.getElementById('notification-styles')) {
+        const styles = document.createElement('style');
+        styles.id = 'notification-styles';
+        styles.textContent = `
+            .notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 9999;
+                max-width: 400px;
+                margin-bottom: 10px;
+                border-radius: 10px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+                animation: slideInRight 0.3s ease;
+                backdrop-filter: blur(10px);
+            }
+            
+            .notification-success {
+                background: linear-gradient(135deg, rgba(76, 175, 80, 0.9), rgba(129, 199, 132, 0.9));
+                border: 1px solid rgba(76, 175, 80, 0.3);
+            }
+            
+            .notification-error {
+                background: linear-gradient(135deg, rgba(244, 67, 54, 0.9), rgba(239, 154, 154, 0.9));
+                border: 1px solid rgba(244, 67, 54, 0.3);
+            }
+            
+            .notification-warning {
+                background: linear-gradient(135deg, rgba(255, 193, 7, 0.9), rgba(255, 224, 130, 0.9));
+                border: 1px solid rgba(255, 193, 7, 0.3);
+            }
+            
+            .notification-info {
+                background: linear-gradient(135deg, rgba(33, 150, 243, 0.9), rgba(144, 202, 249, 0.9));
+                border: 1px solid rgba(33, 150, 243, 0.3);
+            }
+            
+            .notification-content {
+                display: flex;
+                align-items: center;
+                padding: 15px 20px;
+                color: white;
+                font-weight: 500;
+            }
+            
+            .notification-icon {
+                margin-right: 10px;
+                font-size: 1.2rem;
+            }
+            
+            .notification-message {
+                flex: 1;
+                line-height: 1.4;
+            }
+            
+            .notification-close {
+                background: none;
+                border: none;
+                color: white;
+                font-size: 18px;
+                cursor: pointer;
+                margin-left: 10px;
+                opacity: 0.8;
+                transition: opacity 0.2s ease;
+            }
+            
+            .notification-close:hover {
+                opacity: 1;
+            }
+            
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+        `;
+        document.head.appendChild(styles);
+    }
     
     document.body.appendChild(notification);
     
+    // Автоматическое удаление через 5 секунд
     setTimeout(() => {
-        notification.remove();
+        if (notification.parentElement) {
+            notification.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }
     }, 5000);
 }
 </script>

@@ -291,6 +291,12 @@ class Portfolio(Base):
     project_status = Column(String(50), default="completed")  # completed, in_progress, demo
     completed_at = Column(DateTime, nullable=True)  # Дата завершения проекта
     
+    # Telegram публикация
+    is_published = Column(Boolean, default=False)  # Опубликовано ли в канале
+    telegram_message_id = Column(Integer, nullable=True)  # ID сообщения в канале
+    published_at = Column(DateTime, nullable=True)  # Дата публикации
+    telegram_channel_id = Column(String(100), nullable=True)  # ID канала для публикации
+    
     # Системные поля
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -335,6 +341,10 @@ class Portfolio(Base):
             "client_name": self.client_name,
             "project_status": self.project_status,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "is_published": self.is_published,
+            "telegram_message_id": self.telegram_message_id,
+            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "telegram_channel_id": self.telegram_channel_id,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "created_by": self.created_by

@@ -18,7 +18,7 @@ def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
             InlineKeyboardButton("📞 Контакты", callback_data="contacts")
         ],
         [
-            InlineKeyboardButton("💼 Наши проекты", url="https://t.me/your_portfolio_channel")
+            InlineKeyboardButton("💼 Портфолио", url=f"https://t.me/{settings.PORTFOLIO_CHANNEL_ID}" if settings.PORTFOLIO_CHANNEL_ID else "https://t.me/your_portfolio_channel")
         ],
         [
             InlineKeyboardButton("⚙️ Настройки", callback_data="settings")

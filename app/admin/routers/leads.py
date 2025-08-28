@@ -507,8 +507,8 @@ async def convert_lead_to_deal(
             integration_service = IntegrationService(db)
         except ImportError as e:
             logger.error(f"Ошибка импорта IntegrationService: {e}")
-            # Fallback к старой логике
-            return await convert_lead_to_deal_fallback(lead_id, data, user_id, db)
+            # Fallback к простой логике
+            return await convert_lead_to_deal_fallback(lead_id, data, current_user, db)
         
         user_id = current_user.id if hasattr(current_user, 'id') else current_user.get('id')
         result = integration_service.convert_lead_to_deal(
@@ -661,4 +661,76 @@ async def get_funnel_stats(
         
     except Exception as e:
         logger.error(f"Ошибка получения статистики воронки: {str(e)}")
+        return {"success": False, "message": str(e)}
+
+
+async def convert_lead_to_deal_fallback(lead_id: int, data: dict, current_user, db):
+    """Простая fallback функция для конвертации лида в сделку"""
+    try:
+        from ...database.crm_models import Lead, Deal, Client, LeadStatus, DealStatus, ClientStatus
+        
+        # Получаем лид
+        lead = db.query(Lead).filter(Lead.id == lead_id).first()
+        if not lead:
+            return {"success": False, "message": "Лид не найден"}
+        
+        # Обновляем статус лида на "выиграно"
+        lead.status = LeadStatus.WON
+        lead.converted_at = datetime.utcnow()
+        
+        # Создаем или получаем клиента
+        client = None
+        if lead.client_id:
+            client = db.query(Client).filter(Client.id == lead.client_id).first()
+        
+        if not client:
+            # Создаем нового клиента из данных лида
+            from ...database.crm_models import ClientType
+            client = Client(
+                name=lead.contact_name or lead.company_name or "Клиент",
+                type=ClientType.COMPANY if lead.company_name else ClientType.INDIVIDUAL,
+                phone=lead.contact_phone,
+                email=lead.contact_email,
+                telegram=lead.contact_telegram,
+                company_name=lead.company_name,
+                source=lead.source,
+                status=ClientStatus.NEW,
+                created_at=datetime.utcnow()
+            )
+            db.add(client)
+            db.flush()
+            lead.client_id = client.id
+        
+        # Создаем сделку
+        deal = Deal(
+            title=data.get("title", lead.title),
+            client_id=client.id,
+            amount=data.get("amount", lead.budget or 0),
+            status=DealStatus.NEW,
+            description=data.get("description", lead.description),
+            end_date=data.get("expected_close_date", lead.expected_close_date),
+            created_by_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
+            created_at=datetime.utcnow()
+        )
+        
+        db.add(deal)
+        db.flush()
+        
+        # Обновляем лид
+        lead.converted_to_deal_id = deal.id
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Лид успешно конвертирован в сделку",
+            "data": {
+                "deal_id": deal.id,
+                "client_id": client.id,
+                "lead_id": lead.id
+            }
+        }
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Ошибка fallback конвертации лида: {e}")
         return {"success": False, "message": str(e)}

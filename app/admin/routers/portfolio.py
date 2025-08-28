@@ -766,3 +766,129 @@ async def like_portfolio_item(project_id: int, db: Session = Depends(get_db)):
             "success": False,
             "error": "Ошибка обработки лайка"
         }
+
+@router.post("/{portfolio_id}/publish")
+async def publish_to_telegram(
+    portfolio_id: int,
+    current_user: dict = Depends(check_portfolio_access),
+    db: Session = Depends(get_db)
+):
+    """Опубликовать элемент портфолио в Telegram канал"""
+    try:
+        from ...services.portfolio_telegram_service import portfolio_telegram_service
+        
+        # Получаем элемент портфолио
+        portfolio_item = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+        if not portfolio_item:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "error": "Элемент портфолио не найден"}
+            )
+        
+        # Проверяем, не опубликован ли уже
+        if portfolio_item.is_published:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": "Элемент уже опубликован в канале"}
+            )
+        
+        # Публикуем в Telegram канал
+        result = await portfolio_telegram_service.publish_portfolio_item(portfolio_item, db)
+        
+        if result["success"]:
+            return JSONResponse(content={
+                "success": True,
+                "message": "Элемент портфолио опубликован в Telegram канал",
+                "message_id": result.get("message_id"),
+                "channel_id": result.get("channel_id")
+            })
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": result["error"]}
+            )
+        
+    except Exception as e:
+        logger.error(f"Ошибка публикации в Telegram: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "Внутренняя ошибка сервера"}
+        )
+
+@router.put("/{portfolio_id}/update-published")
+async def update_published_item(
+    portfolio_id: int,
+    current_user: dict = Depends(check_portfolio_access),
+    db: Session = Depends(get_db)
+):
+    """Обновить уже опубликованный элемент портфолио в Telegram канале"""
+    try:
+        from ...services.portfolio_telegram_service import portfolio_telegram_service
+        
+        # Получаем элемент портфолио
+        portfolio_item = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+        if not portfolio_item:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "error": "Элемент портфолио не найден"}
+            )
+        
+        # Обновляем в Telegram канале
+        result = await portfolio_telegram_service.update_published_item(portfolio_item, db)
+        
+        if result["success"]:
+            return JSONResponse(content={
+                "success": True,
+                "message": "Элемент портфолио обновлен в Telegram канале"
+            })
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": result["error"]}
+            )
+        
+    except Exception as e:
+        logger.error(f"Ошибка обновления в Telegram: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "Внутренняя ошибка сервера"}
+        )
+
+@router.delete("/{portfolio_id}/unpublish")
+async def unpublish_from_telegram(
+    portfolio_id: int,
+    current_user: dict = Depends(check_portfolio_access),
+    db: Session = Depends(get_db)
+):
+    """Удалить элемент портфолио из Telegram канала"""
+    try:
+        from ...services.portfolio_telegram_service import portfolio_telegram_service
+        
+        # Получаем элемент портфолио
+        portfolio_item = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+        if not portfolio_item:
+            return JSONResponse(
+                status_code=404,
+                content={"success": False, "error": "Элемент портфолио не найден"}
+            )
+        
+        # Удаляем из Telegram канала
+        result = await portfolio_telegram_service.delete_published_item(portfolio_item, db)
+        
+        if result["success"]:
+            return JSONResponse(content={
+                "success": True,
+                "message": "Элемент портфолио удален из Telegram канала"
+            })
+        else:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": result["error"]}
+            )
+        
+    except Exception as e:
+        logger.error(f"Ошибка удаления из Telegram: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "Внутренняя ошибка сервера"}
+        )

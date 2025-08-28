@@ -41,7 +41,9 @@ def get_image_url(image_path: str, request: Request = None) -> str:
 # Импорт роутера портфолио
 try:
     from .routers.portfolio import router as portfolio_router
-except ImportError:
+    print("Роутер портфолио подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера портфолио: {e}")
     portfolio_router = None
 
 # Импорт роутера проектов
@@ -311,7 +313,7 @@ except ImportError as e:
 
 # Подключаем роутер Авито
 if avito_router:
-    admin_router.include_router(avito_router)
+    admin_router.include_router(avito_router, prefix="/avito")
 
 # Подключаем OAuth роутер Авито
 if avito_oauth_router:
@@ -3195,6 +3197,142 @@ async def like_portfolio_project(project_id: int):
             "success": False,
             "error": str(e)
         }
+
+# API для публикации портфолио в Telegram
+@admin_router.post("/api/portfolio/{portfolio_id}/publish")
+async def publish_to_telegram(portfolio_id: int, username: str = Depends(authenticate)):
+    """Опубликовать элемент портфолио в Telegram канал"""
+    try:
+        with get_db_context() as db:
+            # Получаем элемент портфолио
+            portfolio_item = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+            if not portfolio_item:
+                return JSONResponse(
+                    status_code=404,
+                    content={"success": False, "error": "Элемент портфолио не найден"}
+                )
+            
+            # Проверяем, не опубликован ли уже
+            if portfolio_item.is_published:
+                return JSONResponse(
+                    status_code=400,
+                    content={"success": False, "error": "Элемент уже опубликован в канале"}
+                )
+            
+            # Импортируем сервис публикации
+            try:
+                from ...services.portfolio_telegram_service import portfolio_telegram_service
+                # Публикуем в Telegram канал
+                result = await portfolio_telegram_service.publish_portfolio_item(portfolio_item, db)
+                
+                if result["success"]:
+                    return JSONResponse(content={
+                        "success": True,
+                        "message": "Элемент портфолио опубликован в Telegram канал",
+                        "message_id": result.get("message_id"),
+                        "channel_id": result.get("channel_id")
+                    })
+                else:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"success": False, "error": result["error"]}
+                    )
+            except ImportError:
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "error": "Telegram сервис недоступен"}
+                )
+        
+    except Exception as e:
+        logger.error(f"Ошибка публикации в Telegram: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "Внутренняя ошибка сервера"}
+        )
+
+@admin_router.put("/api/portfolio/{portfolio_id}/update-published")
+async def update_published_item(portfolio_id: int, username: str = Depends(authenticate)):
+    """Обновить уже опубликованный элемент портфолио в Telegram канале"""
+    try:
+        with get_db_context() as db:
+            # Получаем элемент портфолио
+            portfolio_item = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+            if not portfolio_item:
+                return JSONResponse(
+                    status_code=404,
+                    content={"success": False, "error": "Элемент портфолио не найден"}
+                )
+            
+            # Импортируем сервис публикации
+            try:
+                from ...services.portfolio_telegram_service import portfolio_telegram_service
+                # Обновляем в Telegram канале
+                result = await portfolio_telegram_service.update_published_item(portfolio_item, db)
+                
+                if result["success"]:
+                    return JSONResponse(content={
+                        "success": True,
+                        "message": "Элемент портфолио обновлен в Telegram канале"
+                    })
+                else:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"success": False, "error": result["error"]}
+                    )
+            except ImportError:
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "error": "Telegram сервис недоступен"}
+                )
+        
+    except Exception as e:
+        logger.error(f"Ошибка обновления в Telegram: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "Внутренняя ошибка сервера"}
+        )
+
+@admin_router.delete("/api/portfolio/{portfolio_id}/unpublish")
+async def unpublish_from_telegram(portfolio_id: int, username: str = Depends(authenticate)):
+    """Удалить элемент портфолио из Telegram канала"""
+    try:
+        with get_db_context() as db:
+            # Получаем элемент портфолио
+            portfolio_item = db.query(Portfolio).filter(Portfolio.id == portfolio_id).first()
+            if not portfolio_item:
+                return JSONResponse(
+                    status_code=404,
+                    content={"success": False, "error": "Элемент портфолио не найден"}
+                )
+            
+            # Импортируем сервис публикации
+            try:
+                from ...services.portfolio_telegram_service import portfolio_telegram_service
+                # Удаляем из Telegram канала
+                result = await portfolio_telegram_service.delete_published_item(portfolio_item, db)
+                
+                if result["success"]:
+                    return JSONResponse(content={
+                        "success": True,
+                        "message": "Элемент портфолио удален из Telegram канала"
+                    })
+                else:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"success": False, "error": result["error"]}
+                    )
+            except ImportError:
+                return JSONResponse(
+                    status_code=500,
+                    content={"success": False, "error": "Telegram сервис недоступен"}
+                )
+        
+    except Exception as e:
+        logger.error(f"Ошибка удаления из Telegram: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "Внутренняя ошибка сервера"}
+        )
 
 # Роуты для аутентификации
 @admin_router.get("/login", response_class=HTMLResponse)

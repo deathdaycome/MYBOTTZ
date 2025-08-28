@@ -88,6 +88,16 @@ def get_upload_path():
     os.makedirs(upload_dir, exist_ok=True)
     return upload_dir
 
+@router.post("/")
+async def upload_file_with_query_param(
+    project_id: int,
+    file: UploadFile = File(...),
+    description: Optional[str] = Form(None),
+    current_user: AdminUser = Depends(get_current_user)
+):
+    """Загрузить файл для проекта (endpoint с query параметром для совместимости с frontend)"""
+    return await upload_project_file(project_id, file, description, current_user)
+
 @router.post("/upload/{project_id}")
 async def upload_project_file(
     project_id: int,

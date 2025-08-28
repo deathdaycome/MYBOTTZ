@@ -127,11 +127,15 @@ async def get_deals(
         
         # Фильтры
         if status:
-            try:
-                status_enum = DealStatus[status.upper()]
+            # Ищем статус по значению
+            status_enum = None
+            for deal_status in DealStatus:
+                if deal_status.value == status:
+                    status_enum = deal_status
+                    break
+            
+            if status_enum:
                 query = query.filter(Deal.status == status_enum)
-            except KeyError:
-                pass
         
         if client_id:
             query = query.filter(Deal.client_id == client_id)
@@ -324,9 +328,14 @@ async def update_deal_status(
         if not new_status:
             return {"success": False, "message": "Статус не указан"}
         
-        try:
-            status_enum = DealStatus[new_status.upper()]
-        except KeyError:
+        # Ищем статус по значению, а не по имени
+        status_enum = None
+        for status in DealStatus:
+            if status.value == new_status:
+                status_enum = status
+                break
+        
+        if not status_enum:
             return {"success": False, "message": "Неверный статус"}
         
         old_status = deal.status

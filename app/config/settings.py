@@ -11,6 +11,7 @@ class Settings:
     # Telegram Bot
     BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
     BOT_USERNAME: str = os.getenv("BOT_USERNAME", "")
+    PORTFOLIO_CHANNEL_ID: str = os.getenv("PORTFOLIO_CHANNEL_ID", "")  # ID канала для портфолио
     
     # OpenAI/OpenRouter
     OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")

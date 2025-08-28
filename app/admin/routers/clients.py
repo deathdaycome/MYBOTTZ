@@ -242,15 +242,15 @@ async def create_client(
         db.refresh(client)
         
         # Логируем действие
-        from ...database.audit_models import AuditLog
+        from ...database.audit_models import AuditLog, AuditActionType, AuditEntityType
         audit_log = AuditLog(
-            action="create",
-            entity_type="client",
+            action_type=AuditActionType.CREATE,
+            entity_type=AuditEntityType.CLIENT,
             entity_id=client.id,
-            new_data=client.to_dict(),
+            new_values=client.to_dict(),
             description=f"Создан клиент: {client.name}",
             user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            user_email=current_user.email if hasattr(current_user, 'email') else current_user.get('email')
         )
         db.add(audit_log)
         db.commit()
@@ -378,16 +378,16 @@ async def update_client(
         db.commit()
         
         # Логируем действие
-        from ...database.audit_models import AuditLog
+        from ...database.audit_models import AuditLog, AuditActionType, AuditEntityType
         audit_log = AuditLog(
-            action="update",
-            entity_type="client",
+            action_type=AuditActionType.UPDATE,
+            entity_type=AuditEntityType.CLIENT,
             entity_id=client.id,
-            old_data=old_data,
-            new_data=client.to_dict(),
+            old_values=old_data,
+            new_values=client.to_dict(),
             description=f"Обновлен клиент: {client.name}",
             user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            user_email=current_user.email if hasattr(current_user, 'email') else current_user.get('email')
         )
         db.add(audit_log)
         db.commit()
@@ -437,15 +437,15 @@ async def delete_client(
         db.commit()
         
         # Логируем действие
-        from ...database.audit_models import AuditLog
+        from ...database.audit_models import AuditLog, AuditActionType, AuditEntityType
         audit_log = AuditLog(
-            action="delete",
-            entity_type="client",
+            action_type=AuditActionType.DELETE,
+            entity_type=AuditEntityType.CLIENT,
             entity_id=client_id,
-            old_data=old_data,
+            old_values=old_data,
             description=f"Удален клиент: {client_name}",
             user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
-            user_name=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+            user_email=current_user.email if hasattr(current_user, 'email') else current_user.get('email')
         )
         db.add(audit_log)
         db.commit()

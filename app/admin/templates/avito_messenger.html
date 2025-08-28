@@ -91,8 +91,8 @@
                                 </div>
                             </div>
                             <div class="btn-group">
-                                <button class="btn btn-outline-primary btn-sm" onclick="createClientFromChat()" title="Добавить в клиенты">
-                                    <i class="fas fa-user-plus"></i>
+                                <button class="btn btn-outline-success btn-sm" onclick="createLeadFromChat()" title="Добавить как лид">
+                                    <i class="fas fa-star"></i>
                                 </button>
                                 <button class="btn btn-outline-secondary btn-sm" onclick="showChatInfo()" title="Информация">
                                     <i class="fas fa-info-circle"></i>
@@ -152,8 +152,8 @@
                                         <i class="fas fa-user-plus"></i>
                                     </button>
                                     <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" href="#" onclick="createClientFromChat()">
-                                            <i class="fas fa-user-plus me-2 text-success"></i>Создать клиента
+                                        <li><a class="dropdown-item" href="#" onclick="createLeadFromChat()">
+                                            <i class="fas fa-star me-2 text-warning"></i>Создать лид
                                         </a></li>
                                         <li><a class="dropdown-item" href="#" onclick="showStatusModal()">
                                             <i class="fas fa-tag me-2 text-primary"></i>Статус клиента
@@ -232,7 +232,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-user-plus me-2"></i>Добавить клиента из диалога
+                    <i class="fas fa-star me-2"></i>Добавить лид из диалога
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -859,14 +859,14 @@ function connectWebSocket(chatId) {
     };
 }
 
-// Создание клиента из чата
-async function createClientFromChat() {
+// Создание лида из чата
+async function createLeadFromChat() {
     if (!currentChatId) return;
     
-    if (!confirm('Добавить собеседника в базу клиентов?')) return;
+    if (!confirm('Добавить собеседника как лид?')) return;
     
     try {
-        const response = await fetch(`/admin/avito/chats/${currentChatId}/create-client`, {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/create-lead`, {
             method: 'POST'
         });
         
@@ -1554,8 +1554,10 @@ function connectWebSocket() {
                 wsReconnectInterval = null;
             }
             
-            // Показываем статус подключения
-            showNotification('🔗 Real-time обновления включены', 'success');
+            // Показываем статус подключения только при первом подключении
+            if (wsReconnectAttempts === 0) {
+                showNotification('🔗 Real-time обновления включены', 'success');
+            }
             
             // Останавливаем автообновление по таймеру
             stopAutoRefresh();
@@ -1591,9 +1593,9 @@ function connectWebSocket() {
             console.log('WebSocket отключен:', event);
             ws = null;
             
-            // Показываем уведомление только если это не планируемое закрытие
-            if (event.code !== 1000) {
-                showNotification('🔌 Соединение потеряно, переподключаемся...', 'warning');
+            // Показываем уведомление только после нескольких неудачных попыток
+            if (event.code !== 1000 && wsReconnectAttempts > 2) {
+                showNotification('🔌 Проблемы с real-time обновлениями', 'warning');
             }
             
             // Возобновляем автообновление по таймеру
@@ -1617,7 +1619,7 @@ function connectWebSocket() {
 function scheduleReconnect() {
     if (wsReconnectAttempts >= maxReconnectAttempts) {
         console.log('Превышено максимальное количество попыток переподключения');
-        showNotification('❌ Не удалось восстановить соединение. Обновите страницу.', 'error');
+        console.log('❌ Максимальные попытки переподключения исчерпаны, используется обычное обновление');
         return;
     }
     
@@ -1700,8 +1702,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// CRM Integration Functions
-async function createClientFromChat(chatId) {
+// CRM Integration Functions  
+async function createLeadFromChat(chatId) {
     if (!chatId) {
         chatId = currentChatId;
     }
@@ -1712,7 +1714,7 @@ async function createClientFromChat(chatId) {
     }
     
     try {
-        const response = await fetch(`/admin/avito/chats/${chatId}/create-client`, {
+        const response = await fetch(`/admin/avito/chats/${chatId}/create-lead`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

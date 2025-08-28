@@ -49,9 +49,10 @@ class IntegrationService:
                 client = self.db.query(Client).filter(Client.id == lead.client_id).first()
             else:
                 # Создаем нового клиента из данных лида
+                from ..database.crm_models import ClientType
                 client = Client(
                     name=lead.contact_name or lead.company_name or "Клиент",
-                    type="company" if lead.company_name else "individual",
+                    type=ClientType.COMPANY if lead.company_name else ClientType.INDIVIDUAL,
                     phone=lead.contact_phone,
                     email=lead.contact_email,
                     telegram=lead.contact_telegram,
@@ -73,12 +74,9 @@ class IntegrationService:
                 title=deal_data.get("title", lead.title),
                 client_id=client.id,
                 amount=deal_data.get("amount", lead.budget),
-                currency="RUB",
                 status=DealStatus.NEW,
-                probability=deal_data.get("probability", lead.probability or 50),
                 description=deal_data.get("description", lead.description),
-                expected_close_date=deal_data.get("expected_close_date", lead.expected_close_date),
-                source_lead_id=lead.id,
+                end_date=deal_data.get("expected_close_date", lead.expected_close_date),
                 created_by_id=current_user_id,
                 created_at=datetime.utcnow()
             )
@@ -370,7 +368,6 @@ class IntegrationService:
             "title": deal.title,
             "status": deal.status.value,
             "amount": deal.amount,
-            "probability": deal.probability,
             "created_at": deal.created_at.isoformat() if deal.created_at else None
         }
 

@@ -32,7 +32,7 @@ import secrets
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/avito", tags=["avito"])
+router = APIRouter(tags=["avito"])
 templates = Jinja2Templates(directory="app/admin/templates")
 
 def get_current_user(username: str):
@@ -535,11 +535,11 @@ async def create_client_from_chat(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.websocket("/ws/{chat_id}")
-async def websocket_endpoint(
+async def websocket_endpoint_chat(
     websocket: WebSocket,
     chat_id: str
 ):
-    """WebSocket для real-time обновлений чата"""
+    """WebSocket для real-time обновлений конкретного чата"""
     await websocket.accept()
     
     # Сохраняем соединение
@@ -619,95 +619,18 @@ async def setup_avito_webhook(request: Request, db: Session = Depends(get_db)):
             "message": f"Ошибка: {str(e)}"
         }, status_code=500)
 
-@router.post("/webhook")
-async def avito_webhook(request: Request):
-    """Обработка webhook уведомлений от Авито"""
-    try:
-        data = await request.json()
-        
-        # Логируем входящее уведомление
-        logger.info(f"Received Avito webhook: {data}")
-        
-        # Обработка нового сообщения
-        if data.get("type") == "message":
-            chat_id = data.get("chat_id")
-            message = data.get("message")
-            
-            # Отправляем через WebSocket
-            if chat_id:
-                await broadcast_message(chat_id, message)
-            
-            # Отправляем Telegram уведомление о новом сообщении
-            if chat_id and message:
-                try:
-                    # Получаем информацию о чате
-                    avito_service = AvitoService()
-                    chats = await avito_service.get_chats(limit=50)
-                    
-                    # Находим нужный чат
-                    target_chat = None
-                    for chat in chats:
-                        if chat.id == chat_id:
-                            target_chat = chat
-                            break
-                    
-                    if target_chat:
-                        # Определяем имя клиента
-                        current_user_id = 216012096
-                        client_name = "Неизвестный клиент"
-                        for user in target_chat.users:
-                            if user.get("id") != current_user_id:
-                                client_name = user.get("name", "Неизвестный клиент")
-                                break
-                        
-                        # Получаем текст сообщения
-                        message_text = ""
-                        if isinstance(message, dict):
-                            content = message.get("content", {})
-                            if isinstance(content, dict):
-                                message_text = content.get("text", "")
-                            elif isinstance(content, str):
-                                message_text = content
-                        
-                        # Пропускаем уведомления о собственных сообщениях
-                        author_id = message.get("author_id")
-                        if author_id != current_user_id and message_text:
-                            # Отправляем уведомление в Telegram
-                            try:
-                                from ...services.notification_service import notification_service
-                                from telegram import Bot
-                                from ...config.settings import settings
-                                
-                                # Убеждаемся что бот настроен
-                                if not notification_service.bot and settings.BOT_TOKEN:
-                                    notification_service.set_bot(Bot(settings.BOT_TOKEN))
-                                
-                                await notification_service.send_avito_notification(chat_id, client_name, message_text)
-                                logger.info(f"Telegram notification sent for chat {chat_id}")
-                            except Exception as bot_error:
-                                logger.error(f"Error setting up bot for notification: {bot_error}")
-                            
-                            # TODO: Здесь можно добавить автоматические ответы на сервере
-                            # если нужно обрабатывать их даже когда интерфейс не открыт
-                    
-                except Exception as notify_error:
-                    logger.error(f"Error sending Telegram notification: {notify_error}")
-        
-        return JSONResponse({"status": "ok"})
-    except Exception as e:
-        logger.error(f"Webhook processing error: {e}")
-        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+# Removed duplicate webhook - using the one below
 
-@router.post("/chats/{chat_id}/create-client")
-async def create_client_from_chat(
+@router.post("/chats/{chat_id}/create-lead")
+async def create_lead_from_chat(
     chat_id: str,
     current_user: AdminUser = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
-    """Создание полноценного клиента из Avito чата с AI анализом"""
+    """Создание лида из Avito чата с AI анализом"""
     try:
         # Получаем сообщения чата
-        avito_service = AvitoService()
+        avito_service = get_avito_service()
         messages = await avito_service.get_chat_messages(chat_id)
         
         if not messages:
@@ -718,11 +641,11 @@ async def create_client_from_chat(
         current_user_id = 216012096  # ID текущего пользователя
         
         for message in messages:
-            author_name = message.get("author", {}).get("name", "Неизвестный")
-            content = message.get("content", {}).get("text", "")
+            # AvitoMessage objects have direct attributes, not get() method
+            content = message.content.get("text", "") if message.content else ""
             
             if content:
-                if message.get("author", {}).get("id") == current_user_id:
+                if message.author_id == current_user_id:
                     conversation_text.append(f"Менеджер: {content}")
                 else:
                     conversation_text.append(f"Клиент: {content}")
@@ -786,67 +709,71 @@ async def create_client_from_chat(
                 "requirements": ""
             }
         
-        # Создаём клиента в базе данных
-        client_name = analysis_data.get("name") or "Клиент Avito"
+        # Создаём лид в базе данных
+        lead_name = analysis_data.get("name") or "Лид Avito"
         
-        # Проверяем, не существует ли уже клиент с таким chat_id
-        existing_client = db.query(Client).filter(Client.avito_chat_id == chat_id).first()
+        # Проверяем, не существует ли уже лид с таким chat_id
+        from ...database.crm_models import Lead, LeadStatus
+        source_identifier = f"avito_chat_{chat_id}"
+        existing_lead = db.query(Lead).filter(Lead.source == source_identifier).first()
         
-        if existing_client:
-            # Обновляем существующего клиента
-            client = existing_client
-            client.name = client_name
+        if existing_lead:
+            # Обновляем существующий лид
+            lead = existing_lead
+            lead.title = lead_name
+            lead.contact_name = lead_name
             if analysis_data.get("phone"):
-                client.phone = analysis_data["phone"]
+                lead.contact_phone = analysis_data["phone"]
             if analysis_data.get("email"):
-                client.email = analysis_data["email"]
+                lead.contact_email = analysis_data["email"]
             if analysis_data.get("telegram"):
-                client.telegram = analysis_data["telegram"]
+                lead.contact_telegram = analysis_data["telegram"]
+            if analysis_data.get("requirements"):
+                lead.description = analysis_data["requirements"]
         else:
-            # Создаём нового клиента
-            client = Client(
-                name=client_name,
-                phone=analysis_data.get("phone"),
-                email=analysis_data.get("email"), 
-                telegram=analysis_data.get("telegram"),
-                source="Avito",
-                type=ClientType.INDIVIDUAL,
-                status=ClientStatus.NEW,
-                avito_chat_id=chat_id,
-                avito_status=AvitoClientStatus.WARM_CONTACT,
-                avito_notes=f"Требования: {analysis_data.get('requirements', 'Не указаны')}",
-                description=analysis_data.get("requirements", "")
+            # Создаём новый лид
+            lead = Lead(
+                title=lead_name,
+                contact_name=lead_name,
+                contact_phone=analysis_data.get("phone"),
+                contact_email=analysis_data.get("email"), 
+                contact_telegram=analysis_data.get("telegram"),
+                source=source_identifier,
+                status=LeadStatus.NEW,
+                description=analysis_data.get("requirements", "Требования не указаны"),
+                notes=f"Создан из Avito чата {chat_id}. Требования: {analysis_data.get('requirements', 'Не указаны')}"
             )
-            db.add(client)
+            db.add(lead)
         
-        # Сохраняем историю диалога в клиенте
+        # Сохраняем историю диалога в лиде
         dialog_history = []
         for message in messages[-10:]:  # Последние 10 сообщений
             dialog_history.append({
-                "timestamp": message.get("created", ""),
-                "author_id": message.get("author", {}).get("id"),
-                "author_name": message.get("author", {}).get("name", ""),
-                "text": message.get("content", {}).get("text", ""),
-                "is_client": message.get("author", {}).get("id") != 216012096
+                "timestamp": message.created,
+                "author_id": message.author_id,
+                "author_name": "Автор",  # Имя автора недоступно в AvitoMessage
+                "text": message.content.get("text", "") if message.content else "",
+                "is_client": message.author_id != 216012096
             })
         
-        client.avito_dialog_history = dialog_history
-        client.communication_history = dialog_history  # Дублируем в общую историю
+        # Сохраняем историю в поле notes лида
+        if dialog_history:
+            lead.notes = lead.notes + "\n\nИстория диалога:\n" + "\n".join([f"{msg['author_name']}: {msg['text']}" for msg in dialog_history[-5:]])
         
         db.commit()
         
-        logger.info(f"Client created/updated from chat {chat_id}: {client.id}")
+        logger.info(f"Lead created/updated from chat {chat_id}: {lead.id}")
         
         return JSONResponse({
             "status": "success",
-            "message": "Клиент успешно создан/обновлен",
-            "client_id": client.id,
-            "client_data": {
-                "name": client.name,
-                "phone": client.phone,
-                "email": client.email,
-                "telegram": client.telegram,
-                "avito_status": client.avito_status.value if client.avito_status else None,
+            "message": "Лид успешно создан/обновлен",
+            "lead_id": lead.id,
+            "lead_data": {
+                "name": lead.contact_name,
+                "phone": lead.contact_phone,
+                "email": lead.contact_email,
+                "telegram": lead.contact_telegram,
+                "status": lead.status.value if lead.status else None,
                 "requirements": analysis_data.get("requirements", "")
             }
         })
@@ -971,15 +898,13 @@ async def export_chat_dialog(
         current_user_id = 216012096
         
         for message in messages:
-            timestamp = message.get("created", "")
-            author = message.get("author", {})
-            author_name = author.get("name", "Неизвестный")
-            author_id = author.get("id")
-            content = message.get("content", {}).get("text", "")
+            timestamp = message.created
+            author_id = message.author_id
+            content = message.content.get("text", "") if message.content else ""
             
             if content:
                 role = "МЕНЕДЖЕР" if author_id == current_user_id else "КЛИЕНТ"
-                export_text += f"[{timestamp}] {role} ({author_name}):\n{content}\n\n"
+                export_text += f"[{timestamp}] {role} (ID: {author_id}):\n{content}\n\n"
         
         # Возвращаем файл
         from fastapi.responses import Response

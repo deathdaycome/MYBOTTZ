@@ -296,7 +296,13 @@ class RBACService:
         if not user:
             raise ValueError(f"Пользователь с ID {user_id} не найден")
         
-        return user.roles
+        try:
+            if hasattr(user, 'roles'):
+                return user.roles
+            else:
+                return []
+        except AttributeError:
+            return []
     
     def get_user_permissions(self, user_id: int) -> List[str]:
         """Получить все разрешения пользователя (через роли и прямые)"""
@@ -320,8 +326,13 @@ class RBACService:
                     permissions.add(perm.name)
         
         # Прямые разрешения
-        for perm in user.additional_permissions:
-            permissions.add(perm.name)
+        try:
+            if hasattr(user, 'additional_permissions') and user.additional_permissions:
+                for perm in user.additional_permissions:
+                    permissions.add(perm.name)
+        except AttributeError:
+            # Пользователь не имеет дополнительных разрешений
+            pass
         
         return list(permissions)
     

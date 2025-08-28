@@ -101,7 +101,11 @@ async def permissions_page(
     users = db.query(AdminUser).filter(AdminUser.role != "owner").all()
     
     # Получаем все роли
-    roles = rbac.get_all_roles()
+    try:
+        roles = rbac.get_all_roles()
+    except Exception as e:
+        logger.error(f"Ошибка получения ролей: {str(e)}")
+        roles = []
     
     return templates.TemplateResponse(
         "permissions_management.html",
@@ -133,10 +137,18 @@ async def get_user_permissions(
         raise HTTPException(status_code=404, detail="Пользователь не найден")
     
     # Получаем роли пользователя
-    user_roles = rbac.get_user_roles(user_id)
+    try:
+        user_roles = rbac.get_user_roles(user_id)
+    except Exception as e:
+        logger.warning(f"Не удалось получить роли пользователя {user_id}: {str(e)}")
+        user_roles = []
     
-    # Получаем разрешения пользователя
-    user_permissions = rbac.get_user_permissions(user_id)
+    # Получаем разрешения пользователя (временно возвращаем пустой список)
+    try:
+        user_permissions = rbac.get_user_permissions(user_id)
+    except Exception as e:
+        logger.warning(f"Не удалось получить разрешения пользователя {user_id}: {str(e)}")
+        user_permissions = []
     
     # Получаем правила доступа к данным
     data_access_rules = db.query(DataAccessRule).filter(
@@ -215,8 +227,22 @@ async def update_user_permissions(
         # Обновляем разрешения и правила доступа
         await _update_user_module_permissions(user_id, module_permissions, rbac, db, current_user)
         
-        # Логируем изменения
-        logger.info(f"Права пользователя {user.username} обновлены пользователем {current_user.username if hasattr(current_user, 'username') else 'Unknown'}")
+        # Логируем изменения  
+        from ...database.audit_models import AuditLog, AuditActionType, AuditEntityType
+        
+        audit_log = AuditLog(
+            action_type=AuditActionType.UPDATE,
+            entity_type=AuditEntityType.USER,
+            entity_id=user.id,
+            new_values=module_permissions,
+            description=f"Обновлены права доступа пользователя: {user.username}",
+            user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
+            user_email=current_user.email if hasattr(current_user, 'email') else current_user.get('email')
+        )
+        db.add(audit_log)
+        db.commit()
+        
+        logger.info(f"Права пользователя {user.username} обновлены пользователем {current_user.username if hasattr(current_user, 'username') else current_user.get('username', 'Unknown')}")
         
         return {"success": True, "message": "Права пользователя успешно обновлены"}
         
@@ -326,6 +352,151 @@ async def get_role_permissions_template(
     
     return template
 
+
+@router.post("/user/{user_id}/apply-role-template", response_class=JSONResponse)
+async def apply_role_template(
+    user_id: int,
+    role_name: str,
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Применить шаблон роли к пользователю"""
+    # Проверяем права доступа
+    rbac = RBACService(db)
+    if not rbac.check_permission(current_user, "users.permissions.manage"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    
+    user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    try:
+        # Получаем шаблон роли
+        response = await get_role_permissions_template(role_name, current_user, db)
+        if hasattr(response, 'status_code') and response.status_code != 200:
+            raise HTTPException(status_code=404, detail="Шаблон роли не найден")
+        
+        template_data = response if isinstance(response, dict) else response.body
+        
+        # Применяем шаблон
+        await _update_user_module_permissions(user_id, template_data['modules'], rbac, db, current_user)
+        
+        return {"success": True, "message": f"Шаблон роли '{template_data['name']}' успешно применен"}
+        
+    except Exception as e:
+        logger.error(f"Ошибка применения шаблона роли для пользователя {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка применения шаблона: {str(e)}")
+
+
+@router.get("/statistics", response_class=JSONResponse)
+async def get_permissions_statistics(
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Получить статистику по правам доступа"""
+    # Проверяем права доступа
+    rbac = RBACService(db)
+    if not rbac.check_permission(current_user, "users.permissions.manage"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    
+    try:
+        # Общая статистика пользователей
+        total_users = db.query(AdminUser).filter(AdminUser.role != "owner").count()
+        active_users = db.query(AdminUser).filter(
+            AdminUser.role != "owner", 
+            AdminUser.is_active == True
+        ).count()
+        
+        # Статистика по ролям
+        users_by_role = {}
+        users_roles_query = db.query(AdminUser.role, db.func.count(AdminUser.id)).filter(
+            AdminUser.role != "owner"
+        ).group_by(AdminUser.role).all()
+        
+        for role, count in users_roles_query:
+            users_by_role[role] = count
+        
+        # Статистика по модулям
+        module_access_stats = {}
+        for module in AVAILABLE_MODULES.keys():
+            # Подсчитываем пользователей с доступом к модулю
+            users_with_access = db.query(DataAccessRule).filter(
+                DataAccessRule.entity_type == module,
+                DataAccessRule.is_active == True,
+                DataAccessRule.access_type != "none"
+            ).count()
+            
+            module_access_stats[module] = users_with_access
+        
+        # Статистика по правам
+        total_permissions = db.query(Permission).count()
+        active_rules = db.query(DataAccessRule).filter(DataAccessRule.is_active == True).count()
+        
+        return {
+            "users": {
+                "total": total_users,
+                "active": active_users,
+                "inactive": total_users - active_users,
+                "by_role": users_by_role
+            },
+            "modules": module_access_stats,
+            "permissions": {
+                "total_permissions": total_permissions,
+                "active_rules": active_rules
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения статистики прав: {str(e)}")
+        raise HTTPException(status_code=500, detail="Ошибка получения статистики")
+
+
+@router.post("/user/{user_id}/reset", response_class=JSONResponse)
+async def reset_user_permissions(
+    user_id: int,
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Сбросить все права пользователя"""
+    # Проверяем права доступа
+    rbac = RBACService(db)
+    if not rbac.check_permission(current_user, "users.permissions.manage"):
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
+    
+    user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Пользователь не найден")
+    
+    try:
+        # Удаляем все разрешения пользователя
+        db.execute(user_permissions.delete().where(user_permissions.c.user_id == user_id))
+        
+        # Удаляем все правила доступа к данным
+        db.query(DataAccessRule).filter(DataAccessRule.user_id == user_id).delete()
+        
+        db.commit()
+        
+        # Логируем действие
+        from ...database.audit_models import AuditLog, AuditActionType, AuditEntityType
+        
+        audit_log = AuditLog(
+            action_type=AuditActionType.DELETE,
+            entity_type=AuditEntityType.USER,
+            entity_id=user.id,
+            description=f"Сброшены все права пользователя: {user.username}",
+            user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
+            user_email=current_user.email if hasattr(current_user, 'email') else current_user.get('email')
+        )
+        db.add(audit_log)
+        db.commit()
+        
+        return {"success": True, "message": "Права пользователя успешно сброшены"}
+        
+    except Exception as e:
+        logger.error(f"Ошибка сброса прав пользователя {user_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Ошибка сброса прав: {str(e)}")
+
+
 async def _update_user_module_permissions(user_id: int, module_permissions: Dict[str, Any], 
                                         rbac: RBACService, db: Session, current_user: AdminUser):
     """Обновить разрешения пользователя по модулям"""
@@ -359,7 +530,7 @@ async def _update_user_module_permissions(user_id: int, module_permissions: Dict
                         description=f"Разрешение {perm_action} для модуля {module}"
                     )
                     db.add(permission)
-                    db.commit()
+                    db.flush()  # Получаем ID без полного commit
                 
                 # Добавляем разрешение пользователю
                 db.execute(user_permissions.insert().values(

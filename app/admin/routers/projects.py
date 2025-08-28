@@ -149,6 +149,7 @@ def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> d
 
 # Статусы проектов
 PROJECT_STATUSES = {
+    # Старые статусы (для совместимости)
     "new": "Новый",
     "review": "На рассмотрении", 
     "accepted": "Принят",
@@ -156,7 +157,23 @@ PROJECT_STATUSES = {
     "testing": "Тестирование",
     "completed": "Завершен",
     "cancelled": "Отменен",
-    "on_hold": "Приостановлен"
+    "on_hold": "Приостановлен",
+    
+    # Новые статусы (из таблицы project_statuses)
+    "новый": "Новый",
+    "на_рассмотрении": "На рассмотрении", 
+    "согласован": "Согласован",
+    "в_работе": "В работе",
+    "на_тестировании": "На тестировании",
+    "завершен": "Завершен",
+    "отменен": "Отменен",
+    "приостановлен": "Приостановлен",
+    "тестовый_статус": "Тестовый статус",
+    "админ_консоль_готова": "админ консоль готова",
+    
+    # Дополнительные вариации для совместимости
+    "active": "В работе",
+    "в работе": "В работе"
 }
 
 @router.get("/")
@@ -786,7 +803,7 @@ async def create_project_root(
             
             if client_telegram_id:
                 # Проверяем, нет ли уже пользователя с таким telegram_id
-                user = db.query(User).filter(User.telegram_id == str(client_telegram_id)).first()
+                user = db.query(User).filter(User.telegram_id == int(client_telegram_id)).first()
             
             if not user:
                 # Создаем нового пользователя
@@ -795,7 +812,7 @@ async def create_project_root(
                 username = f"{base_username}_{int(time.time())}"
                 
                 user = User(
-                    telegram_id=str(client_telegram_id) if client_telegram_id else None,
+                    telegram_id=int(client_telegram_id) if client_telegram_id else int(time.time()),
                     username=username,
                     first_name=client_name,
                     phone=data.get('client_phone'),
@@ -960,7 +977,7 @@ async def create_project(
             # Создаем нового клиента
             if project_data.client_telegram_id:
                 # Ищем существующего пользователя по Telegram ID
-                user = db.query(User).filter(User.telegram_id == project_data.client_telegram_id).first()
+                user = db.query(User).filter(User.telegram_id == int(project_data.client_telegram_id)).first()
             
             if not user:
                 # Генерируем уникальный username на основе имени клиента или используем временную метку
@@ -970,7 +987,7 @@ async def create_project(
                 
                 # Создаем нового пользователя
                 user = User(
-                    telegram_id=project_data.client_telegram_id if project_data.client_telegram_id else None,
+                    telegram_id=int(project_data.client_telegram_id) if project_data.client_telegram_id else int(time.time()),
                     first_name=project_data.client_name or "Клиент",
                     last_name="",
                     username=username,
