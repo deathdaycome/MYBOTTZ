@@ -73,13 +73,32 @@ async def users_page(
     })
 
 @router.get("/api")
-async def get_admin_users():
-    """Получить список всех админ-пользователей - временно без аутентификации для отладки"""
+async def get_admin_users(db: Session = Depends(get_db)):
+    """Получить список всех админ-пользователей для API"""
     try:
-        # Временно возвращаем пустой список пользователей
+        # Получаем всех пользователей из базы данных
+        users = db.query(AdminUser).all()
+        
+        # Преобразуем в формат для API
+        users_data = []
+        for user in users:
+            users_data.append({
+                "id": user.id,
+                "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username,
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+                "notifications": {
+                    "new_tasks": True,
+                    "deadlines": True,
+                    "comments": True,
+                    "reports": True
+                }
+            })
+        
         return {
             "success": True,
-            "users": []
+            "users": users_data
         }
     except Exception as e:
         logger.error(f"Ошибка получения пользователей: {e}")
@@ -104,6 +123,31 @@ async def get_executors():
             "success": False,
             "message": f"Ошибка получения исполнителей: {str(e)}",
             "executors": []
+        }
+
+@router.put("/api/{user_id}/notifications")
+async def update_user_notifications(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Обновить настройки уведомлений пользователя"""
+    try:
+        data = await request.json()
+        
+        # Здесь можно было бы обновлять настройки в базе данных
+        # Пока просто возвращаем успех
+        logger.info(f"Обновление настроек уведомлений для пользователя {user_id}: {data}")
+        
+        return {
+            "success": True,
+            "message": "Настройки уведомлений обновлены"
+        }
+    except Exception as e:
+        logger.error(f"Ошибка обновления настроек уведомлений: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка обновления настроек: {str(e)}"
         }
 
 @router.post("/api/users/create", response_class=JSONResponse)

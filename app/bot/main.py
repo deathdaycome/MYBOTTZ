@@ -57,6 +57,7 @@ def setup_handlers(app: Application):
     # Команды
     app.add_handler(CommandHandler("start", start_handler.start))
     app.add_handler(CommandHandler("help", start_handler.help))
+    app.add_handler(CommandHandler("my_id", start_handler.my_id))
     app.add_handler(CommandHandler("admin", admin_command))
     
     logger.info("🔧 Добавляем conversation handlers...")

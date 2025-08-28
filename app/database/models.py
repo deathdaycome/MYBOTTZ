@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, JSON, ForeignKey
+from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Boolean, Float, JSON, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -530,6 +530,7 @@ class AdminUser(Base):
     first_name = Column(String(255), nullable=True)
     last_name = Column(String(255), nullable=True)
     role = Column(String(50), nullable=False, default='executor')  # 'owner', 'admin', 'sales', 'executor'
+    telegram_id = Column(BigInteger, nullable=True, index=True)  # Telegram ID для уведомлений
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)

@@ -1,360 +1,1193 @@
 {% extends "base.html" %}
 
-{% block title %}Тестирование уведомлений - Админ-панель{% endblock %}
+{% block title %}Управление уведомлениями - Админ-панель{% endblock %}
 
-{% block page_title %}🧪 Тестирование уведомлений{% endblock %}
+{% block page_title %}Управление уведомлениями{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-bell me-2"></i>Тестирование системы уведомлений</h5>
+<style>
+/* СТИЛИ ДЛЯ СТРАНИЦЫ УВЕДОМЛЕНИЙ - VERSION 2.0 */
+body.notifications-page {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    min-height: 100vh !important;
+    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif !important;
+}
+
+.notifications-main {
+    padding: 2rem;
+    min-height: 100vh;
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+    backdrop-filter: blur(20px);
+}
+
+.notifications-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    color: white;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.notifications-header h1 {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #ffffff, #e2e8f0);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.notifications-header p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    margin: 0;
+}
+
+.content-grid {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    gap: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.main-panel {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.side-panel {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    height: fit-content;
+}
+
+.panel-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.panel-title i {
+    font-size: 1.75rem;
+    opacity: 0.9;
+}
+
+.notification-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.section-title {
+    color: white;
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.notification-button {
+    width: 100%;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1rem;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    text-transform: none;
+    letter-spacing: 0.025em;
+    position: relative;
+    overflow: hidden;
+}
+
+.notification-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.notification-button:hover::before {
+    left: 100%;
+}
+
+.btn-admin {
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white;
+    box-shadow: 0 8px 25px rgba(79, 70, 229, 0.3);
+}
+
+.btn-admin:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(79, 70, 229, 0.4);
+}
+
+.btn-error {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: white;
+    box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+}
+
+.btn-error:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(220, 38, 38, 0.4);
+}
+
+.btn-report {
+    background: linear-gradient(135deg, #059669, #047857);
+    color: white;
+    box-shadow: 0 8px 25px rgba(5, 150, 105, 0.3);
+}
+
+.btn-report:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(5, 150, 105, 0.4);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    color: white;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: block;
+    font-size: 0.95rem;
+}
+
+.form-control, .form-select {
+    background: rgba(255, 255, 255, 0.9);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    color: #1e293b;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+    background: rgba(255, 255, 255, 0.95);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
+    outline: none;
+}
+
+.status-indicator {
+    padding: 1rem;
+    border-radius: 12px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.status-checking {
+    background: rgba(59, 130, 246, 0.2);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.status-success {
+    background: rgba(34, 197, 94, 0.2);
+    border-color: rgba(34, 197, 94, 0.3);
+}
+
+.status-error {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.status-warning {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.check-status-btn {
+    background: linear-gradient(135deg, #6b7280, #4b5563);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.check-status-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(107, 114, 128, 0.3);
+}
+
+.log-container {
+    background: rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 1.5rem;
+    height: 350px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.log-entry {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-left: 4px solid #6366f1;
+    color: white;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    backdrop-filter: blur(5px);
+}
+
+.log-entry.success {
+    border-left-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.log-entry.error {
+    border-left-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.log-entry.info {
+    border-left-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.log-timestamp {
+    font-size: 0.8rem;
+    opacity: 0.7;
+    margin-bottom: 0.25rem;
+}
+
+.executor-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: all 0.3s ease;
+}
+
+.executor-card:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.executor-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.executor-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 1.2rem;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+.executor-info h5 {
+    color: white;
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.executor-info p {
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0.25rem 0 0 0;
+    font-size: 0.9rem;
+}
+
+.notification-toggles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.toggle-group {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toggle-label {
+    color: white;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.notification-toggle {
+    position: relative;
+    display: inline-block;
+    width: 52px;
+    height: 28px;
+}
+
+.notification-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(100, 116, 139, 0.4);
+    transition: 0.3s;
+    border-radius: 34px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 20px;
+    width: 20px;
+    left: 2px;
+    bottom: 2px;
+    background: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: rgba(16, 185, 129, 0.5);
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(24px);
+    background: white;
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+
+.notification-type {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+}
+
+.save-settings-btn {
+    width: 100%;
+    margin-top: 1rem;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.save-settings-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(16, 185, 129, 0.4);
+}
+
+.test-status-btn {
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.test-status-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 35px rgba(139, 92, 246, 0.4);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* МОБИЛЬНАЯ АДАПТАЦИЯ */
+@media (max-width: 992px) {
+    body.notifications-page .sidebar {
+        display: none !important;
+    }
+    
+    body.notifications-page .main-content {
+        margin-left: 0 !important;
+        padding: 1rem !important;
+    }
+    
+    .notifications-main {
+        padding: 1rem;
+    }
+    
+    .content-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+    
+    .notifications-header h1 {
+        font-size: 2rem;
+    }
+    
+    .main-panel, .side-panel {
+        padding: 1.5rem;
+    }
+    
+    .notification-section {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .notifications-main {
+        padding: 0.75rem;
+    }
+    
+    .notifications-header h1 {
+        font-size: 1.75rem;
+    }
+    
+    .main-panel, .side-panel {
+        padding: 1rem;
+    }
+    
+    .notification-button {
+        padding: 0.75rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .notification-toggles {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<div class="notifications-main">
+    <div class="notifications-header">
+        <h1><i class="fas fa-bell"></i> Управление уведомлениями</h1>
+        <p>Настройка и тестирование системы уведомлений</p>
+    </div>
+    
+    <div class="content-grid">
+        <div class="main-panel">
+            <h3 class="panel-title">
+                <i class="fas fa-paper-plane"></i>
+                Тестирование уведомлений
+            </h3>
+            
+            <!-- Уведомления администратору -->
+            <div class="notification-section">
+                <h4 class="section-title">
+                    <i class="fas fa-user-shield"></i>
+                    Уведомления администратору
+                </h4>
+                
+                <button class="notification-button btn-admin" onclick="testAdminNotification()">
+                    <i class="fas fa-paper-plane"></i>
+                    Тестовое уведомление
+                </button>
+                
+                <button class="notification-button btn-error" onclick="testErrorNotification()">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    Тестовая ошибка
+                </button>
+                
+                <button class="notification-button btn-report" onclick="testDailyReport()">
+                    <i class="fas fa-chart-line"></i>
+                    Ежедневный отчет
+                </button>
+            </div>
+            
+            <!-- Авито уведомления -->
+            <div class="notification-section">
+                <h4 class="section-title">
+                    <i class="fab fa-avianex"></i>
+                    Авито уведомления
+                </h4>
+                
+                <button class="notification-button" style="background: linear-gradient(135deg, #ff6b6b, #ee5a24); color: white; box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);" onclick="testAvitoNotification()">
+                    <i class="fas fa-comment-dots"></i>
+                    Тестовое сообщение с Авито
+                </button>
+            </div>
+            
+            <!-- Уведомления клиентам -->
+            <div class="notification-section">
+                <h4 class="section-title">
+                    <i class="fas fa-users"></i>
+                    Уведомления клиентам
+                </h4>
+                
+                <div class="form-group">
+                    <label class="form-label">Выберите проект:</label>
+                    <select class="form-select" id="projectSelect">
+                        <option value="">Загрузка...</option>
+                    </select>
                 </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>Уведомления администратору</h6>
-                            <div class="mb-3">
-                                <button class="btn btn-info btn-sm w-100" onclick="testAdminNotification()">
-                                    <i class="fas fa-paper-plane me-1"></i> Тестовое уведомление
-                                </button>
-                            </div>
-                            <div class="mb-3">
-                                <button class="btn btn-warning btn-sm w-100" onclick="testErrorNotification()">
-                                    <i class="fas fa-exclamation-triangle me-1"></i> Тестовая ошибка
-                                </button>
-                            </div>
-                            <div class="mb-3">
-                                <button class="btn btn-success btn-sm w-100" onclick="testDailyReport()">
-                                    <i class="fas fa-chart-line me-1"></i> Ежедневный отчет
-                                </button>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>Уведомления клиентам</h6>
-                            <div class="mb-3">
-                                <label class="form-label">Выберите проект:</label>
-                                <select class="form-select" id="projectSelect">
-                                    <option value="">Загрузка...</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Новый статус:</label>
-                                <select class="form-select" id="statusSelect">
-                                    <option value="new">🆕 Новый</option>
-                                    <option value="review">👀 На рассмотрении</option>
-                                    <option value="accepted">✅ Принят</option>
-                                    <option value="in_progress">🔄 В работе</option>
-                                    <option value="testing">🧪 Тестирование</option>
-                                    <option value="completed">🎉 Завершен</option>
-                                    <option value="cancelled">❌ Отменен</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <button class="btn btn-primary btn-sm w-100" onclick="testStatusNotification()">
-                                    <i class="fas fa-sync-alt me-1"></i> Тестировать смену статуса
-                                </button>
-                            </div>
-                        </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Новый статус:</label>
+                    <select class="form-select" id="statusSelect">
+                        <option value="new">🆕 Новый</option>
+                        <option value="review">👀 На рассмотрении</option>
+                        <option value="accepted">✅ Принят</option>
+                        <option value="in_progress">🔄 В работе</option>
+                        <option value="testing">🧪 Тестирование</option>
+                        <option value="completed">🎉 Завершен</option>
+                        <option value="cancelled">❌ Отменен</option>
+                    </select>
+                </div>
+                
+                <button class="test-status-btn" onclick="testStatusNotification()">
+                    <i class="fas fa-sync-alt"></i>
+                    Тестировать смену статуса
+                </button>
+            </div>
+            
+            <!-- Настройки уведомлений для исполнителей -->
+            <div class="notification-section">
+                <h4 class="section-title">
+                    <i class="fas fa-user-cog"></i>
+                    Настройки уведомлений исполнителей
+                </h4>
+                
+                <div id="executorsNotifications">
+                    <div style="color: rgba(255,255,255,0.7); text-align: center; padding: 2rem; font-size: 1.1rem;">
+                        <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem; display: block;"></i>
+                        Загрузка настроек исполнителей...
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-cog me-2"></i>Настройки уведомлений</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label">Админ чат ID:</label>
-                        <input type="text" class="form-control" id="adminChatId" readonly>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Статус бота:</label>
-                        <div id="botStatus" class="alert alert-info">
-                            <i class="fas fa-spinner fa-spin me-1"></i> Проверка...
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <button class="btn btn-secondary btn-sm w-100" onclick="checkBotStatus()">
-                            <i class="fas fa-sync me-1"></i> Проверить статус
-                        </button>
-                    </div>
+        
+        <div class="side-panel">
+            <h3 class="panel-title">
+                <i class="fas fa-cog"></i>
+                Настройки
+            </h3>
+            
+            <!-- Настройки бота -->
+            <div class="form-group">
+                <label class="form-label">Админ чат ID:</label>
+                <input type="text" class="form-control" id="adminChatId" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">Статус бота:</label>
+                <div id="botStatus" class="status-indicator status-checking">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    Проверка статуса...
                 </div>
             </div>
             
-            <div class="card mt-3">
-                <div class="card-header">
-                    <h5><i class="fas fa-history me-2"></i>Лог уведомлений</h5>
-                </div>
-                <div class="card-body">
-                    <div id="notificationLog" style="height: 300px; overflow-y: auto;">
-                        <p class="text-muted">Логи уведомлений будут отображаться здесь...</p>
-                    </div>
-                </div>
+            <button class="check-status-btn" onclick="checkBotStatus()">
+                <i class="fas fa-sync"></i>
+                Проверить статус
+            </button>
+            
+            <hr style="border: 1px solid rgba(255,255,255,0.2); margin: 2rem 0;">
+            
+            <!-- Лог уведомлений -->
+            <h4 class="section-title">
+                <i class="fas fa-history"></i>
+                Лог уведомлений
+            </h4>
+            
+            <div class="log-container" id="notificationLog">
+                <p style="color: rgba(255,255,255,0.7); text-align: center; margin: 2rem 0;">Логи уведомлений будут отображаться здесь...</p>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Добавляем класс к body для применения стилей
+console.log('Adding notifications-page class to body');
+document.body.classList.add('notifications-page');
+document.body.style.cssText = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important; min-height: 100vh !important; font-family: Inter, Segoe UI, system-ui, sans-serif !important;';
+console.log('Body classes:', document.body.className);
+console.log('Body style applied:', document.body.style.cssText);
+
+// Конфигурация аутентификации
+const username = 'admin';
+const password = 'qwerty123';
+
+let projects = [];
+
+// Загрузка данных при инициализации
+document.addEventListener('DOMContentLoaded', function() {
+    loadProjects();
+    loadSettings();
+    checkBotStatus();
+    loadExecutors();
+});
+
+function addLog(message, type = 'info') {
+    const logDiv = document.getElementById('notificationLog');
+    const timestamp = new Date().toLocaleString('ru-RU');
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = `log-entry ${type}`;
+    logEntry.innerHTML = `
+        <div class="log-timestamp">${timestamp}</div>
+        ${message}
+    `;
+    
+    logDiv.insertBefore(logEntry, logDiv.firstChild);
+    
+    // Удаляем старые записи (оставляем только последние 10)
+    const entries = logDiv.querySelectorAll('.log-entry');
+    if (entries.length > 10) {
+        entries[entries.length - 1].remove();
+    }
+    
+    // Очищаем placeholder если есть
+    const placeholder = logDiv.querySelector('p');
+    if (placeholder && placeholder.textContent.includes('Логи уведомлений')) {
+        placeholder.remove();
+    }
+}
+
+async function loadProjects() {
+    try {
+        const response = await fetch('/admin/api/projects/', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            projects = data.projects || [];
+            
+            const select = document.getElementById('projectSelect');
+            select.innerHTML = '<option value="">Выберите проект...</option>';
+            
+            projects.forEach(project => {
+                const option = document.createElement('option');
+                option.value = project.id;
+                option.textContent = `#${project.id} - ${project.title}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки проектов:', error);
+        addLog('Ошибка загрузки проектов', 'error');
+    }
+}
+
+async function loadSettings() {
+    // Здесь можно загрузить настройки из API
+    document.getElementById('adminChatId').value = 'Загружается...';
+}
+
+async function testAdminNotification() {
+    addLog('<i class="fas fa-paper-plane"></i> Отправка тестового уведомления администратору...', 'info');
+    
+    try {
+        const response = await fetch('/api/notifications/test-admin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                message: '🧪 Тестовое уведомление из админ-панели'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            addLog('<i class="fas fa-check-circle"></i> Тестовое уведомление администратору отправлено', 'success');
+        } else {
+            addLog(`<i class="fas fa-times-circle"></i> Ошибка: ${data.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        addLog('<i class="fas fa-times-circle"></i> Ошибка отправки уведомления', 'error');
+    }
+}
+
+async function testErrorNotification() {
+    addLog('<i class="fas fa-exclamation-triangle"></i> Отправка тестового уведомления об ошибке...', 'info');
+    
+    try {
+        const response = await fetch('/api/notifications/test-error', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                error: 'Тестовая ошибка из админ-панели',
+                context: {
+                    source: 'admin-panel',
+                    timestamp: new Date().toISOString()
+                }
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            addLog('<i class="fas fa-check-circle"></i> Уведомление об ошибке отправлено', 'success');
+        } else {
+            addLog(`<i class="fas fa-times-circle"></i> Ошибка: ${data.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        addLog('<i class="fas fa-times-circle"></i> Ошибка отправки уведомления', 'error');
+    }
+}
+
+async function testDailyReport() {
+    addLog('<i class="fas fa-chart-line"></i> Отправка ежедневного отчета...', 'info');
+    
+    try {
+        const response = await fetch('/api/notifications/daily-report', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            addLog('<i class="fas fa-check-circle"></i> Ежедневный отчет отправлен', 'success');
+        } else {
+            addLog(`<i class="fas fa-times-circle"></i> Ошибка: ${data.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        addLog('<i class="fas fa-times-circle"></i> Ошибка отправки отчета', 'error');
+    }
+}
+
+async function testStatusNotification() {
+    const projectId = document.getElementById('projectSelect').value;
+    const newStatus = document.getElementById('statusSelect').value;
+    
+    if (!projectId) {
+        addLog('<i class="fas fa-times-circle"></i> Выберите проект', 'error');
+        return;
+    }
+    
+    const project = projects.find(p => p.id == projectId);
+    if (!project) {
+        addLog('<i class="fas fa-times-circle"></i> Проект не найден', 'error');
+        return;
+    }
+    
+    addLog(`<i class="fas fa-sync-alt fa-spin"></i> Тестируем смену статуса проекта #${projectId} на "${newStatus}"...`, 'info');
+    
+    try {
+        const response = await fetch(`/admin/api/projects/${projectId}/status`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                status: newStatus,
+                comment: 'Тестовое изменение статуса из админ-панели'
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            addLog(`<i class="fas fa-check-circle"></i> Статус проекта #${projectId} изменен на "${newStatus}"`, 'success');
+            addLog('<i class="fas fa-paper-plane"></i> Уведомление клиенту отправлено', 'success');
+            
+            // Обновляем данные проекта
+            project.status = newStatus;
+        } else {
+            addLog(`<i class="fas fa-times-circle"></i> Ошибка: ${data.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        addLog('<i class="fas fa-times-circle"></i> Ошибка изменения статуса', 'error');
+    }
+}
+
+async function checkBotStatus() {
+    const statusDiv = document.getElementById('botStatus');
+    statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Проверка статуса...';
+    statusDiv.className = 'status-indicator status-checking';
+    
+    try {
+        const response = await fetch('/api/notifications/bot-status', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> Бот работает отлично';
+            statusDiv.className = 'status-indicator status-success';
+            
+            if (data.bot_info) {
+                statusDiv.innerHTML += `<div style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.8;">@${data.bot_info.username}</div>`;
+            }
+        } else {
+            statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> Бот недоступен';
+            statusDiv.className = 'status-indicator status-error';
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Ошибка проверки соединения';
+        statusDiv.className = 'status-indicator status-warning';
+    }
+}
+
+// Функция для показа уведомлений
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+        min-width: 300px;
+        padding: 1rem 1.5rem;
+        border-radius: 12px;
+        color: white;
+        font-weight: 600;
+        backdrop-filter: blur(20px);
+        border: 1px solid rgba(255,255,255,0.2);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        animation: slideIn 0.3s ease-out;
+    `;
+    
+    if (type === 'success') {
+        notification.style.background = 'rgba(34, 197, 94, 0.9)';
+    } else if (type === 'error') {
+        notification.style.background = 'rgba(239, 68, 68, 0.9)';
+    } else {
+        notification.style.background = 'rgba(59, 130, 246, 0.9)';
+    }
+    
+    notification.innerHTML = message;
+    document.body.appendChild(notification);
+    
+    // Автоматически скрываем через 5 секунд
+    setTimeout(() => {
+        notification.style.animation = 'slideOut 0.3s ease-in';
+        setTimeout(() => notification.remove(), 300);
+    }, 5000);
+}
+
+async function testAvitoNotification() {
+    addLog('<i class="fas fa-comment-dots"></i> Тестирование Авито уведомления...', 'info');
+    
+    try {
+        const response = await fetch('/api/notifications/test-avito', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            addLog('<i class="fas fa-check-circle"></i> Тестовое уведомление Авито отправлено продажникам', 'success');
+        } else {
+            addLog(`<i class="fas fa-times-circle"></i> Ошибка: ${data.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка:', error);
+        addLog('<i class="fas fa-times-circle"></i> Ошибка отправки Авито уведомления', 'error');
+    }
+}
+
+async function loadExecutors() {
+    try {
+        const response = await fetch('/admin/api/users/api', {
+            headers: {
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            const executors = data.users || [];
+            
+            const container = document.getElementById('executorsNotifications');
+            container.innerHTML = '';
+            
+            if (executors.length === 0) {
+                container.innerHTML = '<div style="color: rgba(255,255,255,0.7); text-align: center; padding: 2rem;"><i class="fas fa-users" style="font-size: 3rem; margin-bottom: 1rem; display: block; opacity: 0.5;"></i><h4>Нет зарегистрированных исполнителей</h4><p>Исполнители будут отображены здесь после их добавления в систему</p></div>';
+                return;
+            }
+            
+            executors.forEach(executor => {
+                const card = createExecutorCard(executor);
+                container.appendChild(card);
+            });
+            
+            addLog('<i class="fas fa-users"></i> Загружены настройки для ' + executors.length + ' исполнителей', 'success');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки исполнителей:', error);
+        document.getElementById('executorsNotifications').innerHTML = '<div style="color: rgba(255,68,68,0.8); text-align: center; padding: 2rem;"><i class="fas fa-exclamation-triangle" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i><h4>Ошибка загрузки данных</h4><p>Не удалось загрузить список исполнителей</p></div>';
+        addLog('<i class="fas fa-times-circle"></i> Ошибка загрузки данных исполнителей', 'error');
+    }
+}
+
+function createExecutorCard(executor) {
+    const card = document.createElement('div');
+    card.className = 'executor-card';
+    
+    const initials = executor.name.split(' ').map(n => n[0]).join('').toUpperCase();
+    
+    card.innerHTML = `
+        <div class="executor-header">
+            <div class="executor-avatar">${initials}</div>
+            <div class="executor-info">
+                <h5>${executor.name}</h5>
+                <p>${executor.role || 'Исполнитель'} • ${executor.email}</p>
+            </div>
+        </div>
+        
+        <div class="notification-toggles">
+            <div class="toggle-group">
+                <div class="toggle-label">
+                    <i class="fas fa-tasks"></i>
+                    <div>
+                        <div>Новые задачи</div>
+                        <div class="notification-type">При назначении</div>
+                    </div>
+                </div>
+                <label class="notification-toggle">
+                    <input type="checkbox" ${executor.notifications?.new_tasks !== false ? 'checked' : ''} 
+                           onchange="updateNotificationSetting(${executor.id}, 'new_tasks', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            
+            <div class="toggle-group">
+                <div class="toggle-label">
+                    <i class="fas fa-clock"></i>
+                    <div>
+                        <div>Дедлайны</div>
+                        <div class="notification-type">За 24ч до срока</div>
+                    </div>
+                </div>
+                <label class="notification-toggle">
+                    <input type="checkbox" ${executor.notifications?.deadlines !== false ? 'checked' : ''} 
+                           onchange="updateNotificationSetting(${executor.id}, 'deadlines', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            
+            <div class="toggle-group">
+                <div class="toggle-label">
+                    <i class="fas fa-comments"></i>
+                    <div>
+                        <div>Комментарии</div>
+                        <div class="notification-type">К задачам</div>
+                    </div>
+                </div>
+                <label class="notification-toggle">
+                    <input type="checkbox" ${executor.notifications?.comments !== false ? 'checked' : ''} 
+                           onchange="updateNotificationSetting(${executor.id}, 'comments', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            
+            <div class="toggle-group">
+                <div class="toggle-label">
+                    <i class="fas fa-chart-line"></i>
+                    <div>
+                        <div>Отчеты</div>
+                        <div class="notification-type">Ежедневные</div>
+                    </div>
+                </div>
+                <label class="notification-toggle">
+                    <input type="checkbox" ${executor.notifications?.reports !== false ? 'checked' : ''} 
+                           onchange="updateNotificationSetting(${executor.id}, 'reports', this.checked)">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+        </div>
+        
+        <button class="save-settings-btn" onclick="saveExecutorSettings(${executor.id})">
+            <i class="fas fa-save"></i>
+            Сохранить настройки
+        </button>
+    `;
+    
+    return card;
+}
+
+async function updateNotificationSetting(executorId, settingType, enabled) {
+    try {
+        const response = await fetch(`/admin/api/users/api/${executorId}/notifications`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify({
+                [settingType]: enabled
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            addLog(`<i class="fas fa-user-cog"></i> Настройка "${settingType}" ${enabled ? 'включена' : 'отключена'} для исполнителя`, 'success');
+        } else {
+            addLog(`<i class="fas fa-times-circle"></i> Ошибка обновления настроек: ${data.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка обновления настроек:', error);
+        addLog('<i class="fas fa-times-circle"></i> Ошибка сохранения настроек', 'error');
+    }
+}
+
+async function saveExecutorSettings(executorId) {
+    const card = document.querySelector(`[onclick*="${executorId}"]`).closest('.executor-card');
+    const toggles = card.querySelectorAll('input[type="checkbox"]');
+    
+    const settings = {};
+    const settingTypes = ['new_tasks', 'deadlines', 'comments', 'reports'];
+    
+    toggles.forEach((toggle, index) => {
+        settings[settingTypes[index]] = toggle.checked;
+    });
+    
+    try {
+        const response = await fetch(`/admin/api/users/api/${executorId}/notifications`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+            },
+            body: JSON.stringify(settings)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            addLog('<i class="fas fa-check-circle"></i> Настройки уведомлений исполнителя сохранены', 'success');
+            showNotification('Настройки сохранены', 'success');
+        } else {
+            addLog(`<i class="fas fa-times-circle"></i> Ошибка сохранения: ${data.message}`, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка сохранения настроек:', error);
+        addLog('<i class="fas fa-times-circle"></i> Ошибка сохранения настроек', 'error');
+    }
+}
+</script>
+
+<style>
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+</style>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Конфигурация аутентификации
-    const username = 'admin';
-    const password = 'qwerty123';
-    
-    let projects = [];
-    
-    // Загрузка данных при инициализации
-    document.addEventListener('DOMContentLoaded', function() {
-        loadProjects();
-        loadSettings();
-        checkBotStatus();
-    });
-    
-    function addLog(message, type = 'info') {
-        const logDiv = document.getElementById('notificationLog');
-        const timestamp = new Date().toLocaleString('ru-RU');
-        const alertClass = type === 'success' ? 'alert-success' : 
-                          type === 'error' ? 'alert-danger' : 'alert-info';
-        
-        const logEntry = document.createElement('div');
-        logEntry.className = `alert ${alertClass} p-2 mb-2`;
-        logEntry.innerHTML = `
-            <small class="text-muted">${timestamp}</small><br>
-            ${message}
-        `;
-        
-        logDiv.insertBefore(logEntry, logDiv.firstChild);
-        
-        // Удаляем старые записи (оставляем только последние 10)
-        const entries = logDiv.querySelectorAll('.alert');
-        if (entries.length > 10) {
-            entries[entries.length - 1].remove();
-        }
-    }
-    
-    async function loadProjects() {
-        try {
-            const response = await fetch('/admin/api/projects/', {
-                headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                projects = data.projects || [];
-                
-                const select = document.getElementById('projectSelect');
-                select.innerHTML = '<option value="">Выберите проект...</option>';
-                
-                projects.forEach(project => {
-                    const option = document.createElement('option');
-                    option.value = project.id;
-                    option.textContent = `#${project.id} - ${project.title}`;
-                    select.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Ошибка загрузки проектов:', error);
-            addLog('Ошибка загрузки проектов', 'error');
-        }
-    }
-    
-    async function loadSettings() {
-        // Здесь можно загрузить настройки из API
-        document.getElementById('adminChatId').value = 'Загружается...';
-    }
-    
-    async function testAdminNotification() {
-        addLog('Отправка тестового уведомления администратору...', 'info');
-        
-        try {
-            const response = await fetch('/api/notifications/test-admin', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
-                },
-                body: JSON.stringify({
-                    message: '🧪 Тестовое уведомление из админ-панели'
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                addLog('✅ Тестовое уведомление администратору отправлено', 'success');
-            } else {
-                addLog(`❌ Ошибка: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            addLog('❌ Ошибка отправки уведомления', 'error');
-        }
-    }
-    
-    async function testErrorNotification() {
-        addLog('Отправка тестового уведомления об ошибке...', 'info');
-        
-        try {
-            const response = await fetch('/api/notifications/test-error', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
-                },
-                body: JSON.stringify({
-                    error: 'Тестовая ошибка из админ-панели',
-                    context: {
-                        source: 'admin-panel',
-                        timestamp: new Date().toISOString()
-                    }
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                addLog('✅ Уведомление об ошибке отправлено', 'success');
-            } else {
-                addLog(`❌ Ошибка: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            addLog('❌ Ошибка отправки уведомления', 'error');
-        }
-    }
-    
-    async function testDailyReport() {
-        addLog('Отправка ежедневного отчета...', 'info');
-        
-        try {
-            const response = await fetch('/api/notifications/daily-report', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
-                }
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                addLog('✅ Ежедневный отчет отправлен', 'success');
-            } else {
-                addLog(`❌ Ошибка: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            addLog('❌ Ошибка отправки отчета', 'error');
-        }
-    }
-    
-    async function testStatusNotification() {
-        const projectId = document.getElementById('projectSelect').value;
-        const newStatus = document.getElementById('statusSelect').value;
-        
-        if (!projectId) {
-            addLog('❌ Выберите проект', 'error');
-            return;
-        }
-        
-        const project = projects.find(p => p.id == projectId);
-        if (!project) {
-            addLog('❌ Проект не найден', 'error');
-            return;
-        }
-        
-        addLog(`Тестируем смену статуса проекта #${projectId} на "${newStatus}"...`, 'info');
-        
-        try {
-            const response = await fetch(`/admin/api/projects/${projectId}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
-                },
-                body: JSON.stringify({
-                    status: newStatus,
-                    comment: 'Тестовое изменение статуса из админ-панели'
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                addLog(`✅ Статус проекта #${projectId} изменен на "${newStatus}"`, 'success');
-                addLog('📤 Уведомление клиенту отправлено', 'success');
-                
-                // Обновляем данные проекта
-                project.status = newStatus;
-            } else {
-                addLog(`❌ Ошибка: ${data.message}`, 'error');
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            addLog('❌ Ошибка изменения статуса', 'error');
-        }
-    }
-    
-    async function checkBotStatus() {
-        const statusDiv = document.getElementById('botStatus');
-        statusDiv.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Проверка...';
-        statusDiv.className = 'alert alert-info';
-        
-        try {
-            const response = await fetch('/api/notifications/bot-status', {
-                headers: {
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
-                }
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                statusDiv.innerHTML = '<i class="fas fa-check-circle me-1"></i> Бот работает';
-                statusDiv.className = 'alert alert-success';
-                
-                if (data.bot_info) {
-                    statusDiv.innerHTML += `<br><small>@${data.bot_info.username}</small>`;
-                }
-            } else {
-                statusDiv.innerHTML = '<i class="fas fa-times-circle me-1"></i> Бот недоступен';
-                statusDiv.className = 'alert alert-danger';
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Ошибка проверки';
-            statusDiv.className = 'alert alert-warning';
-        }
-    }
-    
-    // Функция для показа уведомлений
-    function showNotification(message, type = 'info') {
-        // Используем существующую систему уведомлений
-        const alertClass = type === 'success' ? 'alert-success' : 
-                          type === 'error' ? 'alert-danger' : 'alert-info';
-        
-        const notification = document.createElement('div');
-        notification.className = `alert ${alertClass} alert-dismissible fade show position-fixed`;
-        notification.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
-        notification.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        
-        document.body.appendChild(notification);
-        
-        // Автоматически скрываем через 5 секунд
-        setTimeout(() => {
-            notification.remove();
-        }, 5000);
-    }
+    // Дополнительные настройки если необходимо
 </script>
 {% endblock %}

@@ -245,5 +245,30 @@ class StartHandler:
         # Другие обработчики будут вызваны по своим паттернам
         # (например, 'create_tz', 'portfolio' и т.д.)
 
+    async def my_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработчик команды /my_id - показывает Telegram ID пользователя"""
+        try:
+            user = update.effective_user
+            user_id = user.id
+            
+            log_user_action(user_id, "my_id_command", f"Username: {user.username}")
+            
+            message = f"""🆔 <b>Ваш Telegram ID:</b> <code>{user_id}</code>
+            
+📋 <i>Скопируйте этот ID и передайте администратору для настройки уведомлений</i>
+            
+ℹ️ Этот ID нужен для привязки вашего аккаунта к системе уведомлений."""
+            
+            await update.message.reply_text(
+                message,
+                parse_mode='HTML'
+            )
+            
+            logger.info(f"Пользователь {user_id} ({user.username}) запросил свой ID")
+            
+        except Exception as e:
+            logger.error(f"Ошибка в my_id: {e}")
+            await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
+
 # Единственный экземпляр класса для использования в других частях приложения
 start_handler = StartHandler()

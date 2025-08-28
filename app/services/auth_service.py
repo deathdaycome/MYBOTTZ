@@ -45,6 +45,23 @@ class AuthService:
         finally:
             db.close()
     
+    @staticmethod  
+    def verify_credentials(credentials) -> bool:
+        """Проверка учетных данных для FastAPI HTTPBasicCredentials"""
+        from app.config.settings import settings
+        import secrets
+        
+        # Проверка основного админа
+        correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
+        correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
+        
+        if correct_username and correct_password:
+            return True
+            
+        # Проверка пользователей из БД
+        user = AuthService.authenticate_user(credentials.username, credentials.password)
+        return user is not None
+
     @staticmethod
     def verify_basic_auth(auth_header: str) -> Tuple[Optional[AdminUser], str]:
         """

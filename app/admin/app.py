@@ -822,6 +822,8 @@ async def users_page(request: Request, username: str = Depends(authenticate)):
     try:
         user_role = get_user_role(username)
         current_user = get_current_user(username)
+        
+        logger.info(f"users_page: username={username}, user_role={user_role}, current_user={current_user}")
         navigation_items = get_navigation_items(user_role)
         
         # Получаем список пользователей
@@ -829,8 +831,8 @@ async def users_page(request: Request, username: str = Depends(authenticate)):
             # Владелец видит всех, исполнитель только себя
             if user_role == 'executor':
                 # Исполнитель видит только свою учетную запись
-                if current_user:
-                    user_id = current_user['id'] if isinstance(current_user, dict) else current_user.id
+                if current_user and isinstance(current_user, dict) and 'id' in current_user:
+                    user_id = current_user['id']
                     users_raw = db.query(AdminUser).filter(AdminUser.id == user_id).all()
                 else:
                     users_raw = []
@@ -2157,6 +2159,262 @@ async def check_bot_status(request: Request):
         }, status_code=500)
 
 
+@admin_router.post("/api/notifications/test-admin")
+async def test_admin_notification(request: Request):
+    """Тестовое уведомление администратору"""
+    try:
+        data = await request.json()
+        message = data.get("message", "🧪 Тестовое уведомление из админ-панели")
+        
+        # Отправляем уведомление в admin chat
+        from telegram import Bot
+        bot = Bot(settings.BOT_TOKEN)
+        
+        # Получаем admin chat ID из настроек
+        admin_chat_id = settings.ADMIN_CHAT_ID or settings.ADMIN_USERNAME
+        
+        if admin_chat_id:
+            await bot.send_message(chat_id=admin_chat_id, text=message)
+            logger.info(f"Тестовое уведомление отправлено администратору: {message}")
+            
+            return JSONResponse({
+                "success": True,
+                "message": "Тестовое уведомление отправлено администратору"
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "message": "Не настроен admin chat ID"
+            }, status_code=400)
+        
+    except Exception as e:
+        logger.error(f"Ошибка отправки тестового уведомления: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": f"Ошибка отправки уведомления: {str(e)}"
+        }, status_code=500)
+
+
+@admin_router.post("/api/notifications/test-error")
+async def test_error_notification(request: Request):
+    """Тестовое уведомление об ошибке"""
+    try:
+        data = await request.json()
+        error = data.get("error", "Тестовая ошибка из админ-панели")
+        context = data.get("context", {})
+        
+        # Формируем сообщение об ошибке
+        message = f"🚨 Ошибка в системе:\n\n{error}\n\nКонтекст: {json.dumps(context, ensure_ascii=False, indent=2)}"
+        
+        # Отправляем уведомление в admin chat
+        from telegram import Bot
+        bot = Bot(settings.BOT_TOKEN)
+        
+        admin_chat_id = settings.ADMIN_CHAT_ID or settings.ADMIN_USERNAME
+        
+        if admin_chat_id:
+            await bot.send_message(chat_id=admin_chat_id, text=message)
+            logger.info(f"Тестовое уведомление об ошибке отправлено: {error}")
+            
+            return JSONResponse({
+                "success": True,
+                "message": "Уведомление об ошибке отправлено"
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "message": "Не настроен admin chat ID"
+            }, status_code=400)
+        
+    except Exception as e:
+        logger.error(f"Ошибка отправки уведомления об ошибке: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": f"Ошибка отправки уведомления: {str(e)}"
+        }, status_code=500)
+
+
+@admin_router.post("/api/notifications/daily-report")
+async def test_daily_report(request: Request):
+    """Тестовый ежедневный отчет"""
+    try:
+        # Генерируем тестовый ежедневный отчет
+        with get_db_context() as db:
+            # Статистика проектов
+            total_projects = db.query(Project).count()
+            new_projects = db.query(Project).filter(Project.status == 'new').count()
+            in_progress_projects = db.query(Project).filter(Project.status == 'in_progress').count()
+            completed_projects = db.query(Project).filter(Project.status == 'completed').count()
+            
+            # Статистика пользователей
+            total_users = db.query(User).count()
+            
+            report = f"""📊 Ежедневный отчет системы
+
+🗂 Проекты:
+• Всего проектов: {total_projects}
+• Новые: {new_projects}
+• В работе: {in_progress_projects}
+• Завершенные: {completed_projects}
+
+👥 Пользователи:
+• Всего пользователей: {total_users}
+
+📅 Дата отчета: {datetime.now().strftime('%d.%m.%Y %H:%M')}
+🤖 Сгенерировано автоматически"""
+        
+        # Отправляем отчет в admin chat
+        from telegram import Bot
+        bot = Bot(settings.BOT_TOKEN)
+        
+        admin_chat_id = settings.ADMIN_CHAT_ID or settings.ADMIN_USERNAME
+        
+        if admin_chat_id:
+            await bot.send_message(chat_id=admin_chat_id, text=report)
+            logger.info("Ежедневный отчет отправлен администратору")
+            
+            return JSONResponse({
+                "success": True,
+                "message": "Ежедневный отчет отправлен"
+            })
+        else:
+            return JSONResponse({
+                "success": False,
+                "message": "Не настроен admin chat ID"
+            }, status_code=400)
+        
+    except Exception as e:
+        logger.error(f"Ошибка отправки ежедневного отчета: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": f"Ошибка отправки отчета: {str(e)}"
+        }, status_code=500)
+
+
+@admin_router.post("/api/notifications/avito-webhook")
+async def avito_notification_webhook(request: Request):
+    """Webhook для получения уведомлений от Avito"""
+    try:
+        data = await request.json()
+        
+        # Логируем все входящие данные от Авито
+        logger.info(f"Получено уведомление от Авито: {data}")
+        
+        # Парсим данные от Авито
+        message_type = data.get('type', 'message')  # новое сообщение, изменение статуса и т.д.
+        chat_id = data.get('chat_id')
+        message = data.get('message', {})
+        
+        if message_type == 'message' and chat_id and message:
+            # Находим всех продажников, которые должны получить уведомления
+            with get_db_context() as db:
+                salespeople = db.query(AdminUser).filter(
+                    AdminUser.role.in_(['salesperson', 'sales']),
+                    AdminUser.is_active == True
+                ).all()
+                
+                # Отправляем уведомления всем продажникам
+                from telegram import Bot
+                bot = Bot(settings.BOT_TOKEN)
+                
+                for salesperson in salespeople:
+                    if salesperson.telegram_id:
+                        try:
+                            notification_text = f"""📩 Новое сообщение в Авито!
+                            
+🔗 Чат ID: {chat_id}
+👤 От: {message.get('author_name', 'Неизвестно')}
+📝 Сообщение: {message.get('content', message.get('text', 'Без текста'))}
+⏰ Время: {datetime.now().strftime('%H:%M:%S')}
+
+👈 Перейти в админ-панель для ответа"""
+
+                            await bot.send_message(
+                                chat_id=salesperson.telegram_id,
+                                text=notification_text
+                            )
+                            
+                            logger.info(f"Уведомление отправлено продажнику {salesperson.username}")
+                            
+                        except Exception as e:
+                            logger.error(f"Не удалось отправить уведомление продажнику {salesperson.username}: {e}")
+                
+                return JSONResponse({
+                    "success": True,
+                    "message": "Уведомления отправлены продажникам"
+                })
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Webhook обработан"
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка обработки Авито webhook: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": f"Ошибка: {str(e)}"
+        }, status_code=500)
+
+
+@admin_router.post("/api/notifications/test-avito")
+async def test_avito_notification(request: Request):
+    """Тестовое уведомление для Авито"""
+    try:
+        # Симулируем получение сообщения с Авито
+        test_data = {
+            "type": "message",
+            "chat_id": "test_chat_123",
+            "message": {
+                "author_name": "Тестовый клиент",
+                "content": "Здравствуйте! Интересует ваша услуга. Можете рассказать подробнее?",
+                "created_at": datetime.now().isoformat()
+            }
+        }
+        
+        # Прямо отправляем уведомление всем продавцам
+        from app.services.notification_service import notification_service
+        
+        message = f"""🔔 <b>Новое сообщение с Авито</b>
+        
+👤 <b>От:</b> {test_data['message']['author_name']}
+💬 <b>Сообщение:</b> {test_data['message']['content']}
+🕐 <b>Время:</b> {test_data['message']['created_at']}
+        
+<i>Это тестовое уведомление от админ-панели</i>"""
+        
+        # Отправляем всем продавцам
+        with get_db_context() as db:
+            salespersons = db.query(AdminUser).filter(
+                AdminUser.role == 'salesperson',
+                AdminUser.telegram_id.isnot(None),
+                AdminUser.is_active == True
+            ).all()
+            
+            sent_count = 0
+            for person in salespersons:
+                try:
+                    await notification_service.send_notification(
+                        chat_id=person.telegram_id,
+                        message=message
+                    )
+                    sent_count += 1
+                except Exception as e:
+                    logger.error(f"Ошибка отправки уведомления {person.username}: {e}")
+        
+        return JSONResponse({
+            "success": True,
+            "message": f"Тестовое уведомление отправлено {sent_count} продавцам"
+        })
+        
+    except Exception as e:
+        logger.error(f"Ошибка тестирования Авито уведомлений: {e}")
+        return JSONResponse({
+            "success": False,
+            "message": f"Ошибка: {str(e)}"
+        }, status_code=500)
+
+
 @admin_router.put("/api/projects/{project_id}/status")
 async def update_project_status_direct(
     project_id: int,
@@ -3429,4 +3687,47 @@ async def logout_auth(request: Request, switch: str = None):
     """
     
     return HTMLResponse(content=html_content, status_code=200)
+
+
+# Основные HTML роуты
+@admin_router.get("/permissions", response_class=HTMLResponse)
+async def permissions_page(request: Request, credentials: HTTPBasicCredentials = Depends(security)):
+    """Страница управления правами"""
+    if not auth_service.verify_credentials(credentials):
+        raise HTTPException(status_code=401, detail="Неверные учетные данные")
+    
+    return templates.TemplateResponse("permissions_management.html", {"request": request})
+
+@admin_router.get("/notifications", response_class=HTMLResponse) 
+async def notifications_page(request: Request, credentials: HTTPBasicCredentials = Depends(security)):
+    """Страница уведомлений"""
+    if not auth_service.verify_credentials(credentials):
+        raise HTTPException(status_code=401, detail="Неверные учетные данные")
+    
+    return templates.TemplateResponse("notifications.html", {"request": request})
+
+# Создание FastAPI приложения
+app = FastAPI(title="Admin Panel")
+
+# Корневой редирект на админку
+@app.get("/")
+async def root():
+    return RedirectResponse(url="/admin/", status_code=302)
+
+# Подключение роутера к приложению с префиксом /admin
+app.include_router(admin_router, prefix="/admin")
+
+# Подключение статических файлов
+app.mount("/static", StaticFiles(directory="app/admin/static"), name="static")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# Подключение шаблонов
+templates = Jinja2Templates(directory="app/admin/templates")
+
+# Добавление middleware
+auth_service = AuthService()
+security = HTTPBasic()
+
+# Role middleware is applied via decorators in individual routes
+role_middleware = RoleMiddleware()
 
