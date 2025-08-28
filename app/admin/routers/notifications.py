@@ -103,7 +103,8 @@ async def update_employee_settings(
     """Обновить настройки уведомлений сотрудника"""
     
     # Проверяем права доступа
-    if current_user.role not in ['owner', 'admin']:
+    user_role = current_user.get("role") if isinstance(current_user, dict) else current_user.role
+    if user_role not in ['owner', 'admin']:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
     
     # Проверяем, что сотрудник существует
@@ -166,7 +167,8 @@ async def notification_queue_page(
     """Страница очереди уведомлений"""
     
     # Проверяем права доступа
-    if current_user.role not in ['owner', 'admin']:
+    user_role = current_user.get("role") if isinstance(current_user, dict) else current_user.role
+    if user_role not in ['owner', 'admin']:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
     
     # Базовый запрос
@@ -224,7 +226,8 @@ async def notification_log_page(
     """Страница лога уведомлений"""
     
     # Проверяем права доступа
-    if current_user.role not in ['owner', 'admin']:
+    user_role = current_user.get("role") if isinstance(current_user, dict) else current_user.role
+    if user_role not in ['owner', 'admin']:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
     
     # Базовый запрос
@@ -274,7 +277,8 @@ async def send_test_notification(
     """Отправить тестовое уведомление сотруднику"""
     
     # Проверяем права доступа
-    if current_user.role not in ['owner', 'admin']:
+    user_role = current_user.get("role") if isinstance(current_user, dict) else current_user.role
+    if user_role not in ['owner', 'admin']:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
     
     # Получаем настройки сотрудника
@@ -312,7 +316,8 @@ async def process_notification_queue_manual(
     """Принудительная обработка очереди уведомлений"""
     
     # Проверяем права доступа
-    if current_user.role not in ['owner', 'admin']:
+    user_role = current_user.get("role") if isinstance(current_user, dict) else current_user.role
+    if user_role not in ['owner', 'admin']:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
     
     try:
@@ -330,7 +335,8 @@ async def notification_stats(
     """Статистика уведомлений"""
     
     # Проверяем права доступа
-    if current_user.role not in ['owner', 'admin']:
+    user_role = current_user.get("role") if isinstance(current_user, dict) else current_user.role
+    if user_role not in ['owner', 'admin']:
         raise HTTPException(status_code=403, detail="Недостаточно прав")
     
     # Период для статистики

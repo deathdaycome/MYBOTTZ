@@ -28,7 +28,7 @@ async def services_page(request: Request, user: AdminUser = Depends(require_admi
         "request": request,
         "user": user,
         "username": user.get("username") if isinstance(user, dict) else user.username,
-        "user_role": user.role,
+        "user_role": user.get("role") if isinstance(user, dict) else user.role,
         "navigation_items": navigation_items
     })
 
