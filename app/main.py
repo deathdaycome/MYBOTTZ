@@ -1,6 +1,7 @@
 import logging
 import asyncio
 from fastapi import FastAPI, Request
+from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from telegram import Update
@@ -48,11 +49,55 @@ try:
 except Exception as e:
     logger.warning(f"Не удалось выполнить проверку БД: {e}")
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Управление жизненным циклом приложения"""
+    # Startup
+    logger.info("🚀 Запуск приложения...")
+    
+    # Запускаем Telegram-бота
+    bot_instance.logger.info("🚀 Запускаем Telegram-бота в фоновом режиме...")
+    asyncio.create_task(bot_instance.run())
+    
+    # Запускаем планировщик автоматизации
+    try:
+        from app.services.scheduler import scheduler
+        scheduler.start()
+        logger.info("✅ Планировщик автоматизации запущен")
+    except Exception as e:
+        logger.error(f"❌ Ошибка запуска планировщика: {e}")
+    
+    # Запускаем Avito polling сервис
+    try:
+        logger.info("🔄 Запускаем Avito polling service...")
+        asyncio.create_task(polling_service.start_polling())
+        logger.info("✅ Avito polling service запущен")
+    except Exception as e:
+        logger.error(f"Ошибка запуска Avito polling: {e}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("🛑 Остановка приложения...")
+    
+    # Останавливаем Telegram-бота
+    bot_instance.logger.info("🛑 Останавливаем Telegram-бота...")
+    await bot_instance.stop()
+    
+    # Останавливаем планировщик
+    try:
+        from app.services.scheduler import scheduler
+        scheduler.stop()
+        logger.info("✅ Планировщик автоматизации остановлен")
+    except Exception as e:
+        logger.error(f"❌ Ошибка остановки планировщика: {e}")
+
 # --- FastAPI App Initialization ---
 app = FastAPI(
     title="Bot Business Card Admin",
     description="Панель управления для Telegram-бота визитки.",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan
 )
 
 # Middleware для логирования запросов
@@ -406,33 +451,6 @@ class TelegramBot:
 # --- Telegram Bot Initialization ---
 bot_instance = TelegramBot()
 
-@app.on_event("startup")
-async def startup_event():
-    """Запуск Telegram-бота при старте FastAPI"""
-    bot_instance.logger.info("🚀 Запускаем Telegram-бота в фоновом режиме...")
-    asyncio.create_task(bot_instance.run())
-    
-    # Запускаем планировщик автоматизации
-    try:
-        from app.services.scheduler import scheduler
-        scheduler.start()
-        logger.info("✅ Планировщик автоматизации запущен")
-    except Exception as e:
-        logger.error(f"❌ Ошибка запуска планировщика: {e}")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Остановка Telegram-бота при выключении FastAPI"""
-    bot_instance.logger.info("🛑 Останавливаем Telegram-бота...")
-    await bot_instance.stop()
-    
-    # Останавливаем планировщик
-    try:
-        from app.services.scheduler import scheduler
-        scheduler.stop()
-        logger.info("✅ Планировщик автоматизации остановлен")
-    except Exception as e:
-        logger.error(f"❌ Ошибка остановки планировщика: {e}")
 
 # --- Webhook (если используется) ---
 @app.post("/webhook")
@@ -514,16 +532,6 @@ async def admin_debug():
             "message": "Ошибка в admin-debug"
         }
 
-@app.on_event("startup")
-async def startup_event():
-    """Инициализация при запуске приложения"""
-    try:
-        # Запускаем Avito polling сервис
-        logger.info("🔄 Запускаем Avito polling service...")
-        asyncio.create_task(polling_service.start_polling())
-        logger.info("✅ Avito polling service запущен")
-    except Exception as e:
-        logger.error(f"Ошибка запуска Avito polling: {e}")
 
 if __name__ == "__main__":
     import uvicorn
