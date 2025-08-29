@@ -1,90 +1,82 @@
 #!/usr/bin/env python3
 """
-Скрипт для исправления отсутствующих колонок в базе данных на сервере
-Исправляет ошибки: no such column: clients.avito_chat_id и leads.source_type
+Скрипт для исправления базы данных на сервере - добавление telegram_id в admin_users
 """
 
 import sqlite3
 import os
 import sys
-from datetime import datetime
 
-def get_database_path():
-    """Найти путь к базе данных"""
-    possible_paths = [
-        "app.db",
-        "data/app.db",
+def fix_server_database():
+    """Исправляет базу данных на сервере"""
+    
+    # Пути к возможным базам данных
+    db_paths = [
+        "/var/www/bot_business_card/admin_panel.db",
+        "/var/www/bot_business_card/database.db", 
         "/var/www/bot_business_card/app.db",
-        "/var/www/bot_business_card/data/app.db"
+        "admin_panel.db",
+        "database.db",
+        "app.db"
     ]
     
-    for path in possible_paths:
+    print("🔍 Ищем базу данных...")
+    
+    db_path = None
+    for path in db_paths:
         if os.path.exists(path):
-            return path
+            db_path = path
+            print(f"✅ Найдена база: {path}")
+            break
     
-    return "app.db"  # Создаст новую если не найдена
-
-def check_column_exists(cursor, table_name, column_name):
-    """Проверить существование колонки"""
-    cursor.execute(f"PRAGMA table_info({table_name})")
-    columns = [row[1] for row in cursor.fetchall()]
-    return column_name in columns
-
-def main():
-    """Исправить базу данных"""
-    print("🔧 Исправляем ошибки базы данных на сервере...")
-    print("=" * 60)
-    
-    db_path = get_database_path()
-    print(f"📁 База данных: {db_path}")
-    
-    if not os.path.exists(db_path):
-        print(f"❌ База данных не найдена: {db_path}")
-        sys.exit(1)
+    if not db_path:
+        print("❌ База данных не найдена!")
+        return False
     
     try:
-        # Подключение к базе
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # Исправления для таблицы clients
-        print("\n🔧 Проверяем таблицу clients...")
-        client_columns = [
-            'avito_chat_id',
-            'avito_user_id', 
-            'avito_status',
-            'avito_dialog_history',
-            'avito_notes',
-            'avito_follow_up',
-            'telegram_user_id'
-        ]
+        # Проверяем структуру таблицы admin_users
+        cursor.execute("PRAGMA table_info(admin_users)")
+        columns = [column[1] for column in cursor.fetchall()]
+        print(f"📋 Колонки в admin_users: {columns}")
         
-        for column in client_columns:
-            if not check_column_exists(cursor, 'clients', column):
-                print(f"➕ Добавляем clients.{column}")
-                cursor.execute(f"ALTER TABLE clients ADD COLUMN {column} TEXT")
-            else:
-                print(f"✅ clients.{column} уже существует")
-        
-        # Исправления для таблицы leads
-        print("\n🔧 Проверяем таблицу leads...")
-        if not check_column_exists(cursor, 'leads', 'source_type'):
-            print("➕ Добавляем leads.source_type")
-            cursor.execute("ALTER TABLE leads ADD COLUMN source_type TEXT")
+        if 'telegram_id' not in columns:
+            print("➕ Добавляем колонку telegram_id...")
+            cursor.execute("""
+                ALTER TABLE admin_users 
+                ADD COLUMN telegram_id BIGINT DEFAULT NULL
+            """)
+            
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_admin_users_telegram_id 
+                ON admin_users(telegram_id)
+            """)
+            
+            conn.commit()
+            print("✅ Колонка telegram_id добавлена!")
         else:
-            print("✅ leads.source_type уже существует")
+            print("ℹ️  Колонка telegram_id уже существует")
         
-        # Сохраняем изменения
-        conn.commit()
+        # Проверяем финальную структуру
+        cursor.execute("PRAGMA table_info(admin_users)")
+        final_columns = [column[1] for column in cursor.fetchall()]
+        print(f"📋 Финальные колонки: {final_columns}")
+        
         conn.close()
-        
-        print(f"\n✅ База данных успешно исправлена!")
-        print(f"⏰ Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("🚀 Теперь страницы лидов и клиентов должны работать!")
+        return True
         
     except Exception as e:
-        print(f"\n❌ Ошибка: {e}")
-        sys.exit(1)
+        print(f"❌ Ошибка: {e}")
+        return False
 
 if __name__ == "__main__":
-    main()
+    print("🚀 Исправление базы данных на сервере")
+    success = fix_server_database()
+    if success:
+        print("✅ Миграция завершена успешно!")
+        sys.exit(0)
+    else:
+        print("❌ Миграция не удалась!")
+        sys.exit(1)
