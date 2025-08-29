@@ -24,6 +24,7 @@ from ...database.crm_models import Client, ClientStatus, ClientType, AvitoClient
 from ...database.models import AdminUser
 from ...services.avito_service import get_avito_service, init_avito_service, AvitoService
 from ...services.openai_service import generate_conversation_summary
+from ...services.ai_sales_service import get_ai_sales_service
 from ..navigation import get_navigation_items
 from ...config.settings import settings
 # Импортируем функции аутентификации из middleware.auth
@@ -95,7 +96,7 @@ async def avito_messenger(
     return templates.TemplateResponse("avito_messenger.html", {
         "request": request,
         "user": current_user,
-        "navigation": get_navigation_items("/avito", user_role=current_user.get('role') if current_user else None),
+        "navigation_items": get_navigation_items("/avito", user_role=current_user.get('role') if current_user else None),
         "title": "Авито Мессенджер"
     })
 
@@ -1183,3 +1184,107 @@ async def webhook_status():
         "websocket_connections": len(manager.active_connections),
         "message": "Avito webhook endpoint is working"
     }
+
+@router.post("/chats/{chat_id}/ai-sales")
+async def get_ai_sales_suggestions(
+    chat_id: str,
+    request: Request,
+    username: str = Depends(authenticate)
+):
+    """AI продажник - анализ и предложения ответов"""
+    try:
+        data = await request.json()
+        industry = data.get("industry", "")
+        action_type = data.get("action_type", "suggest_response")  # suggest_response или startup_offer
+        
+        ai_sales = get_ai_sales_service()
+        
+        if action_type == "startup_offer":
+            # Генерируем стартовый оффер
+            offer = ai_sales.generate_startup_offer(industry, data.get("client_context", ""))
+            
+            return JSONResponse({
+                "status": "success",
+                "action": "startup_offer",
+                "offer": offer,
+                "industry": industry
+            })
+            
+        elif action_type == "suggest_response":
+            # Подготавливаем тестовый контекст для демонстрации
+            conversation_context = [
+                {
+                    "text": "Здравствуйте! Интересует разработка бота для бизнеса",
+                    "is_client": True,
+                    "timestamp": "2025-08-29T12:00:00"
+                },
+                {
+                    "text": "Какой именно функционал вам нужен?",
+                    "is_client": False,
+                    "timestamp": "2025-08-29T12:01:00"
+                }
+            ]
+            
+            # Последнее сообщение клиента
+            client_message = data.get("client_message", "Интересует разработка бота для моего бизнеса")
+            
+            # Генерируем варианты ответов
+            try:
+                result = ai_sales.generate_sales_response(
+                    conversation_context, 
+                    client_message,
+                    industry
+                )
+                
+                return JSONResponse({
+                    "status": "success",
+                    "action": "suggest_response",
+                    **result
+                })
+            except Exception as e:
+                logger.error(f"Error in generate_sales_response: {e}")
+                # Возвращаем базовые варианты ответов
+                return JSONResponse({
+                    "status": "success",
+                    "action": "suggest_response",
+                    "success": True,
+                    "variants": [
+                        {"title": "1 Прямой и деловой", "text": "Понял вашу потребность! У меня есть готовые решения для ювелирного бизнеса. Можем обсудить детали?"},
+                        {"title": "2 Консультативный", "text": "Интересный проект! Расскажите подробнее какие задачи хотите автоматизировать в ювелирном деле?"},
+                        {"title": "3 Кейсовый", "text": "Делал похожий бот для ювелира - автоматизировал заказы и уведомления. Результат отличный!"}
+                    ],
+                    "context_analysis": "Начало беседы",
+                    "recommended_variant": 1
+                })
+            
+        else:
+            return JSONResponse({
+                "status": "error",
+                "message": "Неизвестный тип действия"
+            }, status_code=400)
+            
+    except Exception as e:
+        logger.error(f"AI Sales error for chat {chat_id}: {e}")
+        return JSONResponse({
+            "status": "error",
+            "message": str(e)
+        }, status_code=500)
+
+@router.get("/ai-sales/industries")
+async def get_industry_suggestions(
+    partial: str = "",
+    username: str = Depends(authenticate)
+):
+    """Получение списка доступных сфер бизнеса"""
+    try:
+        ai_sales = get_ai_sales_service()
+        suggestions = ai_sales.get_industry_suggestions(partial)
+        
+        return JSONResponse({
+            "suggestions": suggestions
+        })
+    except Exception as e:
+        logger.error(f"Error getting industry suggestions: {e}")
+        return JSONResponse({
+            "suggestions": ["ювелирка", "красота", "ресторан", "недвижимость", "автомобили"]
+        })

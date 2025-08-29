@@ -91,6 +91,9 @@
                                 </div>
                             </div>
                             <div class="btn-group">
+                                <button class="btn btn-outline-primary btn-sm" onclick="showAiSalesModal()" title="Мой продажник - AI помощник">
+                                    <i class="fas fa-user-tie"></i> Продажник
+                                </button>
                                 <button class="btn btn-outline-success btn-sm" onclick="createLeadFromChat()" title="Добавить как лид">
                                     <i class="fas fa-star"></i>
                                 </button>
@@ -247,6 +250,70 @@
             </div>
             <div class="modal-body" id="chatInfoContent">
                 <!-- Информация загружается динамически -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно AI Продажника -->
+<div class="modal fade" id="aiSalesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-user-tie me-2"></i>Мой продажник - AI помощник
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Анализ сферы клиента -->
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Сфера деятельности клиента:</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="clientIndustry" placeholder="ювелирка, красота, ресторан..." list="industryList">
+                        <button class="btn btn-outline-secondary" type="button" onclick="analyzeIndustry()">
+                            <i class="fas fa-search"></i> Анализ
+                        </button>
+                    </div>
+                    <datalist id="industryList">
+                        <option value="ювелирка">
+                        <option value="красота">
+                        <option value="ресторан">
+                        <option value="недвижимость">
+                        <option value="автомобили">
+                        <option value="интернет-магазин">
+                        <option value="услуги">
+                    </datalist>
+                    <small class="text-muted">AI автоматически определит боли и потребности клиента</small>
+                </div>
+
+                <!-- Кнопки действий -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <button class="btn btn-success w-100" onclick="generateStartupOffer()">
+                            <i class="fas fa-rocket me-2"></i>Стартовый оффер
+                        </button>
+                        <small class="text-muted d-block mt-1">Персонализированное предложение для клиента</small>
+                    </div>
+                    <div class="col-md-6">
+                        <button class="btn btn-info w-100" onclick="generateResponseSuggestions()">
+                            <i class="fas fa-comments me-2"></i>Варианты ответов
+                        </button>
+                        <small class="text-muted d-block mt-1">AI предложит варианты ответа на последнее сообщение</small>
+                    </div>
+                </div>
+
+                <!-- Результат AI -->
+                <div id="aiSalesResult" style="display: none;">
+                    <hr>
+                    <div id="aiSalesContent"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-primary" id="useAiSalesResult" onclick="useAiResult()" style="display: none;">
+                    <i class="fas fa-check"></i> Использовать
+                </button>
             </div>
         </div>
     </div>
@@ -1125,5 +1192,256 @@ document.getElementById('searchChats')?.addEventListener('input', function(e) {
 document.getElementById('showUnreadOnly')?.addEventListener('change', function() {
     loadChats();
 });
+
+// === AI ПРОДАЖНИК ФУНКЦИИ ===
+
+let currentAiResult = null;
+
+// Показать модальное окно AI продажника
+function showAiSalesModal() {
+    if (!currentChatId) {
+        showNotification('Выберите чат для работы с продажником', 'warning');
+        return;
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('aiSalesModal'));
+    modal.show();
+    
+    // Очищаем предыдущие результаты
+    document.getElementById('aiSalesResult').style.display = 'none';
+    document.getElementById('useAiSalesResult').style.display = 'none';
+    currentAiResult = null;
+}
+
+// Анализ сферы клиента
+async function analyzeIndustry() {
+    const industry = document.getElementById('clientIndustry').value.trim();
+    if (!industry) {
+        showNotification('Введите сферу деятельности клиента', 'warning');
+        return;
+    }
+    
+    showNotification('Анализирую сферу клиента...', 'info');
+    
+    try {
+        const response = await fetch('/admin/avito/ai-sales/industries', {
+            method: 'GET'
+        });
+        
+        const data = await response.json();
+        
+        if (data.suggestions.includes(industry.toLowerCase())) {
+            showNotification(`✅ Сфера "${industry}" найдена в базе знаний`, 'success');
+        } else {
+            showNotification(`⚠️ Сфера "${industry}" будет обработана как общий бизнес`, 'info');
+        }
+        
+    } catch (error) {
+        console.error('Industry analysis error:', error);
+        showNotification('Ошибка анализа сферы', 'error');
+    }
+}
+
+// Генерация стартового оффера
+async function generateStartupOffer() {
+    const industry = document.getElementById('clientIndustry').value.trim();
+    if (!industry) {
+        showNotification('Сначала укажите сферу клиента', 'warning');
+        return;
+    }
+    
+    const aiContent = document.getElementById('aiSalesContent');
+    const aiResult = document.getElementById('aiSalesResult');
+    
+    aiResult.style.display = 'block';
+    aiContent.innerHTML = `
+        <div class="text-center p-4">
+            <i class="fas fa-spinner fa-spin fa-2x text-primary mb-3"></i>
+            <h5>Генерирую стартовый оффер...</h5>
+            <small class="text-muted">Анализирую сферу "${industry}" и создаю персонализированное предложение</small>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/ai-sales`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                industry: industry,
+                action_type: 'startup_offer'
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            currentAiResult = data.offer;
+            
+            aiContent.innerHTML = `
+                <div class="alert alert-success">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-rocket text-success me-2"></i>
+                        <strong>Стартовый оффер для "${data.industry}"</strong>
+                    </div>
+                </div>
+                <div class="border rounded p-3 bg-light mb-3">
+                    <div style="white-space: pre-wrap; font-size: 14px; line-height: 1.5;">${data.offer}</div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        <i class="fas fa-info-circle me-1"></i>
+                        Длина: ${data.offer.length} символов (макс. 1000)
+                    </small>
+                    <button class="btn btn-sm btn-outline-primary" onclick="regenerateOffer('${industry}')">
+                        <i class="fas fa-sync-alt"></i> Новый вариант
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('useAiSalesResult').style.display = 'block';
+            
+        } else {
+            throw new Error(data.message || 'Неизвестная ошибка');
+        }
+        
+    } catch (error) {
+        console.error('Startup offer generation error:', error);
+        aiContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Ошибка генерации оффера: ${error.message}
+            </div>
+        `;
+    }
+}
+
+// Генерация вариантов ответов
+async function generateResponseSuggestions() {
+    const industry = document.getElementById('clientIndustry').value.trim();
+    
+    const aiContent = document.getElementById('aiSalesContent');
+    const aiResult = document.getElementById('aiSalesResult');
+    
+    aiResult.style.display = 'block';
+    aiContent.innerHTML = `
+        <div class="text-center p-4">
+            <i class="fas fa-spinner fa-spin fa-2x text-info mb-3"></i>
+            <h5>Генерирую варианты ответов...</h5>
+            <small class="text-muted">Анализирую контекст беседы и создаю подходящие ответы</small>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch(`/admin/avito/chats/${currentChatId}/ai-sales`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                industry: industry,
+                action_type: 'suggest_response'
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.variants) {
+            let variantsHtml = `
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center mb-2">
+                        <i class="fas fa-comments text-info me-2"></i>
+                        <strong>Предложенные варианты ответов</strong>
+                    </div>
+                    ${data.context_analysis ? `<small>Контекст: ${data.context_analysis}</small>` : ''}
+                </div>
+            `;
+            
+            data.variants.forEach((variant, index) => {
+                variantsHtml += `
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <small class="text-muted">Вариант ${index + 1}: ${variant.title}</small>
+                        </div>
+                        <div class="card-body">
+                            <div class="variant-text" data-text="${escapeHtml(variant.text)}" style="white-space: pre-wrap; font-size: 14px; line-height: 1.5;">
+                                ${escapeHtml(variant.text)}
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-outline-success" onclick="selectVariant('${escapeHtml(variant.text)}')">
+                                    <i class="fas fa-check"></i> Выбрать
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            aiContent.innerHTML = variantsHtml;
+            
+        } else {
+            throw new Error(data.message || 'Не удалось сгенерировать варианты');
+        }
+        
+    } catch (error) {
+        console.error('Response suggestions error:', error);
+        aiContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Ошибка генерации ответов: ${error.message}
+            </div>
+        `;
+    }
+}
+
+// Выбор варианта ответа
+function selectVariant(text) {
+    currentAiResult = text;
+    
+    // Подсветим выбранный вариант
+    document.querySelectorAll('.variant-text').forEach(el => {
+        el.parentElement.parentElement.classList.remove('border-success');
+    });
+    
+    event.target.closest('.card').classList.add('border-success');
+    document.getElementById('useAiSalesResult').style.display = 'block';
+    
+    showNotification('Вариант выбран', 'success');
+}
+
+// Регенерация оффера
+async function regenerateOffer(industry) {
+    await generateStartupOffer();
+}
+
+// Использование AI результата
+function useAiResult() {
+    if (!currentAiResult) {
+        showNotification('Нет результата для использования', 'warning');
+        return;
+    }
+    
+    const messageInput = document.getElementById('messageInput');
+    messageInput.value = currentAiResult;
+    
+    // Закрываем модальное окно
+    const modal = bootstrap.Modal.getInstance(document.getElementById('aiSalesModal'));
+    modal.hide();
+    
+    // Фокусируемся на поле ввода
+    messageInput.focus();
+    
+    showNotification('Текст добавлен в сообщение', 'success');
+}
+
 </script>
 {% endblock %}

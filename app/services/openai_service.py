@@ -1021,3 +1021,7 @@ async def generate_customer_response(conversation_context: str, item_context: st
 
 # Создаем глобальный экземпляр сервиса
 ai_service = OpenAIService()
+
+def get_openai_client():
+    """Возвращает настроенный клиент OpenAI для использования в других сервисах"""
+    return ai_service.client
