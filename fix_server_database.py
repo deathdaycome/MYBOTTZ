@@ -12,10 +12,12 @@ def fix_server_database():
     
     # Пути к возможным базам данных
     db_paths = [
+        "/var/www/bot_business_card/data/bot.db",  # Основная база из конфига
         "/var/www/bot_business_card/admin_panel.db",
         "/var/www/bot_business_card/database.db", 
         "/var/www/bot_business_card/app.db",
         "/var/www/bot_business_card/data/database.db",
+        "data/bot.db",
         "admin_panel.db",
         "database.db",
         "app.db"
