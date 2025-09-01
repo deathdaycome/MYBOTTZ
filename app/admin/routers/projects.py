@@ -801,7 +801,7 @@ async def create_project_root(
             client_telegram_id = data.get('client_telegram_id')
             client_name = data.get('client_name', 'Клиент')
             
-            if client_telegram_id:
+            if client_telegram_id and client_telegram_id.isdigit():
                 # Проверяем, нет ли уже пользователя с таким telegram_id
                 user = db.query(User).filter(User.telegram_id == int(client_telegram_id)).first()
             
@@ -830,6 +830,20 @@ async def create_project_root(
                 db.flush()  # Получаем ID пользователя
         
         # Создаем объект проекта
+        from datetime import timedelta
+        
+        # Вычисляем плановую дату завершения
+        planned_end_date = datetime.utcnow()
+        if data.get('deadline'):
+            planned_end_date = datetime.fromisoformat(data['deadline'])
+        elif data.get('estimated_hours'):
+            # Добавляем дни на основе оценочных часов (8 часов = 1 рабочий день)
+            days_needed = (data.get('estimated_hours') / 8) + 1
+            planned_end_date = datetime.utcnow() + timedelta(days=days_needed)
+        else:
+            # По умолчанию 7 дней от текущей даты
+            planned_end_date = datetime.utcnow() + timedelta(days=7)
+        
         new_project = Project(
             user_id=user.id,  # Указываем user_id
             title=data.get('title', ''),
@@ -842,6 +856,7 @@ async def create_project_root(
             executor_cost=data.get('executor_cost'),
             estimated_hours=data.get('estimated_hours'),
             assigned_executor_id=data.get('assigned_executor_id'),
+            planned_end_date=planned_end_date,
             deadline=datetime.fromisoformat(data['deadline']) if data.get('deadline') else None,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
@@ -981,7 +996,7 @@ async def create_project(
                 }
         else:
             # Создаем нового клиента
-            if project_data.client_telegram_id:
+            if project_data.client_telegram_id and str(project_data.client_telegram_id).isdigit():
                 # Ищем существующего пользователя по Telegram ID
                 user = db.query(User).filter(User.telegram_id == int(project_data.client_telegram_id)).first()
             
@@ -1010,6 +1025,20 @@ async def create_project(
                 db.flush()  # Получаем ID пользователя
         
         # Создаем проект
+        from datetime import timedelta
+        
+        # Вычисляем плановую дату завершения
+        planned_end_date = datetime.utcnow()
+        if project_data.deadline:
+            planned_end_date = datetime.fromisoformat(project_data.deadline)
+        elif project_data.estimated_hours:
+            # Добавляем дни на основе оценочных часов (8 часов = 1 рабочий день)
+            days_needed = (project_data.estimated_hours / 8) + 1
+            planned_end_date = datetime.utcnow() + timedelta(days=days_needed)
+        else:
+            # По умолчанию 7 дней от текущей даты
+            planned_end_date = datetime.utcnow() + timedelta(days=7)
+        
         project = Project(
             user_id=user.id,
             title=project_data.title,
@@ -1025,6 +1054,7 @@ async def create_project(
             executor_paid_total=project_data.executor_paid_total or 0,
             assigned_executor_id=project_data.assigned_executor_id,
             estimated_hours=project_data.estimated_hours,
+            planned_end_date=planned_end_date,
             deadline=datetime.fromisoformat(project_data.deadline) if project_data.deadline else None,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
