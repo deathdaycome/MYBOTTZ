@@ -1,6 +1,7 @@
 import logging
 import asyncio
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -36,7 +37,7 @@ from app.services.avito_polling_service import polling_service
 logger = get_logger(__name__)
 
 # Создаем таблицы при запуске
-init_db()
+# init_db()  # Временно отключено из-за проблем с portfolio
 
 # Проверяем и исправляем структуру БД
 try:
@@ -55,9 +56,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Запуск приложения...")
     
-    # Запускаем Telegram-бота
-    bot_instance.logger.info("🚀 Запускаем Telegram-бота в фоновом режиме...")
-    asyncio.create_task(bot_instance.run())
+    # Telegram-бот отключен для избежания конфликтов
+    logger.info("📱 Telegram-бот отключен (можно запустить отдельно)")
+    # asyncio.create_task(bot_instance.run())
     
     # Запускаем планировщик автоматизации
     try:
@@ -98,6 +99,15 @@ app = FastAPI(
     description="Панель управления для Telegram-бота визитки.",
     version="0.1.0",
     lifespan=lifespan
+)
+
+# Добавляем CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Разрешаем все домены для разработки
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Middleware для логирования запросов
