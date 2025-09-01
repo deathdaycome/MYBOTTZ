@@ -811,8 +811,14 @@ async def create_project_root(
                 base_username = (client_name or "client").replace(' ', '_').lower()
                 username = f"{base_username}_{int(time.time())}"
                 
+                # Безопасная конвертация Telegram ID
+                try:
+                    telegram_id = int(client_telegram_id) if client_telegram_id and client_telegram_id.isdigit() else int(time.time())
+                except (ValueError, AttributeError):
+                    telegram_id = int(time.time())
+                
                 user = User(
-                    telegram_id=int(client_telegram_id) if client_telegram_id else int(time.time()),
+                    telegram_id=telegram_id,
                     username=username,
                     first_name=client_name,
                     phone=data.get('client_phone'),
@@ -985,9 +991,15 @@ async def create_project(
                 base_username = (project_data.client_name or "client").replace(' ', '_').lower()
                 username = f"{base_username}_{int(time.time())}"
                 
+                # Безопасная конвертация Telegram ID для нового пользователя
+                try:
+                    telegram_id = int(project_data.client_telegram_id) if project_data.client_telegram_id and str(project_data.client_telegram_id).isdigit() else int(time.time())
+                except (ValueError, AttributeError):
+                    telegram_id = int(time.time())
+                
                 # Создаем нового пользователя
                 user = User(
-                    telegram_id=int(project_data.client_telegram_id) if project_data.client_telegram_id else int(time.time()),
+                    telegram_id=telegram_id,
                     first_name=project_data.client_name or "Клиент",
                     last_name="",
                     username=username,
