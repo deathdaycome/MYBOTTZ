@@ -3499,7 +3499,7 @@ tr .project-color-indicator {
     // Функция для загрузки списка клиентов
     async function loadClients() {
         try {
-            const response = await fetch('/admin/api', {
+            const response = await fetch('/admin/api/clients/', {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }

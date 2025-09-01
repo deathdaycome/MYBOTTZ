@@ -245,7 +245,7 @@ except ImportError as e:
 
 # Подключаем роутер клиентов
 if clients_router:
-    admin_router.include_router(clients_router)
+    admin_router.include_router(clients_router, prefix="/api/clients")
 
 # Импорт роутера лидов
 try:
