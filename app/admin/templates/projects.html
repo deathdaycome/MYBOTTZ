@@ -1316,11 +1316,9 @@ tr .project-color-indicator {
                                     <i class="fas fa-comment"></i>
                                 </button>
                                 {% endif %}
-                                {% if project.status == 'completed' %}
-                                <button class="btn btn-outline-success" onclick="archiveProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="{% if project.is_archived %}Восстановить из архива{% else %}Добавить в архив{% endif %}">
+                                <button class="btn btn-outline-warning" onclick="archiveProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="{% if project.is_archived %}Восстановить из архива{% else %}Добавить в архив{% endif %}">
                                     <i class="fas fa-{% if project.is_archived %}box-open{% else %}archive{% endif %}"></i>
                                 </button>
-                                {% endif %}
                                 <button class="btn btn-outline-danger" onclick="confirmDeleteProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="Удалить проект">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -1844,6 +1842,9 @@ tr .project-color-indicator {
                             <i class="fas fa-comment"></i>
                         </button>
                     `}
+                    <button class="btn btn-outline-warning" onclick="archiveProject(${project.id}, '${project.title}')" title="${project.is_archived ? 'Восстановить из архива' : 'Добавить в архив'}">
+                        <i class="fas fa-${project.is_archived ? 'box-open' : 'archive'}"></i>
+                    </button>
                     <button class="btn btn-outline-danger" onclick="deleteProject(${project.id})" title="Удалить">
                         <i class="fas fa-trash"></i>
                     </button>
@@ -1904,6 +1905,9 @@ tr .project-color-indicator {
                         </button>
                         <button class="btn btn-outline-info" onclick="openEditModal(${project.id})" title="Редактировать">
                             <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="archiveProject(${project.id}, '${project.title}')" title="${project.is_archived ? 'Восстановить из архива' : 'Добавить в архив'}">
+                            <i class="fas fa-${project.is_archived ? 'box-open' : 'archive'}"></i>
                         </button>
                     </div>
                 </div>
@@ -2238,7 +2242,7 @@ tr .project-color-indicator {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 },
                 body: JSON.stringify({ 
                     status: 'completed',
@@ -2284,7 +2288,7 @@ tr .project-color-indicator {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 },
                 body: JSON.stringify({
                     is_archived: false,
@@ -2315,7 +2319,7 @@ tr .project-color-indicator {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
             });
             
@@ -2359,7 +2363,7 @@ tr .project-color-indicator {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 },
                 body: JSON.stringify({ status: newStatus, comment })
             });
@@ -3155,7 +3159,7 @@ tr .project-color-indicator {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 },
                 body: JSON.stringify({
                     telegram_id: telegramId,
@@ -3652,11 +3656,11 @@ tr .project-color-indicator {
                 status: status || 'new'
             });
             
-            const response = await fetch('/admin/api/projects/create', {
+            const response = await fetch('http://localhost:8001/admin/api/projects/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 },
                 body: JSON.stringify({
                     title: title.trim(),
@@ -3676,7 +3680,8 @@ tr .project-color-indicator {
                     estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
                     executor_cost: executorCost ? parseFloat(executorCost) : null,
                     estimated_hours: estimatedHours ? parseInt(estimatedHours) : null,
-                    deadline: deadline || null,
+                    start_date: new Date().toISOString(),
+                    planned_end_date: deadline ? new Date(deadline).toISOString() : new Date(Date.now() + 30*24*60*60*1000).toISOString(),
                     prepayment_amount: prepaymentAmount ? parseFloat(prepaymentAmount) : 0,
                     client_paid_total: clientPaidTotal ? parseFloat(clientPaidTotal) : 0,
                     executor_paid_total: executorPaidTotal ? parseFloat(executorPaidTotal) : 0,
@@ -3769,7 +3774,7 @@ tr .project-color-indicator {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                        'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                     },
                     body: JSON.stringify({ name: customName })
                 });
@@ -3801,7 +3806,7 @@ tr .project-color-indicator {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Basic ' + btoa(`${username}:${password}`)
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 },
                 body: JSON.stringify({ status_id: statusId, comment })
             });
