@@ -1711,7 +1711,7 @@ tr .project-color-indicator {
     let allProjects = {{ projects|tojson|safe }};
     let filteredProjects = [...allProjects];
     let projectStatuses = []; // Массив для хранения статусов проектов
-    let showArchived = false; // Флаг для отображения архивных проектов
+    let showArchived = '{{ show_archived }}' === 'True'; // Флаг для отображения архивных проектов
 
     // Функция переключения архива
     async function toggleArchiveView() {
@@ -2024,10 +2024,8 @@ tr .project-color-indicator {
     }
 
     function toggleArchived() {
-        const showArchived = document.getElementById('showArchivedToggle').checked;
-        const url = new URL(window.location.href);
-        url.searchParams.set('show_archived', showArchived);
-        window.location.href = url.toString();
+        showArchived = document.getElementById('showArchivedToggle').checked;
+        loadProjects(); // Перезагружаем проекты с новым флагом
     }
 
     function clearFilters() {
