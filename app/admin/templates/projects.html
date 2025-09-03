@@ -3499,7 +3499,7 @@ tr .project-color-indicator {
     // Функция для загрузки списка клиентов
     async function loadClients() {
         try {
-            const response = await fetch('/admin/api/clients/', {
+            const response = await fetch('/admin/api/clients/simple', {
                 headers: {
                     'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
                 }
@@ -3520,7 +3520,7 @@ tr .project-color-indicator {
                         data.clients.forEach(client => {
                             const option = document.createElement('option');
                             option.value = client.id;
-                            option.textContent = `${client.first_name || 'Без имени'} ${client.last_name || ''} ${client.username ? '@' + client.username : ''}`.trim();
+                            option.textContent = client.name || client.username || 'Без имени';
                             option.dataset.telegramId = client.telegram_id || '';
                             option.dataset.phone = client.phone || '';
                             clientSelect.appendChild(option);
@@ -3656,7 +3656,7 @@ tr .project-color-indicator {
                 status: status || 'new'
             });
             
-            const response = await fetch('http://localhost:8001/admin/api/projects/create', {
+            const response = await fetch('/admin/api/projects/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

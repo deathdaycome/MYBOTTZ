@@ -31,8 +31,8 @@ router = APIRouter(tags=["projects"])
 # Базовая аутентификация
 security = HTTPBasic()
 
-# Модель для создания проекта с обязательными полями
-class ProjectCreateModel(BaseModel):
+# Модель для создания проекта с валидацией
+class ProjectCreateValidatedModel(BaseModel):
     title: str  # Обязательное
     user_id: int  # Клиент (обязательное)
     estimated_cost: float  # Стоимость (обязательное)
@@ -90,7 +90,7 @@ class ProjectCreateModel(BaseModel):
     project_type: str = "website"
     complexity: str = "medium"
     priority: str = "medium"
-    estimated_cost: Optional[float] = None
+    estimated_cost: Optional[float] = 0.0
     executor_cost: Optional[float] = None
     prepayment_amount: Optional[float] = 0
     client_paid_total: Optional[float] = 0
@@ -852,9 +852,9 @@ async def create_project_root(
             complexity=data.get('complexity', 'medium'),
             priority=data.get('priority', 'normal'),
             status=data.get('status', 'new'),
-            estimated_cost=data.get('estimated_cost'),
+            estimated_cost=data.get('estimated_cost') or 0.0,
             executor_cost=data.get('executor_cost'),
-            estimated_hours=data.get('estimated_hours'),
+            estimated_hours=data.get('estimated_hours') or 0,
             assigned_executor_id=data.get('assigned_executor_id'),
             planned_end_date=planned_end_date,
             deadline=datetime.fromisoformat(data['deadline']) if data.get('deadline') else None,
@@ -863,7 +863,11 @@ async def create_project_root(
         )
         
         db.add(new_project)
+        db.flush()  # Принудительно записываем в БД и получаем ID
+        logger.info(f"Проект добавлен в БД с ID: {new_project.id}")
+        
         db.commit()
+        logger.info(f"Транзакция создания проекта {new_project.id} зафиксирована")
         db.refresh(new_project)
         
         logger.info(f"Проект успешно создан с ID: {new_project.id}")
@@ -876,6 +880,8 @@ async def create_project_root(
         
     except Exception as e:
         logger.error(f"Ошибка создания проекта: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        db.rollback()
         return {
             "success": False,
             "message": f"Ошибка создания проекта: {str(e)}"
@@ -883,7 +889,7 @@ async def create_project_root(
 
 @router.post("/create-validated")
 async def create_project_validated(
-    project_data: ProjectCreateModel,
+    project_data: ProjectCreateValidatedModel,
     credentials: HTTPBasicCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
@@ -1047,13 +1053,13 @@ async def create_project(
             complexity=project_data.complexity,
             priority=project_data.priority,
             status=project_data.status,
-            estimated_cost=project_data.estimated_cost,
+            estimated_cost=project_data.estimated_cost or 0.0,
             executor_cost=project_data.executor_cost,
             prepayment_amount=project_data.prepayment_amount or 0,
             client_paid_total=project_data.client_paid_total or 0,
             executor_paid_total=project_data.executor_paid_total or 0,
             assigned_executor_id=project_data.assigned_executor_id,
-            estimated_hours=project_data.estimated_hours,
+            estimated_hours=project_data.estimated_hours or 0,
             planned_end_date=planned_end_date,
             deadline=datetime.fromisoformat(project_data.deadline) if project_data.deadline else None,
             created_at=datetime.utcnow(),
@@ -1061,7 +1067,11 @@ async def create_project(
         )
         
         db.add(project)
+        db.flush()  # Принудительно записываем в БД и получаем ID
+        logger.info(f"Проект добавлен в БД с ID: {project.id}")
+        
         db.commit()
+        logger.info(f"Транзакция создания проекта {project.id} зафиксирована")
         db.refresh(project)
         
         # Логируем создание в метаданных

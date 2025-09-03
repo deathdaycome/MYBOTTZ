@@ -187,9 +187,8 @@ class AvitoPollingService:
                     await employee_notification_service.notify_avito_new_message(
                         db=db,
                         chat_id=str(chat.id),
-                        sender_name=user_name,
-                        message_text=message_text,
-                        chat_url="http://147.45.215.199:8001/admin/avito/"
+                        client_name=user_name,
+                        message_text=message_text
                     )
                     logger.info(f"Уведомления продажникам о новом сообщении отправлены")
             except Exception as e:

@@ -16,10 +16,35 @@ from ...database.crm_models import Client, ClientType, ClientStatus, Lead, Deal,
 from ...services.rbac_service import RBACService, require_permission
 from ...config.logging import get_logger
 from ..middleware.auth import get_current_admin_user
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+import secrets
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/clients", tags=["clients"])
+router = APIRouter(tags=["clients"])
 templates = Jinja2Templates(directory="app/admin/templates")
+security = HTTPBasic()
+
+def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> dict:
+    """Получение текущего пользователя с проверкой аутентификации (для совместимости)"""
+    from ...config.settings import settings
+    
+    # Проверяем старую систему (владелец)
+    correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
+    
+    if correct_username and correct_password:
+        return {
+            "id": 1,
+            "username": credentials.username,
+            "role": "owner",
+            "is_active": True
+        }
+    
+    raise HTTPException(
+        status_code=401,
+        detail="Неверные учетные данные",
+        headers={"WWW-Authenticate": "Basic"},
+    )
 
 
 @router.get("", response_class=HTMLResponse)
@@ -61,7 +86,40 @@ async def clients_page(
     })
 
 
-@router.get("/api", response_class=JSONResponse)
+@router.get("/simple", response_class=JSONResponse)
+async def get_clients_simple(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Простой список пользователей для создания проектов (совместимость)"""
+    try:
+        # Получаем всех активных пользователей
+        users = db.query(User).filter(User.is_active == True).limit(100).all()
+        
+        users_data = []
+        for user in users:
+            users_data.append({
+                "id": user.id,
+                "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.username,
+                "telegram_id": user.telegram_id,
+                "phone": user.phone,
+                "username": user.username
+            })
+        
+        return {
+            "success": True,
+            "clients": users_data
+        }
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения списка пользователей: {e}")
+        return {
+            "success": False,
+            "message": f"Ошибка получения списка пользователей: {str(e)}",
+            "clients": []
+        }
+
+@router.get("/", response_class=JSONResponse)
 async def get_clients(
     current_user: AdminUser = Depends(get_current_admin_user),
     db: Session = Depends(get_db),
