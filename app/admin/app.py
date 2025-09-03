@@ -86,23 +86,17 @@ except ImportError as e:
     print(f"Ошибка импорта роутера статусов проектов: {e}")
     project_statuses_router = None
 
-# Импорт роутера финансов (простая версия)
+# Импорт роутера финансов
 try:
-    from .routers.finance_simple import router as finance_router
-    print("Роутер финансов (простая версия) подключен")
+    from .routers.finance import router as finance_router
+    print("Роутер финансов подключен")
 except ImportError as e:
     print(f"Ошибка импорта роутера финансов: {e}")
-    # Fallback на основной роутер
-    try:
-        from .routers.finance import router as finance_router
-        print("Роутер финансов подключен")
-    except ImportError as e2:
-        print(f"Ошибка импорта роутера финансов: {e2}")
-        finance_router = None
+    finance_router = None
 
 # Импорт роутера настроек
 try:
-    from .routers.settings_simple import router as settings_router
+    from .routers.settings import router as settings_router
     print("Роутер настроек подключен")
 except ImportError as e:
     print(f"Ошибка импорта роутера настроек: {e}")
@@ -235,17 +229,12 @@ try:
     print("Роутер клиентов подключен")
 except ImportError as e:
     print(f"Ошибка импорта роутера клиентов: {e}")
-    # Fallback на простую версию
-    try:
-        from .routers.clients_simple import router as clients_router
-        print("Роутер клиентов (простая версия) подключен")
-    except ImportError as e2:
-        print(f"Ошибка импорта простого роутера клиентов: {e2}")
-        clients_router = None
+    clients_router = None
 
 # Подключаем роутер клиентов
 if clients_router:
-    admin_router.include_router(clients_router, prefix="/api/clients")
+    admin_router.include_router(clients_router, prefix="/api/clients")  # API endpoints
+    admin_router.include_router(clients_router, prefix="/clients")      # HTML pages
 
 # Импорт роутера лидов
 try:
@@ -271,13 +260,7 @@ try:
     print("Роутер сделок подключен")
 except ImportError as e:
     print(f"Ошибка импорта роутера сделок: {e}")
-    # Fallback на простую версию
-    try:
-        from .routers.deals_simple import router as deals_router
-        print("Роутер сделок (простая версия) подключен")
-    except ImportError as e2:
-        print(f"Ошибка импорта простого роутера сделок: {e2}")
-        deals_router = None
+    deals_router = None
 
 # Подключаем роутер сделок
 if deals_router:
