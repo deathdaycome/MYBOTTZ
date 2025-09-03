@@ -2072,6 +2072,7 @@ tr .project-color-indicator {
     }
 
     function updateProjectsDisplay() {
+        console.log('updateProjectsDisplay: filteredProjects.length =', filteredProjects.length);
         const projectsCount = document.getElementById('projectsCount');
         if (projectsCount) {
             projectsCount.textContent = `Показано: ${filteredProjects.length}`;
@@ -2085,31 +2086,43 @@ tr .project-color-indicator {
     }
 
     function updateTableView() {
-        // Hide all rows first
-        const rows = document.querySelectorAll('#projectsTable tbody tr');
-        rows.forEach(row => row.style.display = 'none');
-
-        // Show filtered rows
-        filteredProjects.forEach(project => {
-            const row = document.querySelector(`tr[data-project-id="${project.id}"]`);
-            if (row) {
-                row.style.display = '';
-            }
+        console.log('updateTableView: обновляем таблицу, проектов =', filteredProjects.length);
+        const tableBody = document.querySelector('#projectsTable tbody');
+        if (!tableBody) {
+            console.error('Таблица #projectsTable tbody не найдена!');
+            return;
+        }
+        
+        // Полностью очищаем и пересоздаем строки
+        tableBody.innerHTML = '';
+        
+        filteredProjects.forEach((project, index) => {
+            console.log(`Создаем строку для проекта ${index + 1}: ID=${project.id}, archived=${project.is_archived}`);
+            const row = createProjectRow(project);
+            tableBody.appendChild(row);
         });
+        
+        console.log('updateTableView: таблица обновлена');
     }
 
     function updateCardsView() {
-        // Hide all cards first
-        const cards = document.querySelectorAll('#projectsCards .project-card');
-        cards.forEach(card => card.style.display = 'none');
-
-        // Show filtered cards
-        filteredProjects.forEach(project => {
-            const card = document.querySelector(`.project-card[data-project-id="${project.id}"]`);
-            if (card) {
-                card.style.display = '';
-            }
+        console.log('updateCardsView: обновляем карточки, проектов =', filteredProjects.length);
+        const cardsContainer = document.getElementById('projectsCards');
+        if (!cardsContainer) {
+            console.error('Контейнер #projectsCards не найден!');
+            return;
+        }
+        
+        // Полностью очищаем и пересоздаем карточки
+        cardsContainer.innerHTML = '';
+        
+        filteredProjects.forEach((project, index) => {
+            console.log(`Создаем карточку для проекта ${index + 1}: ID=${project.id}, archived=${project.is_archived}`);
+            const card = createProjectCard(project);
+            cardsContainer.appendChild(card);
         });
+        
+        console.log('updateCardsView: карточки обновлены');
     }
 
     async function changeProjectColor(projectId, currentColor) {
