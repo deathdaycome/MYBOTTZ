@@ -1744,8 +1744,12 @@ tr .project-color-indicator {
             
             if (response.ok) {
                 const data = await response.json();
+                console.log('Загруженные проекты:', data);
+                console.log('showArchived:', showArchived);
                 allProjects = data.projects || [];
                 filteredProjects = [...allProjects];
+                console.log('Всего проектов:', allProjects.length);
+                console.log('После фильтрации:', filteredProjects.length);
                 
                 // Обновляем отображение
                 updateProjectsDisplay();
@@ -1755,6 +1759,7 @@ tr .project-color-indicator {
                 if (counter) {
                     const archivedText = showArchived ? ' (архив)' : '';
                     counter.textContent = `Показано: ${filteredProjects.length}${archivedText}`;
+                    console.log('Счетчик обновлен:', counter.textContent);
                 }
             }
         } catch (error) {
@@ -2492,7 +2497,6 @@ tr .project-color-indicator {
         changeView(currentView);
         sortProjects();
         loadProjectStatuses();
-        loadExecutors();
         
         // Инициализация изменяемых столбцов
         initResizableColumns();
