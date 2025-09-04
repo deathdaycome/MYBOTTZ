@@ -22,6 +22,7 @@ from ...config.logging import get_logger
 from ...config.settings import settings
 from ...services.notification_service import NotificationService
 from ...services.employee_notification_service import employee_notification_service
+from ..middleware.auth import get_current_admin_user
 
 logger = get_logger(__name__)
 notification_service = NotificationService()

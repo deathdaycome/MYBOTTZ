@@ -68,6 +68,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"❌ Ошибка запуска планировщика: {e}")
     
+    # Запускаем планировщик уведомлений о задачах
+    try:
+        from app.services.task_scheduler import task_scheduler
+        await task_scheduler.start()
+        logger.info("✅ Планировщик уведомлений о задачах запущен")
+    except Exception as e:
+        logger.error(f"❌ Ошибка запуска планировщика уведомлений: {e}")
+    
     # Запускаем Avito polling сервис
     try:
         logger.info("🔄 Запускаем Avito polling service...")
@@ -92,6 +100,14 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Планировщик автоматизации остановлен")
     except Exception as e:
         logger.error(f"❌ Ошибка остановки планировщика: {e}")
+    
+    # Останавливаем планировщик уведомлений о задачах
+    try:
+        from app.services.task_scheduler import task_scheduler
+        await task_scheduler.stop()
+        logger.info("✅ Планировщик уведомлений о задачах остановлен")
+    except Exception as e:
+        logger.error(f"❌ Ошибка остановки планировщика уведомлений: {e}")
 
 # --- FastAPI App Initialization ---
 app = FastAPI(

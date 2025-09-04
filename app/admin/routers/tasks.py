@@ -13,6 +13,7 @@ from ...config.logging import get_logger
 from ...database.database import get_db_context
 from ...database.models import Task, TaskComment, AdminUser, Project
 from ..middleware.auth import get_current_admin_user
+from ...services.task_notification_service import task_notification_service
 from fastapi import Cookie
 from ..middleware.roles import RoleMiddleware
 
@@ -397,6 +398,12 @@ async def create_task(
             db.commit()
             db.refresh(new_task)
             
+            # Отправляем уведомление о назначенной задаче
+            try:
+                await task_notification_service.notify_task_assigned(db, new_task)
+            except Exception as e:
+                logger.error(f"Ошибка отправки уведомления о назначенной задаче {new_task.id}: {e}")
+            
             # Загружаем связанные данные для возврата
             if new_task.created_by_id:
                 new_task.created_by = db.query(AdminUser).filter(AdminUser.id == new_task.created_by_id).first()
@@ -664,6 +671,12 @@ async def update_task(
                 if status == "completed":
                     task.completed_at = datetime.utcnow()
                 changes.append(f"статус: {old_status} → {status}")
+                
+                # Отправляем уведомление об изменении статуса
+                try:
+                    await task_notification_service.notify_task_status_changed(db, task, old_status)
+                except Exception as e:
+                    logger.error(f"Ошибка отправки уведомления об изменении статуса задачи {task.id}: {e}")
             
             task.updated_at = datetime.utcnow()
             db.commit()
@@ -776,6 +789,12 @@ async def add_task_comment(
             db.add(new_comment)
             db.commit()
             db.refresh(new_comment)
+            
+            # Отправляем уведомление о новом комментарии
+            try:
+                await task_notification_service.notify_new_task_comment(db, task, new_comment)
+            except Exception as e:
+                logger.error(f"Ошибка отправки уведомления о комментарии к задаче {task.id}: {e}")
             
             logger.info(f"Добавлен комментарий к задаче {task_id}")
             
@@ -945,6 +964,13 @@ async def update_task_status(
             task.updated_at = datetime.utcnow()
             db.commit()
             
+            # Отправляем уведомление об изменении статуса
+            if old_status != new_status:
+                try:
+                    await task_notification_service.notify_task_status_changed(db, task, old_status)
+                except Exception as e:
+                    logger.error(f"Ошибка отправки уведомления об изменении статуса задачи {task.id}: {e}")
+            
             # Добавляем комментарий об изменении статуса
             if old_status != new_status:
                 status_comment = TaskComment(
@@ -1032,6 +1058,12 @@ async def reassign_task(
             # Обновляем исполнителя
             task.assigned_to_id = new_assignee_id
             task.updated_at = datetime.utcnow()
+            
+            # Отправляем уведомление новому исполнителю
+            try:
+                await task_notification_service.notify_task_assigned(db, task)
+            except Exception as e:
+                logger.error(f"Ошибка отправки уведомления о переназначении задачи {task.id}: {e}")
             
             # Добавляем комментарий об изменении
             reassign_comment = TaskComment(
