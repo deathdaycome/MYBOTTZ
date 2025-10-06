@@ -181,7 +181,7 @@ if project_statuses_router:
 
 # Подключаем роутер финансов
 if finance_router:
-    admin_router.include_router(finance_router)
+    admin_router.include_router(finance_router, prefix="/finance")
 
 # Подключаем роутер настроек
 if settings_router:

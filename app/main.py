@@ -470,9 +470,17 @@ class TelegramBot:
     async def stop(self):
         """Остановка бота."""
         self.logger.info("Остановка бота...")
-        if self.application.updater and self.application.updater.running:
-            await self.application.updater.stop()
-        await self.application.stop()
+        try:
+            if self.application.updater and self.application.updater.running:
+                await self.application.updater.stop()
+            # Проверяем, что приложение запущено перед остановкой
+            if self.application.running:
+                await self.application.stop()
+        except RuntimeError as e:
+            # Игнорируем ошибку "This Application is not running!"
+            if "not running" not in str(e).lower():
+                raise
+            self.logger.warning(f"Бот уже остановлен: {e}")
 
 # --- Telegram Bot Initialization ---
 bot_instance = TelegramBot()
