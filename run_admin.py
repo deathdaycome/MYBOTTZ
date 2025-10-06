@@ -76,7 +76,16 @@ async def run_admin_panel():
     
     @app.on_event("startup")
     async def startup_event():
+        # Запускаем Avito polling
         await start_avito_polling()
+
+        # Запускаем планировщик напоминаний о задачах
+        try:
+            from app.services.task_scheduler import task_scheduler
+            await task_scheduler.start()
+            print("✅ Планировщик напоминаний о задачах запущен")
+        except Exception as e:
+            print(f"⚠️  Ошибка запуска планировщика задач: {e}")
     
     # Подключаем статические файлы
     try:
