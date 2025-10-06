@@ -436,9 +436,7 @@
     async function loadFinancialMetrics() {
         try {
             const response = await fetch('/admin/reports/dashboard-metrics', {
-                headers: {
-                    'Authorization': 'Basic ' + btoa('admin:qwerty123')
-                }
+                credentials: 'include'
             });
             
             const data = await response.json();
