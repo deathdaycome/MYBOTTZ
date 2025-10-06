@@ -188,75 +188,119 @@ async def get_dashboard_metrics(
 ) -> Dict[str, Any]:
     """Получить метрики для дашборда"""
     try:
-        reports_service = ReportsService(db)
-        
+        from ...database.models import Project, Transaction
+        from sqlalchemy import func, and_
+
         # Отчет за текущий месяц
         current_month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        
+
         # Отчет за прошлый месяц для сравнения
         last_month_end = current_month_start - timedelta(days=1)
         last_month_start = last_month_end.replace(day=1)
-        
-        # Текущий месяц
-        current_month_report = reports_service.get_financial_report(
-            start_date=current_month_start,
-            end_date=datetime.now()
-        )
-        
-        # Прошлый месяц
-        last_month_report = reports_service.get_financial_report(
-            start_date=last_month_start,
-            end_date=last_month_end
-        )
-        
+
+        # Проверяем, есть ли транзакции в базе
+        transactions_count = db.query(Transaction).count()
+
+        if transactions_count > 0:
+            # Используем данные из финансовых транзакций
+            reports_service = ReportsService(db)
+
+            # Текущий месяц
+            current_month_report = reports_service.get_financial_report(
+                start_date=current_month_start,
+                end_date=datetime.now()
+            )
+
+            # Прошлый месяц
+            last_month_report = reports_service.get_financial_report(
+                start_date=last_month_start,
+                end_date=last_month_end
+            )
+
+            current_income = current_month_report['summary']['total_income']
+            current_expense = current_month_report['summary']['total_expense']
+            last_income = last_month_report['summary']['total_income']
+            last_expense = last_month_report['summary']['total_expense']
+        else:
+            # Используем данные из проектов
+            # Доход за текущий месяц - оплаты от клиентов (client_paid_total)
+            current_income = db.query(func.sum(Project.client_paid_total)).filter(
+                and_(
+                    Project.created_at >= current_month_start,
+                    Project.created_at <= datetime.now()
+                )
+            ).scalar() or 0
+
+            # Расходы за текущий месяц - выплаты исполнителям (executor_paid_total)
+            current_expense = db.query(func.sum(Project.executor_paid_total)).filter(
+                and_(
+                    Project.created_at >= current_month_start,
+                    Project.created_at <= datetime.now()
+                )
+            ).scalar() or 0
+
+            # Доход за прошлый месяц
+            last_income = db.query(func.sum(Project.client_paid_total)).filter(
+                and_(
+                    Project.created_at >= last_month_start,
+                    Project.created_at <= last_month_end
+                )
+            ).scalar() or 0
+
+            # Расходы за прошлый месяц
+            last_expense = db.query(func.sum(Project.executor_paid_total)).filter(
+                and_(
+                    Project.created_at >= last_month_start,
+                    Project.created_at <= last_month_end
+                )
+            ).scalar() or 0
+
+        # Считаем прибыль
+        current_profit = current_income - current_expense
+        last_profit = last_income - last_expense
+
+        # Считаем рентабельность
+        current_margin = (current_profit / current_income * 100) if current_income > 0 else 0
+        last_margin = (last_profit / last_income * 100) if last_income > 0 else 0
+
         # Считаем изменения
         income_change = 0
-        if last_month_report['summary']['total_income'] > 0:
-            income_change = (
-                (current_month_report['summary']['total_income'] - 
-                 last_month_report['summary']['total_income']) / 
-                last_month_report['summary']['total_income'] * 100
-            )
-        
+        if last_income > 0:
+            income_change = ((current_income - last_income) / last_income * 100)
+
         expense_change = 0
-        if last_month_report['summary']['total_expense'] > 0:
-            expense_change = (
-                (current_month_report['summary']['total_expense'] - 
-                 last_month_report['summary']['total_expense']) / 
-                last_month_report['summary']['total_expense'] * 100
-            )
-        
+        if last_expense > 0:
+            expense_change = ((current_expense - last_expense) / last_expense * 100)
+
+        profit_change = current_profit - last_profit
+
         return {
             "success": True,
             "metrics": {
                 "current_month": {
-                    "income": current_month_report['summary']['total_income'],
-                    "expense": current_month_report['summary']['total_expense'],
-                    "profit": current_month_report['summary']['profit'],
-                    "profit_margin": current_month_report['summary']['profit_margin']
+                    "income": float(current_income),
+                    "expense": float(current_expense),
+                    "profit": float(current_profit),
+                    "profit_margin": float(current_margin)
                 },
                 "last_month": {
-                    "income": last_month_report['summary']['total_income'],
-                    "expense": last_month_report['summary']['total_expense'],
-                    "profit": last_month_report['summary']['profit'],
-                    "profit_margin": last_month_report['summary']['profit_margin']
+                    "income": float(last_income),
+                    "expense": float(last_expense),
+                    "profit": float(last_profit),
+                    "profit_margin": float(last_margin)
                 },
                 "changes": {
-                    "income_change": income_change,
-                    "expense_change": expense_change,
-                    "profit_change": (
-                        current_month_report['summary']['profit'] - 
-                        last_month_report['summary']['profit']
-                    )
-                },
-                "forecast": current_month_report.get('forecast', {}),
-                "top_projects": current_month_report.get('top_projects_by_income', [])[:5],
-                "expense_categories": current_month_report.get('expense_categories', {})
+                    "income_change": float(income_change),
+                    "expense_change": float(expense_change),
+                    "profit_change": float(profit_change)
+                }
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Ошибка получения метрик дашборда: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 

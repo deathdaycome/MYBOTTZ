@@ -631,6 +631,11 @@ function showEditContractorModal(contractor) {
                                 <input type="text" class="form-control" id="editUsername" value="${contractor.username || ''}">
                             </div>
                             <div class="mb-3">
+                                <label class="form-label">Telegram ID (для уведомлений)</label>
+                                <input type="number" class="form-control" id="editTelegramId" value="${contractor.telegram_id || ''}" placeholder="Введите Telegram ID для получения уведомлений">
+                                <div class="form-text">Найдите свой Telegram ID через бота @userinfobot</div>
+                            </div>
+                            <div class="mb-3">
                                 <div class="form-check">
                                     <input type="checkbox" class="form-check-input" id="editIsActive" ${contractor.is_active ? 'checked' : ''}>
                                     <label class="form-check-label">Активен</label>
@@ -672,7 +677,8 @@ async function saveEditedContractor(contractorId) {
             last_name: document.getElementById('editLastName').value,
             email: document.getElementById('editEmail').value,
             username: document.getElementById('editUsername').value,
-            is_active: document.getElementById('editIsActive').checked
+            is_active: document.getElementById('editIsActive').checked,
+            telegram_id: document.getElementById('editTelegramId').value ? parseInt(document.getElementById('editTelegramId').value) : null
         };
         
         const response = await fetch(`/admin/api/contractors/${contractorId}`, {
@@ -1004,6 +1010,66 @@ setTimeout(function() {
     console.log('ОБРАБОТЧИКИ КНОПОК ПРИВЯЗАНЫ');
 }, 50);
 
+// Функция сохранения изменений исполнителя (для статической формы)
+async function saveEditContractor() {
+    try {
+        const contractorId = document.getElementById('editContractorId').value;
+        
+        const contractorData = {
+            username: document.getElementById('editContractorUsername').value,
+            email: document.getElementById('editContractorEmail').value,
+            first_name: document.getElementById('editContractorFirstName').value,
+            last_name: document.getElementById('editContractorLastName').value,
+            is_active: document.getElementById('editContractorIsActive').checked,
+            telegram_id: document.getElementById('editContractorTelegramId').value ? parseInt(document.getElementById('editContractorTelegramId').value) : null
+        };
+        
+        console.log('Сохранение исполнителя:', contractorId, contractorData);
+        
+        const response = await fetch(`/admin/api/contractors/${contractorId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(contractorData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('Исполнитель успешно обновлен!');
+            
+            // Закрываем модальное окно
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editContractorModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Перезагружаем список исполнителей
+            loadContractors();
+        } else {
+            alert('Ошибка при обновлении исполнителя: ' + data.message);
+        }
+    } catch (error) {
+        console.error('Ошибка при сохранении исполнителя:', error);
+        alert('Ошибка при сохранении исполнителя');
+    }
+}
+
+// Функция заполнения статической формы редактирования
+function fillEditContractorForm(contractor) {
+    console.log('Заполнение формы исполнителя:', contractor);
+    
+    document.getElementById('editContractorId').value = contractor.id;
+    document.getElementById('editContractorUsername').value = contractor.username || '';
+    document.getElementById('editContractorEmail').value = contractor.email || '';
+    document.getElementById('editContractorFirstName').value = contractor.first_name || '';
+    document.getElementById('editContractorLastName').value = contractor.last_name || '';
+    document.getElementById('editContractorTelegramId').value = contractor.telegram_id || '';
+    document.getElementById('editContractorIsActive').checked = contractor.is_active || false;
+}
+
 </script>
 {% endblock %}
 
@@ -1280,6 +1346,11 @@ setTimeout(function() {
                             <label class="form-label">Фамилия</label>
                             <input type="text" class="form-control" id="editContractorLastName">
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telegram ID (для уведомлений)</label>
+                        <input type="number" class="form-control" id="editContractorTelegramId" placeholder="Введите Telegram ID для получения уведомлений">
+                        <div class="form-text">Найдите свой Telegram ID через бота @userinfobot</div>
                     </div>
                     <div class="mb-3">
                         <div class="form-check">

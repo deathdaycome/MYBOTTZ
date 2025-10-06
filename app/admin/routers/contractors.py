@@ -72,6 +72,7 @@ class ContractorModel(BaseModel):
     admin_login: Optional[str] = None
     admin_password: Optional[str] = None
     force_password_change: Optional[bool] = None
+    telegram_id: Optional[int] = None  # Добавляем поле для Telegram ID
     
     class Config:
         from_attributes = True
@@ -102,6 +103,7 @@ async def get_contractors(
                 "email": contractor.email,
                 "role": contractor.role,
                 "is_active": contractor.is_active,
+                "telegram_id": contractor.telegram_id,  # Добавляем Telegram ID
                 "created_at": contractor.created_at.isoformat() if contractor.created_at else None,
                 "last_login": contractor.last_login.isoformat() if contractor.last_login else None,
                 "total_payments": total_payments
@@ -147,6 +149,7 @@ async def get_contractor(
             "email": contractor.email,
             "role": contractor.role,
             "is_active": contractor.is_active,
+            "telegram_id": contractor.telegram_id,  # Добавляем Telegram ID
             "created_at": contractor.created_at.isoformat() if contractor.created_at else None,
             "last_login": contractor.last_login.isoformat() if contractor.last_login else None
         }
@@ -223,7 +226,8 @@ async def update_contractor(
                 "last_name": contractor.last_name,
                 "email": contractor.email,
                 "role": contractor.role,
-                "is_active": contractor.is_active
+                "is_active": contractor.is_active,
+                "telegram_id": contractor.telegram_id  # Добавляем Telegram ID
             }
         }
         
