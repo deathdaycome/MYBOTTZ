@@ -3204,8 +3204,8 @@ tr .project-color-indicator {
         
         // Создаем унифицированное модальное окно для создания проекта
         const modalHTML = `
-            <div id="customCreateModal" class="modal show" onclick="if(event.target.id === 'customCreateModal') hideCreateProjectModal()">
-                <div class="modal-dialog modal-xl" onclick="event.stopPropagation()">
+            <div id="customCreateModal" class="modal show" data-bs-backdrop="static">
+                <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-header">
                             <h5 class="modal-title">
