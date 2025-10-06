@@ -1,10 +1,9 @@
 module.exports = {
   apps: [{
     name: 'bot-business-card',
-    script: '/var/www/bot_business_card/venv/bin/python3',
-    args: '-m app.main',
+    script: 'run.py',
     cwd: '/var/www/bot_business_card',
-    interpreter: 'none',
+    interpreter: '/var/www/bot_business_card/venv/bin/python3',
     instances: 1,
     autorestart: true,
     watch: false,
