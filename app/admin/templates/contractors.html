@@ -909,9 +909,9 @@ function handleSaveContractor() {
         fetch('/admin/api/contractors/', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Basic ' + btoa('admin:qwerty123')
+                'Content-Type': 'application/json'
             },
+            credentials: 'include',
             body: JSON.stringify(contractorData)
         })
         .then(response => {

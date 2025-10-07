@@ -206,9 +206,12 @@ async def update_contractor(
         
         # Обновляем данные подрядчика
         update_data = contractor_data.dict(exclude_unset=True, exclude_none=True)
-        
+
+        # Исключаем admin_password из обновления (для смены пароля есть отдельный endpoint)
+        excluded_fields = ['admin_password', 'id']
+
         for field, value in update_data.items():
-            if hasattr(contractor, field):
+            if field not in excluded_fields and hasattr(contractor, field):
                 setattr(contractor, field, value)
         
         contractor.updated_at = datetime.utcnow()

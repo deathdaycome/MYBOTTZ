@@ -221,8 +221,36 @@ body.tasks-page .kanban-column {
 }
 
 .task-card.status-completed {
-    opacity: 0.75;
-    background: linear-gradient(135deg, #f0fdf4, #ffffff);
+    background: linear-gradient(135deg, #10b981, #34d399) !important;
+    border-left-color: #059669 !important;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3) !important;
+    animation: taskComplete 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes taskComplete {
+    0% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.1) rotate(5deg);
+        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5);
+    }
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+}
+
+.task-card.status-completed .task-title,
+.task-card.status-completed .task-description,
+.task-card.status-completed .task-meta {
+    color: white !important;
+}
+
+.task-card.status-completed .badge {
+    background-color: rgba(255, 255, 255, 0.3) !important;
+    color: white !important;
 }
 
 .task-card.status-in_progress {
