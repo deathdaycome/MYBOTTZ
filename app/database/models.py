@@ -1240,6 +1240,11 @@ class Task(Base):
     deadline = Column(DateTime, nullable=True)  # Дедлайн
     estimated_hours = Column(Integer, nullable=True)  # Оценочное время в часах
     actual_hours = Column(Integer, nullable=True)  # Фактическое время
+
+    # Прогресс и таймер
+    progress = Column(Integer, default=0)  # Процент выполнения (0-100)
+    time_spent_seconds = Column(Integer, default=0)  # Время работы в секундах
+    timer_started_at = Column(DateTime, nullable=True)  # Когда запущен таймер
     
     # Системные поля
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -1267,6 +1272,9 @@ class Task(Base):
             "deadline": self.deadline.isoformat() if self.deadline else None,
             "estimated_hours": self.estimated_hours,
             "actual_hours": self.actual_hours,
+            "progress": self.progress or 0,
+            "time_spent_seconds": self.time_spent_seconds or 0,
+            "timer_started_at": self.timer_started_at.isoformat() if self.timer_started_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,

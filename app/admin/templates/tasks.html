@@ -384,15 +384,40 @@ function createTaskCard(task) {
         'urgent': 'Срочно'
     };
     
+    const progress = task.progress || 0;
+    const timeSpent = task.time_spent_seconds || 0;
+    const timerRunning = task.timer_started_at !== null;
+
+    const hours = Math.floor(timeSpent / 3600);
+    const minutes = Math.floor((timeSpent % 3600) / 60);
+    const timeFormatted = `${hours}:${minutes.toString().padStart(2, '0')}`;
+
     card.innerHTML = `
         <div class="task-title">${escapeHtml(task.title)}</div>
         ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
-        
+
         <div class="task-badges">
             <span class="priority-badge priority-${task.priority}">${priorityText[task.priority]}</span>
             <span class="status-badge status-${task.status}">${statusText[task.status]}</span>
         </div>
-        
+
+        ${task.status !== 'completed' ? `
+        <div class="task-progress-container">
+            <div class="task-progress-bar" onclick="openProgressModal(${task.id}, ${progress}); event.stopPropagation();">
+                <div class="task-progress-fill" style="width: ${progress}%"></div>
+            </div>
+            <div class="task-progress-text">${progress}%</div>
+        </div>
+
+        <div class="task-timer">
+            <div class="timer-display ${timerRunning ? 'running' : ''}" id="timer-${task.id}">${timeFormatted}</div>
+            ${!timerRunning ?
+                `<button class="timer-btn timer-btn-start" onclick="startTimer(${task.id}); event.stopPropagation();">▶ Старт</button>` :
+                `<button class="timer-btn timer-btn-stop" onclick="stopTimer(${task.id}); event.stopPropagation();">■ Стоп</button>`
+            }
+        </div>
+        ` : ''}
+
         <div class="task-meta">
             ${task.deadline ? `<span class="task-deadline ${deadlineClass}"><i class="fas fa-calendar"></i> ${deadlineText}</span>` : ''}
             ${task.comments_count > 0 ? `<span><i class="fas fa-comments"></i> ${task.comments_count}</span>` : ''}
@@ -958,6 +983,86 @@ async function handleDrop(e) {
     }
     
     return false;
+}
+
+// Функции для таймера
+async function startTimer(taskId) {
+    try {
+        const response = await fetch(`/admin/api/tasks/${taskId}/timer/start`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            showNotification('Таймер запущен', 'success');
+            loadTasksToBoard();
+        } else {
+            showNotification(data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка запуска таймера:', error);
+        showNotification('Ошибка запуска таймера', 'error');
+    }
+}
+
+async function stopTimer(taskId) {
+    try {
+        const response = await fetch(`/admin/api/tasks/${taskId}/timer/stop`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadTasksToBoard();
+        } else {
+            showNotification(data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка остановки таймера:', error);
+        showNotification('Ошибка остановки таймера', 'error');
+    }
+}
+
+// Функция для модального окна изменения прогресса
+function openProgressModal(taskId, currentProgress) {
+    const newProgress = prompt(`Укажите процент выполнения задачи (0-100):`, currentProgress);
+
+    if (newProgress === null) return; // Отменено
+
+    const progressValue = parseInt(newProgress);
+    if (isNaN(progressValue) || progressValue < 0 || progressValue > 100) {
+        showNotification('Прогресс должен быть числом от 0 до 100', 'error');
+        return;
+    }
+
+    updateTaskProgress(taskId, progressValue);
+}
+
+async function updateTaskProgress(taskId, progress) {
+    try {
+        const response = await fetch(`/admin/api/tasks/${taskId}/progress`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ progress })
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadTasksToBoard();
+        } else {
+            showNotification(data.message, 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка обновления прогресса:', error);
+        showNotification('Ошибка обновления прогресса', 'error');
+    }
 }
 </script>
 {% endblock %}
