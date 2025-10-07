@@ -692,9 +692,7 @@
         
         try {
             const response = await fetch(`/admin/finance/categories?type=${type}`, {
-                headers: {
-                    'Authorization': 'Basic ' + btoa('{{ username }}:{{ password }}')
-                }
+                credentials: 'include'
             });
             
             const data = await response.json();

@@ -56,9 +56,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Запуск приложения...")
     
-    # Telegram-бот отключен для избежания конфликтов
-    logger.info("📱 Telegram-бот отключен (можно запустить отдельно)")
-    # asyncio.create_task(bot_instance.run())
+    # Запускаем Telegram-бот
+    logger.info("📱 Запускаем Telegram-бот...")
+    asyncio.create_task(bot_instance.run())
     
     # Запускаем планировщик автоматизации
     try:
