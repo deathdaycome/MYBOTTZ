@@ -1234,109 +1234,106 @@ async def import_projects_as_tasks(
 async def update_task_progress(
     task_id: int,
     progress_data: dict,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user_dependency)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Обновить прогресс выполнения задачи"""
     try:
-        task = db.query(Task).filter(Task.id == task_id).first()
-        if not task:
-            return {"success": False, "message": "Задача не найдена"}
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                return {"success": False, "message": "Задача не найдена"}
 
-        progress = progress_data.get("progress", 0)
-        if not isinstance(progress, int) or progress < 0 or progress > 100:
-            return {"success": False, "message": "Прогресс должен быть числом от 0 до 100"}
+            progress = progress_data.get("progress", 0)
+            if not isinstance(progress, int) or progress < 0 or progress > 100:
+                return {"success": False, "message": "Прогресс должен быть числом от 0 до 100"}
 
-        task.progress = progress
-        task.updated_at = datetime.utcnow()
+            task.progress = progress
+            task.updated_at = datetime.utcnow()
 
-        # Если прогресс 100%, автоматически завершаем задачу
-        if progress == 100 and task.status != "completed":
-            task.status = "completed"
-            task.completed_at = datetime.utcnow()
+            # Если прогресс 100%, автоматически завершаем задачу
+            if progress == 100 and task.status != "completed":
+                task.status = "completed"
+                task.completed_at = datetime.utcnow()
 
-        db.commit()
-        db.refresh(task)
+            db.commit()
+            db.refresh(task)
 
-        return {
-            "success": True,
-            "message": f"Прогресс обновлен до {progress}%",
-            "data": task.to_dict()
-        }
+            return {
+                "success": True,
+                "message": f"Прогресс обновлен до {progress}%",
+                "data": task.to_dict()
+            }
     except Exception as e:
         logger.error(f"Ошибка обновления прогресса задачи {task_id}: {e}")
-        db.rollback()
         return {"success": False, "message": str(e)}
 
 @router.post("/{task_id}/timer/start")
 async def start_task_timer(
     task_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user_dependency)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Запустить таймер работы над задачей"""
     try:
-        task = db.query(Task).filter(Task.id == task_id).first()
-        if not task:
-            return {"success": False, "message": "Задача не найдена"}
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                return {"success": False, "message": "Задача не найдена"}
 
-        if task.timer_started_at:
-            return {"success": False, "message": "Таймер уже запущен"}
+            if task.timer_started_at:
+                return {"success": False, "message": "Таймер уже запущен"}
 
-        task.timer_started_at = datetime.utcnow()
-        task.updated_at = datetime.utcnow()
+            task.timer_started_at = datetime.utcnow()
+            task.updated_at = datetime.utcnow()
 
-        # Автоматически переводим в статус "в работе"
-        if task.status == "pending":
-            task.status = "in_progress"
+            # Автоматически переводим в статус "в работе"
+            if task.status == "pending":
+                task.status = "in_progress"
 
-        db.commit()
-        db.refresh(task)
+            db.commit()
+            db.refresh(task)
 
-        return {
-            "success": True,
-            "message": "Таймер запущен",
-            "data": task.to_dict()
-        }
+            return {
+                "success": True,
+                "message": "Таймер запущен",
+                "data": task.to_dict()
+            }
     except Exception as e:
         logger.error(f"Ошибка запуска таймера задачи {task_id}: {e}")
-        db.rollback()
         return {"success": False, "message": str(e)}
 
 @router.post("/{task_id}/timer/stop")
 async def stop_task_timer(
     task_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user_dependency)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Остановить таймер работы над задачей"""
     try:
-        task = db.query(Task).filter(Task.id == task_id).first()
-        if not task:
-            return {"success": False, "message": "Задача не найдена"}
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                return {"success": False, "message": "Задача не найдена"}
 
-        if not task.timer_started_at:
-            return {"success": False, "message": "Таймер не был запущен"}
+            if not task.timer_started_at:
+                return {"success": False, "message": "Таймер не был запущен"}
 
-        # Вычисляем затраченное время
-        time_elapsed = (datetime.utcnow() - task.timer_started_at).total_seconds()
-        task.time_spent_seconds = (task.time_spent_seconds or 0) + int(time_elapsed)
-        task.timer_started_at = None
-        task.updated_at = datetime.utcnow()
+            # Вычисляем затраченное время
+            time_elapsed = (datetime.utcnow() - task.timer_started_at).total_seconds()
+            task.time_spent_seconds = (task.time_spent_seconds or 0) + int(time_elapsed)
+            task.timer_started_at = None
+            task.updated_at = datetime.utcnow()
 
-        db.commit()
-        db.refresh(task)
+            db.commit()
+            db.refresh(task)
 
-        hours = int(task.time_spent_seconds // 3600)
-        minutes = int((task.time_spent_seconds % 3600) // 60)
+            hours = int(task.time_spent_seconds // 3600)
+            minutes = int((task.time_spent_seconds % 3600) // 60)
 
-        return {
-            "success": True,
-            "message": f"Таймер остановлен. Всего времени: {hours}ч {minutes}м",
-            "data": task.to_dict(),
-            "time_formatted": f"{hours}:{minutes:02d}"
-        }
+            return {
+                "success": True,
+                "message": f"Таймер остановлен. Всего времени: {hours}ч {minutes}м",
+                "data": task.to_dict(),
+                "time_formatted": f"{hours}:{minutes:02d}"
+            }
     except Exception as e:
         logger.error(f"Ошибка остановки таймера задачи {task_id}: {e}")
-        db.rollback()
         return {"success": False, "message": str(e)}
