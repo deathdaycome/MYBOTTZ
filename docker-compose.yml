@@ -1,75 +1,64 @@
 version: '3.8'
 
 services:
-  telegram-bot:
-    build: .
-    container_name: telegram-bot-business-card
+  bot-business-card:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bot-business-card
     restart: unless-stopped
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
-      - ./.env:/app/.env:ro
+    ports:
+      - "8000:8000"  # API + Mini App
+      - "8001:8001"  # Admin Panel
     environment:
+      # Telegram Bot
+      - BOT_TOKEN=${BOT_TOKEN}
+      - BOT_USERNAME=${BOT_USERNAME:-NikolaevCodeBot}
+
+      # OpenAI/OpenRouter
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      # Database
+      - DATABASE_URL=sqlite:////app/data/bot.db
+      - DATABASE_ECHO=False
+
+      # Admin Panel
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - ADMIN_PORT=8001
+
+      # Notifications
+      - ADMIN_CHAT_ID=${ADMIN_CHAT_ID}
+      - NOTIFICATION_CHAT_ID=${NOTIFICATION_CHAT_ID}
+
+      # Mini App
+      - MINIAPP_URL=${MINIAPP_URL:-http://147.45.215.199:8000}
+
+      # Other
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - PYTHONUNBUFFERED=1
-    depends_on:
-      - redis
+
+    volumes:
+      # База данных (ВАЖНО! Сохраняется при пересборке)
+      - ./data:/app/data
+
+      # Загруженные файлы
+      - ./uploads:/app/uploads
+
+      # Логи
+      - ./logs:/app/logs
+
     networks:
       - bot-network
+
     healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/docs"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  admin-panel:
-    build: .
-    container_name: admin-panel-business-card
-    restart: unless-stopped
-    command: uvicorn app.admin.app:app --host 0.0.0.0 --port 8000
-    ports:
-      - "8000:8000"
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./uploads:/app/uploads
-      - ./.env:/app/.env:ro
-    environment:
-      - PYTHONUNBUFFERED=1
-    depends_on:
-      - redis
-    networks:
-      - bot-network
-
-  redis:
-    image: redis:7-alpine
-    container_name: redis-business-card
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - bot-network
-    command: redis-server --appendonly yes
-
-  nginx:
-    image: nginx:alpine
-    container_name: nginx-business-card
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro
-    depends_on:
-      - admin-panel
-    networks:
-      - bot-network
-
-volumes:
-  redis_data:
+      start_period: 40s
 
 networks:
   bot-network:

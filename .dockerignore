@@ -1,0 +1,93 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Логи
+*.log
+logs/
+
+# База данных (не копируем в образ, монтируем через volume)
+data/
+*.db
+*.sqlite
+
+# Uploads (не копируем в образ)
+uploads/
+
+# Node.js (кроме miniapp)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Test files
+tests/
+test_*.py
+*_test.py
+pytest.ini
+.pytest_cache/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Scripts
+redeploy_server.sh
+deploy.sh
+*.sh
+
+# Environment
+.env
+.env.*
+!.env.example
