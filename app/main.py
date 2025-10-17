@@ -221,6 +221,8 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/admin/static", StaticFiles(directory="app/admin/static"), name="admin_static")
 # Подключаем uploads для портфолио и файлов
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Подключаем Mini App
+app.mount("/", StaticFiles(directory="miniapp/dist", html=True), name="miniapp")
 
 # --- Telegram Bot Initialization ---
 class TelegramBot:
