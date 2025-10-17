@@ -176,9 +176,16 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик всех callback"""
         try:
+            print(f"\n{'='*60}")
+            print(f"DEBUG: handle_callback вызван!")
+            print(f"DEBUG: update={update}")
+            print(f"DEBUG: callback_query={update.callback_query if update else 'None'}")
+            print(f"DEBUG: callback_data={update.callback_query.data if update and update.callback_query else 'None'}")
+            print(f"{'='*60}\n")
+
             callback_data = update.callback_query.data
             user_id = update.effective_user.id
-            
+
             # Подробное логирование
             logger.info(f"🔍 CALLBACK RECEIVED: user_id={user_id}, callback_data='{callback_data}'")
             logger.info(f"🔍 Update type: {type(update)}")
@@ -263,14 +270,24 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 from ..handlers.money_management import money_handler
                 await money_handler.handle_money_analytics(update, context)
                 
+            elif callback_data == "quick_request":
+                logger.info(f"⚡ Обрабатываем quick_request для пользователя {user_id}")
+                from ..handlers.quick_project_request import quick_project_handler
+                await quick_project_handler.show_quick_request_menu(update, context)
+
+            elif callback_data.startswith("quick_"):
+                logger.info(f"⚡ Обрабатываем быстрый запрос проекта для пользователя {user_id}")
+                from ..handlers.quick_project_request import quick_project_handler
+                await quick_project_handler.handle_quick_request(update, context)
+
             elif callback_data == "calculator":
                 logger.info(f"🧮 Обрабатываем calculator для пользователя {user_id}")
                 await self.show_calculator(update, context)
-                
+
             elif callback_data == "faq":
                 logger.info(f"❓ Обрабатываем faq для пользователя {user_id}")
                 await self.show_faq(update, context)
-                
+
             elif callback_data == "consultation":
                 logger.info(f"💬 Обрабатываем consultation для пользователя {user_id}")
                 await self.show_consultation(update, context)
@@ -463,7 +480,21 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
                 from .revisions import revisions_handler
                 await revisions_handler.handle_revision_description(update, context)
                 return
-            
+
+            # Проверяем, ожидает ли система причину отклонения правки
+            if context.user_data.get('waiting_for_rejection_reason'):
+                logger.info(f"📝 Пользователь пишет причину отклонения правки")
+                await self.handle_rejection_reason(update, context)
+                return
+
+            # Проверяем, пишет ли пользователь сообщение в чат правки
+            if context.user_data.get('writing_message_step') == 'text':
+                # Вызываем обработчик сообщений правок
+                logger.info(f"💬 Пользователь пишет сообщение в чат правки - вызываем revision_chat_handlers")
+                from .revision_chat_handlers import revision_chat_handlers
+                await revision_chat_handlers.handle_chat_message(update, context)
+                return
+
             # Если сообщение не является командой, показываем главное меню
             if not message_text.startswith('/'):
                 keyboard = get_main_menu_keyboard()
@@ -477,7 +508,131 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка текстовых сообщений (алиас для handle_text_input)"""
         await self.handle_text_input(update, context)
-    
+
+    async def handle_rejection_reason(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка причины отклонения правки"""
+        try:
+            user_id = update.effective_user.id
+            reason = update.message.text
+            revision_id = context.user_data.get('rejecting_revision_id')
+
+            if not revision_id:
+                await update.message.reply_text("Произошла ошибка. Попробуйте еще раз.")
+                context.user_data.pop('waiting_for_rejection_reason', None)
+                return
+
+            from ...database.database import get_db_context, get_or_create_user
+            from ...database.models import ProjectRevision, RevisionMessage, Project
+
+            with get_db_context() as db:
+                user = get_or_create_user(db, user_id)
+
+                # Получаем правку с проверкой доступа
+                revision = db.query(ProjectRevision).join(Project).filter(
+                    ProjectRevision.id == revision_id,
+                    Project.user_id == user.id
+                ).first()
+
+                if not revision:
+                    await update.message.reply_text("Правка не найдена")
+                    context.user_data.pop('waiting_for_rejection_reason', None)
+                    context.user_data.pop('rejecting_revision_id', None)
+                    return
+
+                # Обновляем статус на "needs_rework"
+                revision.status = "needs_rework"
+                revision.updated_at = datetime.utcnow()
+
+                # Сохраняем причину как сообщение
+                rejection_message = RevisionMessage(
+                    revision_id=revision_id,
+                    sender_type="client",
+                    sender_user_id=user.id,
+                    message=f"❌ Требует доработки:\n\n{reason}",
+                    is_internal=False
+                )
+                db.add(rejection_message)
+                db.commit()
+
+                # Проверяем, есть ли прикрепленные файлы
+                rejection_files = context.user_data.get('rejection_files', [])
+                files_text = ""
+                if rejection_files:
+                    files_text = f"\n\n<b>Прикрепленные файлы:</b> {len(rejection_files)} шт."
+
+                # Уведомляем исполнителя
+                from ...services.notification_service import notification_service
+                if revision.assigned_to:
+                    admin_message = f"""
+❌ <b>Правка #{revision.revision_number} отправлена на доработку</b>
+
+👤 <b>Клиент:</b> {user.first_name or user.username or 'Клиент'}
+📋 <b>Проект:</b> {revision.project.title}
+🔧 <b>Правка:</b> {revision.title}
+
+<b>Причина:</b>
+{reason}{files_text}
+                    """
+                    # Отправляем уведомление исполнителю
+                    if hasattr(revision.assigned_to, 'telegram_id') and revision.assigned_to.telegram_id:
+                        await notification_service.send_user_notification(
+                            revision.assigned_to.telegram_id,
+                            admin_message
+                        )
+
+                        # Отправляем прикрепленные файлы
+                        if rejection_files:
+                            for file_data in rejection_files:
+                                try:
+                                    if file_data['type'] == 'photo':
+                                        await context.bot.send_photo(
+                                            chat_id=revision.assigned_to.telegram_id,
+                                            photo=file_data['file_id'],
+                                            caption="📎 Прикрепленное фото"
+                                        )
+                                    elif file_data['type'] == 'video':
+                                        await context.bot.send_video(
+                                            chat_id=revision.assigned_to.telegram_id,
+                                            video=file_data['file_id'],
+                                            caption="📎 Прикрепленное видео"
+                                        )
+                                    elif file_data['type'] == 'document':
+                                        await context.bot.send_document(
+                                            chat_id=revision.assigned_to.telegram_id,
+                                            document=file_data['file_id'],
+                                            caption=f"📎 {file_data.get('file_name', 'Документ')}"
+                                        )
+                                except Exception as file_err:
+                                    logger.error(f"Ошибка отправки файла исполнителю: {file_err}")
+
+                # Очищаем флаги и файлы
+                context.user_data.pop('waiting_for_rejection_reason', None)
+                context.user_data.pop('rejecting_revision_id', None)
+                context.user_data.pop('rejection_files', None)
+
+                files_count_text = ""
+                if rejection_files:
+                    files_count_text = f"\n📎 Прикреплено файлов: {len(rejection_files)}"
+
+                await update.message.reply_text(
+                    f"""
+❌ <b>Правка отправлена на доработку</b>
+
+📋 <b>Проект:</b> {revision.project.title}
+🔧 <b>Правка #{revision.revision_number}:</b> {revision.title}
+
+Ваше сообщение отправлено исполнителю.{files_count_text}
+Мы свяжемся с вами после исправления.
+                    """,
+                    parse_mode='HTML'
+                )
+
+        except Exception as e:
+            logger.error(f"Ошибка в handle_rejection_reason: {e}", exc_info=True)
+            await update.message.reply_text("Произошла ошибка при обработке отклонения")
+            context.user_data.pop('waiting_for_rejection_reason', None)
+            context.user_data.pop('rejecting_revision_id', None)
+
     async def handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка голосовых сообщений"""
         try:
@@ -502,7 +657,25 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             logger.info(f"📄 Creating revision step: {context.user_data.get('creating_revision_step')}")
             
             log_user_action(user_id, "document_message", file_name)
-            
+
+            # Если ожидается причина отклонения, сохраняем документ
+            if context.user_data.get('waiting_for_rejection_reason'):
+                if 'rejection_files' not in context.user_data:
+                    context.user_data['rejection_files'] = []
+
+                context.user_data['rejection_files'].append({
+                    'type': 'document',
+                    'file_id': document.file_id,
+                    'file_name': file_name
+                })
+
+                await update.message.reply_text(
+                    f"📄 Документ '{file_name}' сохранен!\n\n"
+                    "Теперь напишите текстовое описание причины отклонения.\n"
+                    "Документ будет прикреплен к вашему сообщению."
+                )
+                return
+
             # Проверяем, ожидает ли пользователь загрузку чека
             from ..handlers.money_management import money_handler
             if money_handler.user_states.get(user_id) == "waiting_for_receipt":
@@ -538,7 +711,14 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             logger.info(f"� Creating revision step: {context.user_data.get('creating_revision_step')}")
             
             log_user_action(user_id, "photo_message")
-            
+
+            # Если ожидается причина отклонения, направляем в специальный обработчик
+            if context.user_data.get('waiting_for_rejection_reason'):
+                logger.info(f"📸 Фото при отклонении - вызываем revision_chat_handlers")
+                from .revision_chat_handlers import revision_chat_handlers
+                await revision_chat_handlers.handle_chat_photo(update, context)
+                return
+
             # Проверяем, ожидает ли пользователь загрузку чека
             from ..handlers.money_management import money_handler
             if money_handler.user_states.get(user_id) == "waiting_for_receipt":
@@ -548,11 +728,18 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             
             # Проверяем, создает ли пользователь правку
             if context.user_data.get('creating_revision_step') == 'files':
-                logger.info(f"� ROUTING TO REVISION FILES HANDLER")
+                logger.info(f"📸 ROUTING TO REVISION FILES HANDLER")
                 await self.handle_revision_photo(update, context)
                 return
-            
-            logger.info(f"� NOT IN REVISION MODE - sending default message")
+
+            # Проверяем, пишет ли пользователь в чат правки
+            if context.user_data.get('writing_message_step') == 'text':
+                logger.info(f"📸 ROUTING TO REVISION CHAT PHOTO HANDLER")
+                from .revision_chat_handlers import revision_chat_handlers
+                await revision_chat_handlers.handle_chat_photo(update, context)
+                return
+
+            logger.info(f"📸 NOT IN REVISION MODE - sending default message")
             await update.message.reply_text(
                 "📷 Фотография получена! В будущем здесь будет обработка изображений."
             )
@@ -610,13 +797,27 @@ Telegram, WhatsApp, веб-сайты, социальные сети.
             logger.info(f"🎥 Creating revision step: {context.user_data.get('creating_revision_step')}")
             
             log_user_action(user_id, "video_message")
-            
+
+            # Если ожидается причина отклонения, направляем в специальный обработчик
+            if context.user_data.get('waiting_for_rejection_reason'):
+                logger.info(f"🎥 Видео при отклонении - вызываем revision_chat_handlers")
+                from .revision_chat_handlers import revision_chat_handlers
+                await revision_chat_handlers.handle_chat_video(update, context)
+                return
+
             # Проверяем, создает ли пользователь правку
             if context.user_data.get('creating_revision_step') == 'files':
                 logger.info(f"🎥 ROUTING TO REVISION VIDEO HANDLER")
                 await self.handle_revision_video(update, context)
                 return
-            
+
+            # Проверяем, пишет ли пользователь в чат правки
+            if context.user_data.get('writing_message_step') == 'text':
+                logger.info(f"🎥 ROUTING TO REVISION CHAT VIDEO HANDLER")
+                from .revision_chat_handlers import revision_chat_handlers
+                await revision_chat_handlers.handle_chat_video(update, context)
+                return
+
             await update.message.reply_text(
                 "🎥 Видео получено! В будущем здесь будет обработка видео."
             )

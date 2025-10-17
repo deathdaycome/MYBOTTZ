@@ -1088,7 +1088,12 @@ class ProjectRevision(Base):
     completed_at = Column(DateTime, nullable=True)  # Когда правка была выполнена
     estimated_time = Column(Integer, nullable=True)  # Оценочное время на исправление (в часах)
     actual_time = Column(Integer, nullable=True)  # Фактическое время
-    
+
+    # Прогресс и таймер
+    progress = Column(Integer, default=0)  # Процент выполнения (0-100)
+    time_spent_seconds = Column(Integer, default=0)  # Время работы в секундах
+    timer_started_at = Column(DateTime, nullable=True)  # Когда запущен таймер
+
     # Связи
     project = relationship("Project", back_populates="revisions")
     created_by = relationship("User", back_populates="created_revisions")
@@ -1112,6 +1117,9 @@ class ProjectRevision(Base):
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "estimated_time": self.estimated_time,
             "actual_time": self.actual_time,
+            "progress": self.progress if hasattr(self, 'progress') else 0,
+            "time_spent_seconds": self.time_spent_seconds if hasattr(self, 'time_spent_seconds') else 0,
+            "timer_started_at": self.timer_started_at.isoformat() if hasattr(self, 'timer_started_at') and self.timer_started_at else None,
             "created_by": self.created_by.to_dict() if self.created_by else None,
             "assigned_to": self.assigned_to.to_dict() if self.assigned_to else None,
             "messages_count": len(self.messages) if self.messages else 0,
@@ -1314,12 +1322,13 @@ class TaskComment(Base):
     comment = Column(Text, nullable=False)  # Текст комментария
     comment_type = Column(String(50), default="general")  # general, status_change, deadline_change
     is_internal = Column(Boolean, default=False)  # Внутренний комментарий (только для команды)
+    attachments = Column(JSON, default=lambda: [])  # Прикрепленные файлы/скриншоты [{"filename": "...", "path": "..."}]
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     # Связи
     task = relationship("Task", back_populates="comments")
     author = relationship("AdminUser", back_populates="task_comments")
-    
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -1328,6 +1337,7 @@ class TaskComment(Base):
             "comment": self.comment,
             "comment_type": self.comment_type,
             "is_internal": self.is_internal,
+            "attachments": self.attachments or [],
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "author": self.author.to_dict() if self.author else None
         }
@@ -1496,3 +1506,45 @@ User.created_revisions = relationship("ProjectRevision", back_populates="created
 #             "user_agent": self.user_agent,
 #             "created_at": self.created_at.isoformat() if self.created_at else None
 #         }
+# === CRM AUTO-SYNC: Автоматическое создание клиента при создании пользователя ===
+from sqlalchemy import event
+
+@event.listens_for(User, 'after_insert')
+def create_crm_client_for_user(mapper, connection, target):
+    """Автоматически создаёт CRM клиента при создании нового пользователя"""
+    try:
+        from .crm_models import Client, ClientType, ClientStatus
+        from sqlalchemy.orm import Session
+        from datetime import datetime
+        
+        # Создаём сессию из connection
+        session = Session(bind=connection)
+        
+        # Проверяем есть ли уже клиент
+        existing = session.query(Client).filter(Client.telegram_user_id == target.id).first()
+        if existing:
+            return
+        
+        # Создаём клиента
+        client = Client(
+            name=target.first_name or target.username or f"Клиент {target.id}",
+            type=ClientType.INDIVIDUAL,
+            status=ClientStatus.NEW,
+            phone=target.phone,
+            telegram=f"@{target.username}" if target.username else None,
+            source="auto_user_creation",
+            description="Создан автоматически при регистрации пользователя",
+            telegram_user_id=target.id,
+            manager_id=1,
+            created_by_id=1,
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        session.add(client)
+        session.commit()
+        
+        print(f"✅ [AUTO-CRM] Создан клиент для user_id={target.id}")
+    except Exception as e:
+        print(f"❌ [AUTO-CRM] Ошибка: {e}")
+        import traceback
+        traceback.print_exc()

@@ -46,6 +46,9 @@ class Settings:
     # Notifications
     NOTIFICATION_CHAT_ID: str = os.getenv("NOTIFICATION_CHAT_ID", "")
     ADMIN_CHAT_ID: str = os.getenv("ADMIN_CHAT_ID", os.getenv("NOTIFICATION_CHAT_ID", ""))
+
+    # Mini App
+    MINIAPP_URL: str = os.getenv("MINIAPP_URL", "https://thesaurus-chubby-concept-alternative.trycloudflare.com")
     
     # Admin IDs
     ADMIN_IDS: list = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]

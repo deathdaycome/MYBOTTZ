@@ -22,11 +22,13 @@ from app.bot.handlers.admin import AdminHandler, admin_command
 from app.bot.handlers.consultant import ConsultantHandler
 from app.bot.handlers.projects import ProjectsHandler
 from app.bot.handlers.revisions import RevisionsHandler
+from app.bot.handlers.revision_chat_handlers import RevisionChatHandlers
 from app.bot.handlers.tz_creation import TZCreationHandler
 from app.bot.handlers.common import CommonHandler
 from app.bot.handlers.portfolio import PortfolioHandler
 from app.bot.handlers.bot_creation import BotCreationHandler
 from app.bot.handlers.money_management import money_handler
+from app.bot.handlers.quick_project_request import QuickProjectRequestHandler
 from app.database.database import init_db
 
 logger = logging.getLogger(__name__)
@@ -48,10 +50,12 @@ def setup_handlers(app: Application):
     consultant_handler = ConsultantHandler()
     projects_handler = ProjectsHandler()
     revisions_handler = RevisionsHandler()
+    revision_chat_handler = RevisionChatHandlers()
     tz_handler = TZCreationHandler()
     common_handler = CommonHandler()
     portfolio_handler = PortfolioHandler()
     bot_creation_handler = BotCreationHandler()
+    quick_project_handler = QuickProjectRequestHandler()
     
     logger.info("🔧 Добавляем команды...")
     # Команды
@@ -89,13 +93,29 @@ def setup_handlers(app: Application):
     
     logger.info("🔧 Добавляем callback query handlers...")
     # Callback query handlers
+
+    # ВАЖНО: Quick request handlers должны быть ПЕРВЫМИ
+    logger.info("🔥 Регистрируем quick_request handler")
     app.add_handler(CallbackQueryHandler(
-        portfolio_handler.show_portfolio_categories, 
+        quick_project_handler.show_quick_request_menu,
+        pattern="^quick_request$"
+    ))
+    logger.info("🔥 quick_request handler зарегистрирован!")
+
+    logger.info("🔥 Регистрируем quick_* handler")
+    app.add_handler(CallbackQueryHandler(
+        quick_project_handler.handle_quick_request,
+        pattern="^quick_(telegram|whatsapp|website|integration|mobile|shop)$"
+    ))
+    logger.info("🔥 quick_* handler зарегистрирован!")
+
+    app.add_handler(CallbackQueryHandler(
+        portfolio_handler.show_portfolio_categories,
         pattern="^portfolio$"
     ))
-    
+
     app.add_handler(CallbackQueryHandler(
-        common_handler.handle_callback, 
+        common_handler.handle_callback,
         pattern="^(main_menu|back|consultant|projects|about|calculator|faq|consultation|contacts|my_projects|create_tz|create_bot_guide|settings|setup_timeweb|setup_bot_token|send_bot_token|get_telegram_id|get_chat_id|send_chat_id|detailed_chat_instructions|timeweb_registered|admin_console|admin_money|upload_receipt|transaction_.*|my_transactions|view_income|view_expenses|money_analytics|money_categories)$"
     ))
     
@@ -139,7 +159,7 @@ def setup_handlers(app: Application):
         revisions_handler.files_done,
         pattern="^files_done_"
     ))
-    
+
     # Добавляем обработчики для всех callback кнопок правок
     app.add_handler(CallbackQueryHandler(
         common_handler.handle_callback,
@@ -212,20 +232,21 @@ def setup_handlers(app: Application):
         filters.PHOTO,
         common_handler.handle_photo
     ))
-    
+
     # Message handlers - ВИДЕО ОБРАБОТЧИК
     app.add_handler(MessageHandler(
         filters.VIDEO,
         common_handler.handle_video
     ))
-    
-    # Message handlers - ДОКУМЕНТЫ ОБРАБОТЧИК  
+
+    # Message handlers - ДОКУМЕНТЫ ОБРАБОТЧИК
     app.add_handler(MessageHandler(
         filters.ATTACHMENT,
         common_handler.handle_document
     ))
-    
-    # Message handlers - ТЕКСТ ОБРАБОТЧИК (исключаем фото и видео)
+
+    # Message handlers - ТЕКСТ ОБРАБОТЧИК (все текстовые сообщения обрабатываются здесь)
+    # Внутри handle_text_input есть роутинг для чата правок, создания ТЗ и других сценариев
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND & ~filters.PHOTO & ~filters.VIDEO,
         common_handler.handle_text_input

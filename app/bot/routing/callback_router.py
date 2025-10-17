@@ -88,19 +88,10 @@ class CallbackRouter:
                     logger.error(f"❌ ROUTER: ошибка в обработчике {route.pattern}: {e}")
                     raise
         
-        # Маршрут не найден
-        logger.warning(f"⚠️ ROUTER: маршрут не найден для '{callback_data}'")
+        # Маршрут не найден - передаем обработку дальше
+        logger.info(f"ℹ️ ROUTER: маршрут не найден для '{callback_data}', передаем дальше")
         self.stats["unhandled"] += 1
-        
-        # Отправляем сообщение об ошибке пользователю
-        try:
-            await update.callback_query.answer("❌ Неизвестная команда. Возвращайтесь в главное меню.")
-            from ..handlers.start import StartHandler
-            start_handler = StartHandler()
-            await start_handler.start(update, context)
-        except Exception as e:
-            logger.error(f"Ошибка при обработке неизвестного callback: {e}")
-        
+
         return False
     
     def get_stats(self) -> Dict:

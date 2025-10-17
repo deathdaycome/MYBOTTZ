@@ -211,7 +211,8 @@ class ProjectsHandler:
                     'updated_at': project.updated_at,
                     'deadline': project.deadline,
                     'project_metadata': project.project_metadata,
-                    'user_preferences': user.preferences if user else None
+                    'user_preferences': user.preferences if user else None,
+                    'test_link': project.project_metadata.get('test_link') if project.project_metadata else None
                 }
             
             # Формируем расширенную детальную информацию
@@ -244,8 +245,8 @@ class ProjectsHandler:
 {self._get_project_credentials_info(project_data)}
             """
             
-            keyboard = get_project_actions_keyboard(project_data['id'])
-            
+            keyboard = get_project_actions_keyboard(project_data['id'], project_data.get('test_link'))
+
             await query.edit_message_text(
                 text,
                 reply_markup=keyboard,
@@ -352,6 +353,8 @@ class ProjectsHandler:
         emojis = {
             'new': '🆕',
             'review': '👀',
+            'clarification': '❓',
+            'proposal_sent': '📄',
             'accepted': '✅',
             'in_progress': '🔄',
             'testing': '🧪',
@@ -359,14 +362,16 @@ class ProjectsHandler:
             'cancelled': '❌'
         }
         return emojis.get(status, '📊')
-    
+
     def _get_status_name(self, status: str) -> str:
         """Получить название статуса"""
         names = {
-            'new': 'Новый',
+            'new': 'Новый запрос',
             'review': 'На рассмотрении',
-            'accepted': 'Принят',
-            'in_progress': 'В работе',
+            'clarification': 'Требуется уточнение',
+            'proposal_sent': 'Предложение отправлено',
+            'accepted': 'Принят в работу',
+            'in_progress': 'Разрабатывается',
             'testing': 'Тестирование',
             'completed': 'Завершен',
             'cancelled': 'Отменен'

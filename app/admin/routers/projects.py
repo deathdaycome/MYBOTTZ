@@ -829,7 +829,61 @@ async def create_project_root(
                 )
                 db.add(user)
                 db.flush()  # Получаем ID пользователя
-        
+                logger.info(f"Создан пользователь с ID: {user.id}")
+
+        # Создаем клиента в CRM для этого пользователя
+        try:
+            with open('/tmp/crm_debug.log', 'a') as f:
+                f.write(f"=== Проверка user: {user} ===\n")
+
+            if user:
+                from ...database.crm_models import Client, ClientType, ClientStatus
+
+                with open('/tmp/crm_debug.log', 'a') as f:
+                    f.write(f"User ID: {user.id}, Name: {user.first_name}\n")
+
+                # Проверяем, нет ли уже клиента для этого пользователя
+                existing_client = db.query(Client).filter(Client.telegram_user_id == user.id).first()
+
+                if not existing_client:
+                    client_name = data.get('client_name') or user.first_name or 'Клиент'
+
+                    with open('/tmp/crm_debug.log', 'a') as f:
+                        f.write(f"Создаём клиента: {client_name}\n")
+
+                    crm_client = Client(
+                        name=client_name,
+                        type=ClientType.INDIVIDUAL,
+                        status=ClientStatus.NEW,
+                        phone=data.get('client_phone'),
+                        email=data.get('client_email'),
+                        telegram=f"@{user.username}" if user.username else None,
+                        source="admin_panel_project",
+                        description=f"Создан автоматически при создании проекта",
+                        telegram_user_id=user.id,
+                        manager_id=data.get('manager_id') or 1,
+                        created_by_id=1
+                    )
+                    db.add(crm_client)
+                    db.flush()
+                    logger.info(f"✅ Создан CRM клиент с ID: {crm_client.id} для пользователя {user.id}")
+
+                    with open('/tmp/crm_debug.log', 'a') as f:
+                        f.write(f"✅ Клиент создан ID={crm_client.id}\n")
+                else:
+                    logger.info(f"CRM клиент уже существует с ID: {existing_client.id}")
+                    with open('/tmp/crm_debug.log', 'a') as f:
+                        f.write(f"Клиент уже есть ID={existing_client.id}\n")
+            else:
+                with open('/tmp/crm_debug.log', 'a') as f:
+                    f.write(f"ERROR: user=None\n")
+        except Exception as e:
+            logger.error(f"Ошибка создания CRM клиента: {e}")
+            with open('/tmp/crm_debug.log', 'a') as f:
+                f.write(f"EXCEPTION: {e}\n")
+                import traceback
+                f.write(traceback.format_exc())
+
         # Создаем объект проекта
         from datetime import timedelta
         

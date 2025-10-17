@@ -6,22 +6,23 @@ def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
     """Главное меню бота"""
     keyboard = [
         [
-            InlineKeyboardButton("🚀 Создать ТЗ", callback_data="create_tz"),
+            InlineKeyboardButton("⚡ Создать проект", callback_data="quick_request"),
             InlineKeyboardButton("📊 Мои проекты", callback_data="my_projects")
         ],
         [
-            InlineKeyboardButton("🧮 Калькулятор", callback_data="calculator"),
+            InlineKeyboardButton("🚀 Создать ТЗ", callback_data="create_tz"),
             InlineKeyboardButton("🤖 AI Консультант", callback_data="consultant")
         ],
         [
-            InlineKeyboardButton("❓ FAQ", callback_data="faq"),
-            InlineKeyboardButton("📞 Контакты", callback_data="contacts")
+            InlineKeyboardButton("🧮 Калькулятор", callback_data="calculator"),
+            InlineKeyboardButton("❓ FAQ", callback_data="faq")
+        ],
+        [
+            InlineKeyboardButton("📞 Контакты", callback_data="contacts"),
+            InlineKeyboardButton("⚙️ Настройки", callback_data="settings")
         ],
         [
             InlineKeyboardButton("💼 Портфолио", url=f"https://t.me/{settings.PORTFOLIO_CHANNEL_ID}" if settings.PORTFOLIO_CHANNEL_ID else "https://t.me/your_portfolio_channel")
-        ],
-        [
-            InlineKeyboardButton("⚙️ Настройки", callback_data="settings")
         ]
     ]
     
@@ -69,9 +70,15 @@ def get_portfolio_categories_keyboard() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def get_project_actions_keyboard(project_id: int) -> InlineKeyboardMarkup:
+def get_project_actions_keyboard(project_id: int, test_link: str = None) -> InlineKeyboardMarkup:
     """Действия с проектом"""
-    keyboard = [
+    keyboard = []
+
+    # Добавляем кнопку тестирования если есть ссылка
+    if test_link:
+        keyboard.append([InlineKeyboardButton("🧪 Протестировать", url=test_link)])
+
+    keyboard.extend([
         [
             InlineKeyboardButton("📝 Детали", callback_data=f"project_details_{project_id}"),
             InlineKeyboardButton("💬 Чат", callback_data=f"project_chat_{project_id}")
@@ -83,7 +90,7 @@ def get_project_actions_keyboard(project_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("📊 Мои проекты", callback_data="my_projects"),
             InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")
         ]
-    ]
+    ])
     return InlineKeyboardMarkup(keyboard)
 
 def get_project_status_keyboard(project_id: int) -> InlineKeyboardMarkup:
@@ -292,29 +299,25 @@ def get_project_revisions_keyboard(project_id: int, revisions_count: int = 0) ->
 def get_revision_actions_keyboard(revision_id: int, project_id: int, status: str) -> InlineKeyboardMarkup:
     """Клавиатура для управления конкретной правкой"""
     keyboard = []
-    
-    # Кнопки в зависимости от статуса
-    if status == "pending":
+
+    # Кнопка чата (всегда доступна)
+    keyboard.append([
+        InlineKeyboardButton("💬 Открыть чат", callback_data=f"revision_chat_{revision_id}")
+    ])
+
+    # Кнопки для завершенных правок
+    if status == "completed":
         keyboard.append([
-            InlineKeyboardButton("💬 Добавить комментарий", callback_data=f"revision_comment_{revision_id}"),
-            InlineKeyboardButton("📎 Прикрепить файл", callback_data=f"revision_file_{revision_id}")
+            InlineKeyboardButton("✅ Принять работу", callback_data=f"revision_approve_{revision_id}"),
+            InlineKeyboardButton("❌ Запросить доработку", callback_data=f"revision_reject_{revision_id}")
         ])
-    elif status == "in_progress":
-        keyboard.append([
-            InlineKeyboardButton("💬 Добавить комментарий", callback_data=f"revision_comment_{revision_id}"),
-            InlineKeyboardButton("📎 Прикрепить файл", callback_data=f"revision_file_{revision_id}")
-        ])
-    elif status == "completed":
-        keyboard.append([
-            InlineKeyboardButton("💬 Комментировать", callback_data=f"revision_comment_{revision_id}")
-        ])
-    
+
     # Навигационные кнопки
     keyboard.extend([
         [InlineKeyboardButton("🔙 К правкам", callback_data=f"project_revisions_{project_id}")],
         [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
     ])
-    
+
     return InlineKeyboardMarkup(keyboard)
 
 def get_revision_priority_keyboard(project_id: int) -> InlineKeyboardMarkup:

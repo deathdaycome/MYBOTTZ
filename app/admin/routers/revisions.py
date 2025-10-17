@@ -762,19 +762,24 @@ async def send_revision_message_notification(revision: ProjectRevision, message:
     try:
         from ...services.notification_service import notification_service
         from ...database.database import get_db_context
-        
+        from telegram import Bot
+        from ...config.settings import settings
+
+        # Инициализируем бота для отправки уведомлений
+        notification_service.set_bot(Bot(settings.BOT_TOKEN))
+
         with get_db_context() as db:
             # Получаем данные проекта и пользователей
             project = db.get(Project, revision.project_id)
             client_user = db.get(User, project.user_id)
-            
+
             # Получаем отправителя в зависимости от типа
             sender_user = None
             if message.sender_type == "client" and message.sender_user_id:
                 sender_user = db.get(User, message.sender_user_id)
             elif message.sender_type in ["admin", "executor"] and message.sender_admin_id:
                 sender_user = db.get(AdminUser, message.sender_admin_id)
-            
+
             # Определяем получателя по типу отправителя
             if message.sender_type == "client":
                 # Сообщение от клиента - уведомляем админа
@@ -789,9 +794,9 @@ async def send_revision_message_notification(revision: ProjectRevision, message:
                 await notification_service.notify_revision_message(
                     revision, project, message, sender_user, client_user
                 )
-                
+
         logger.info(f"Revision message notification sent: revision_id={revision.id}, message_id={message.id}")
-        
+
     except Exception as e:
         logger.error(f"Error sending revision message notification: {e}")
 
@@ -804,26 +809,26 @@ async def create_revision_message_simple(
     """Создать сообщение правки (упрощенный роут)"""
     try:
         logger.info(f"Creating revision message for user {user['id']}")
-        
+
         # Получаем данные из формы
         form_data = await request.form()
-        
+
         revision_id = form_data.get("revision_id")
         content = form_data.get("message")  # Фронтенд отправляет 'message', а не 'content'
         is_internal = form_data.get("is_internal") == "true"
-        
+
         logger.info(f"Form data: revision_id={revision_id}, content_length={len(content) if content else 0}, is_internal={is_internal}")
-        
+
         if not revision_id or not content:
             raise HTTPException(status_code=400, detail="Необходимо указать revision_id и message")
-        
+
         revision_id = int(revision_id)
-        
+
         # Проверяем существование правки
         revision = db.query(ProjectRevision).filter(ProjectRevision.id == revision_id).first()
         if not revision:
             raise HTTPException(status_code=404, detail="Правка не найдена")
-        
+
         # Создаем сообщение
         message = RevisionMessage(
             revision_id=revision_id,
@@ -833,28 +838,28 @@ async def create_revision_message_simple(
             is_internal=is_internal,
             created_at=datetime.utcnow()
         )
-        
+
         db.add(message)
         db.flush()
-        
+
         # Обработка файлов
         files = form_data.getlist("files")
         uploaded_files = []
-        
+
         for file in files:
             if hasattr(file, 'filename') and file.filename:
                 # Сохраняем файл
                 upload_dir = Path("uploads/revisions/messages")
                 upload_dir.mkdir(parents=True, exist_ok=True)
-                
+
                 file_ext = Path(file.filename).suffix
                 unique_filename = f"{uuid.uuid4()}{file_ext}"
                 file_path = upload_dir / unique_filename
-                
+
                 with open(file_path, "wb") as f:
                     content = await file.read()
                     f.write(content)
-                
+
                 # Создаем запись в БД
                 message_file = RevisionMessageFile(
                     message_id=message.id,
@@ -865,25 +870,235 @@ async def create_revision_message_simple(
                     file_path=str(file_path),
                     created_at=datetime.utcnow()
                 )
-                
+
                 db.add(message_file)
                 uploaded_files.append(message_file)
-        
+
         db.commit()
-        
+
         # Отправляем уведомление
         await send_revision_message_notification(revision, message)
-        
+
         return JSONResponse(content={
             "success": True,
             "message": "Сообщение добавлено",
             "message_id": message.id,
             "files_count": len(uploaded_files)
         })
-        
+
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating revision message: {e}")
         raise HTTPException(status_code=500, detail="Ошибка создания сообщения")
+
+@router.post("/api/revisions/{revision_id}/progress")
+async def update_revision_progress(
+    revision_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Обновление прогресса выполнения правки"""
+    try:
+        data = await request.json()
+        progress = data.get('progress', 0)
+
+        revision = db.query(ProjectRevision).filter(ProjectRevision.id == revision_id).first()
+        if not revision:
+            return JSONResponse({"success": False, "error": "Правка не найдена"}, status_code=404)
+
+        # Проверка прав: создатель или исполнитель
+        if revision.created_by_id != current_user['id'] and revision.assigned_to_id != current_user['id']:
+            return JSONResponse({"success": False, "error": "Нет прав для изменения прогресса"}, status_code=403)
+
+        revision.progress = progress
+        revision.updated_at = datetime.utcnow()
+        db.commit()
+
+        return JSONResponse({"success": True, "progress": progress, "message": "Прогресс обновлён"})
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating revision progress {revision_id}: {e}")
+        return JSONResponse({"success": False, "error": "Не удалось обновить прогресс"}, status_code=500)
+
+@router.post("/api/revisions/{revision_id}/timer/start")
+async def start_revision_timer(
+    revision_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Запуск таймера для правки"""
+    try:
+        revision = db.query(ProjectRevision).filter(ProjectRevision.id == revision_id).first()
+        if not revision:
+            return JSONResponse({"success": False, "error": "Правка не найдена"}, status_code=404)
+
+        # Проверка прав
+        if revision.created_by_id != current_user['id'] and revision.assigned_to_id != current_user['id']:
+            return JSONResponse({"success": False, "error": "Нет прав для управления таймером"}, status_code=403)
+
+        # Если таймер уже запущен, игнорируем
+        if revision.timer_started_at:
+            return JSONResponse({"success": True, "message": "Таймер уже запущен"})
+
+        revision.timer_started_at = datetime.utcnow()
+        revision.updated_at = datetime.utcnow()
+        db.commit()
+
+        return JSONResponse({"success": True, "message": "Таймер запущен", "started_at": revision.timer_started_at.isoformat()})
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error starting revision timer {revision_id}: {e}")
+        return JSONResponse({"success": False, "error": "Не удалось запустить таймер"}, status_code=500)
+
+@router.post("/api/revisions/{revision_id}/timer/stop")
+async def stop_revision_timer(
+    revision_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Остановка таймера для правки"""
+    try:
+        revision = db.query(ProjectRevision).filter(ProjectRevision.id == revision_id).first()
+        if not revision:
+            return JSONResponse({"success": False, "error": "Правка не найдена"}, status_code=404)
+
+        # Проверка прав
+        if revision.created_by_id != current_user['id'] and revision.assigned_to_id != current_user['id']:
+            return JSONResponse({"success": False, "error": "Нет прав для управления таймером"}, status_code=403)
+
+        # Если таймер не запущен, игнорируем
+        if not revision.timer_started_at:
+            return JSONResponse({"success": True, "message": "Таймер не был запущен"})
+
+        # Вычисляем время работы
+        elapsed_seconds = int((datetime.utcnow() - revision.timer_started_at).total_seconds())
+        revision.time_spent_seconds += elapsed_seconds
+        revision.timer_started_at = None
+        revision.updated_at = datetime.utcnow()
+        db.commit()
+
+        return JSONResponse({
+            "success": True,
+            "message": "Таймер остановлен",
+            "time_spent_seconds": revision.time_spent_seconds,
+            "elapsed_seconds": elapsed_seconds
+        })
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error stopping revision timer {revision_id}: {e}")
+        return JSONResponse({"success": False, "error": "Не удалось остановить таймер"}, status_code=500)
+
+@router.post("/api/revisions/{revision_id}/send-for-review", response_class=JSONResponse)
+async def send_revision_for_review(
+    revision_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Отправить правку клиенту на проверку"""
+    try:
+        revision = db.query(ProjectRevision).filter(
+            ProjectRevision.id == revision_id
+        ).first()
+
+        if not revision:
+            return JSONResponse({
+                "success": False,
+                "error": "Правка не найдена"
+            }, status_code=404)
+
+        # Останавливаем таймер, если он запущен
+        if revision.timer_started_at:
+            elapsed_seconds = int((datetime.utcnow() - revision.timer_started_at).total_seconds())
+            revision.time_spent_seconds += elapsed_seconds
+            revision.timer_started_at = None
+
+        # Обновляем статус на "review"
+        old_status = revision.status
+        revision.status = "review"
+        revision.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(revision)
+
+        # Получаем проект и клиента
+        project = db.get(Project, revision.project_id)
+        if not project:
+            return JSONResponse({
+                "success": False,
+                "error": "Проект не найден"
+            }, status_code=404)
+
+        client_user = db.get(User, project.user_id)
+        if not client_user:
+            return JSONResponse({
+                "success": False,
+                "error": "Клиент не найден"
+            }, status_code=404)
+
+        # Отправляем уведомление клиенту с кнопками
+        from ...services.notification_service import notification_service
+        from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+        from ...config.settings import settings
+
+        # Инициализируем бота
+        bot = Bot(settings.BOT_TOKEN)
+        notification_service.set_bot(bot)
+
+        # Создаем сообщение с кнопками
+        message_text = f"""
+✅ <b>Правка готова к проверке!</b>
+
+📋 <b>Проект:</b> {project.title}
+🔧 <b>Правка #{revision.revision_number}:</b> {revision.title}
+
+Пожалуйста, проверьте выполненную работу по ссылке ниже.
+
+После проверки выберите действие:
+• <b>Принять</b> - если всё выполнено правильно
+• <b>На доработку</b> - если требуются исправления
+        """
+
+        # Создаем клавиатуру с кнопками
+        keyboard = [
+            [
+                InlineKeyboardButton(
+                    "✅ Принять правку",
+                    callback_data=f"revision_client_approve_{revision.id}"
+                ),
+                InlineKeyboardButton(
+                    "❌ На доработку",
+                    callback_data=f"revision_client_reject_{revision.id}"
+                )
+            ]
+        ]
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        # Отправляем уведомление
+        await bot.send_message(
+            chat_id=client_user.telegram_id,
+            text=message_text,
+            parse_mode='HTML',
+            reply_markup=reply_markup
+        )
+
+        logger.info(f"Revision {revision_id} sent for review to client {client_user.telegram_id}")
+
+        return JSONResponse({
+            "success": True,
+            "message": "Правка отправлена клиенту на проверку",
+            "data": revision.to_dict()
+        })
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error sending revision {revision_id} for review: {e}", exc_info=True)
+        return JSONResponse({
+            "success": False,
+            "error": f"Не удалось отправить правку на проверку: {str(e)}"
+        }, status_code=500)

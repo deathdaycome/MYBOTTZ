@@ -1337,3 +1337,205 @@ async def stop_task_timer(
     except Exception as e:
         logger.error(f"Ошибка остановки таймера задачи {task_id}: {e}")
         return {"success": False, "message": str(e)}
+@router.post("/api/tasks/{task_id}/upload-image")
+async def upload_task_image(
+    task_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Загрузить изображение к задаче"""
+    try:
+        from fastapi import UploadFile, File
+        import os
+        import uuid
+        
+        # Получаем multipart form data
+        form = await request.form()
+        files = form.getlist("files")
+        
+        if not files:
+            return {"success": False, "error": "Файлы не найдены"}
+        
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            
+            if not task:
+                return {"success": False, "error": "Задача не найдена"}
+            
+            # Проверяем права доступа
+            can_upload = (
+                current_user["role"] == "owner" or
+                task.assigned_to_id == current_user["id"] or
+                task.created_by_id == current_user["id"]
+            )
+            
+            if not can_upload:
+                return {"success": False, "error": "Недостаточно прав"}
+            
+            # Создаём директорию для сохранения
+            upload_dir = f"uploads/tasks/{task_id}"
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            uploaded_files = []
+            
+            for file in files:
+                if hasattr(file, 'filename') and file.filename:
+                    # Генерируем уникальное имя файла
+                    file_ext = os.path.splitext(file.filename)[1]
+                    unique_filename = f"{uuid.uuid4()}{file_ext}"
+                    file_path = os.path.join(upload_dir, unique_filename)
+                    
+                    # Сохраняем файл
+                    content = await file.read()
+                    with open(file_path, "wb") as f:
+                        f.write(content)
+                    
+                    uploaded_files.append({
+                        "filename": file.filename,
+                        "path": file_path,
+                        "uploaded_at": datetime.utcnow().isoformat(),
+                        "uploaded_by": current_user["id"]
+                    })
+            
+            # Обновляем metadata задачи, добавляя информацию о файлах
+            if not task.task_metadata:
+                task.task_metadata = {}
+            
+            if "attachments" not in task.task_metadata:
+                task.task_metadata["attachments"] = []
+            
+            task.task_metadata["attachments"].extend(uploaded_files)
+            task.updated_at = datetime.utcnow()
+            
+            db.commit()
+            db.refresh(task)
+            
+            return {
+                "success": True,
+                "message": f"Загружено файлов: {len(uploaded_files)}",
+                "files": uploaded_files
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка загрузки файлов к задаче {task_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+@router.post("/api/tasks/{task_id}/comments/upload")
+async def upload_comment_attachment(
+    task_id: int,
+    comment_id: int = Form(...),
+    request: Request = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Загрузить изображение к комментарию"""
+    try:
+        from fastapi import UploadFile, File
+        import os
+        import uuid
+        
+        # Получаем multipart form data
+        form = await request.form()
+        files = form.getlist("files")
+        
+        if not files:
+            return {"success": False, "error": "Файлы не найдены"}
+        
+        with get_db_context() as db:
+            comment = db.query(TaskComment).filter(TaskComment.id == comment_id).first()
+            
+            if not comment or comment.task_id != task_id:
+                return {"success": False, "error": "Комментарий не найден"}
+            
+            # Проверяем права доступа
+            can_upload = (
+                current_user["role"] == "owner" or
+                comment.author_id == current_user["id"]
+            )
+            
+            if not can_upload:
+                return {"success": False, "error": "Недостаточно прав"}
+            
+            # Создаём директорию для сохранения
+            upload_dir = f"uploads/tasks/{task_id}/comments"
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            uploaded_files = []
+            
+            for file in files:
+                if hasattr(file, 'filename') and file.filename:
+                    # Генерируем уникальное имя файла
+                    file_ext = os.path.splitext(file.filename)[1]
+                    unique_filename = f"{uuid.uuid4()}{file_ext}"
+                    file_path = os.path.join(upload_dir, unique_filename)
+                    
+                    # Сохраняем файл
+                    content = await file.read()
+                    with open(file_path, "wb") as f:
+                        f.write(content)
+                    
+                    uploaded_files.append({
+                        "filename": file.filename,
+                        "path": file_path,
+                        "uploaded_at": datetime.utcnow().isoformat(),
+                        "uploaded_by": current_user["id"]
+                    })
+            
+            # Обновляем attachments комментария
+            if not comment.attachments:
+                comment.attachments = []
+            
+            comment.attachments.extend(uploaded_files)
+            
+            db.commit()
+            db.refresh(comment)
+            
+            return {
+                "success": True,
+                "message": f"Загружено файлов: {len(uploaded_files)}",
+                "files": uploaded_files
+            }
+            
+    except Exception as e:
+        logger.error(f"Ошибка загрузки файлов к комментарию {comment_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+@router.post("/api/tasks/{task_id}/progress")
+async def update_task_progress(
+    task_id: int,
+    request: Request,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Обновление прогресса выполнения задачи"""
+    try:
+        data = await request.json()
+        progress = data.get('progress', 0)
+
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                return {"success": False, "error": "Задача не найдена"}
+
+            # Проверка прав: создатель или исполнитель
+            if task.created_by_id != current_user['id'] and task.assigned_to_id != current_user['id']:
+                return {"success": False, "error": "Нет прав для изменения прогресса"}
+
+            task.progress = progress
+            db.commit()
+
+            logger.info(f"Прогресс задачи {task_id} обновлён на {progress}% пользователем {current_user['username']}")
+
+            return {
+                "success": True,
+                "progress": progress,
+                "message": "Прогресс обновлён"
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка обновления прогресса задачи {task_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "error": str(e)}

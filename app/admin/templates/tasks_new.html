@@ -608,6 +608,153 @@
             text-decoration: line-through;
             opacity: 0.7;
         }
+
+        /* Современный футер с прогрессом и таймером */
+        .task-footer-modern {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        /* Прогресс */
+        .progress-modern {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .progress-modern:hover {
+            transform: translateY(-1px);
+        }
+
+        .progress-bar-modern {
+            flex: 1;
+            height: 8px;
+            background: rgba(99, 102, 241, 0.15);
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-modern:hover .progress-bar-modern {
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+        }
+
+        .progress-fill-modern {
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1 0%, #818cf8 100%);
+            border-radius: 10px;
+            transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+        }
+
+        .progress-fill-modern::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: shimmer-slide 2s infinite;
+        }
+
+        @keyframes shimmer-slide {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-label-modern {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #6366f1;
+            min-width: 40px;
+            text-align: right;
+        }
+
+        /* Таймер */
+        .timer-modern {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        .timer-modern i {
+            color: #94a3b8;
+        }
+
+        .timer-value-modern {
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            min-width: 42px;
+        }
+
+        .timer-value-modern.active {
+            color: #10b981;
+            animation: pulse-timer-glow 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse-timer-glow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.65; }
+        }
+
+        .timer-btn-modern {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.65rem;
+        }
+
+        .timer-btn-modern.play {
+            background: linear-gradient(135deg, #10b981, #34d399);
+            color: white;
+            box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25);
+        }
+
+        .timer-btn-modern.play:hover {
+            background: linear-gradient(135deg, #059669, #10b981);
+            transform: scale(1.08);
+            box-shadow: 0 3px 6px rgba(16, 185, 129, 0.35);
+        }
+
+        .timer-btn-modern.stop {
+            background: linear-gradient(135deg, #ef4444, #f87171);
+            color: white;
+            box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);
+        }
+
+        .timer-btn-modern.stop:hover {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            transform: scale(1.08);
+            box-shadow: 0 3px 6px rgba(239, 68, 68, 0.35);
+        }
+
+        .task-deadline-info {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.625rem;
+        }
+
+        .task-deadline-info i {
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
@@ -1049,25 +1196,52 @@ function createTaskCard(task) {
     // Добавляем специальную иконку для срочных задач
     const urgentIcon = task.priority === 'urgent' ? '<i class="fas fa-exclamation-triangle" style="color: #dc2626; margin-right: 0.5rem; animation: pulse 1.5s ease-in-out infinite;"></i>' : '';
     
+    const progress = task.progress || 0;
+    const timeSpent = task.time_spent_seconds || 0;
+    const timerRunning = task.timer_started_at !== null;
+    const hours = Math.floor(timeSpent / 3600);
+    const minutes = Math.floor((timeSpent % 3600) / 60);
+    const timeFormatted = `${hours}:${minutes.toString().padStart(2, '0')}`;
+
     card.innerHTML = `
         <div class="task-actions">
-            <button class="task-action-btn edit" onclick="openTaskDetail(${task.id}); event.stopPropagation();" title="Просмотр">
+            <button class="task-action-btn view" onclick="openTaskDetail(${task.id}); event.stopPropagation();" title="Просмотр">
                 <i class="fas fa-eye"></i>
             </button>
-            ${task.can_delete ? `<button class="task-action-btn delete" onclick="deleteTask(${task.id}); event.stopPropagation();" title="Удалить">
+            <button class="task-action-btn delete" onclick="deleteTask(${task.id}); event.stopPropagation();" title="Удалить">
                 <i class="fas fa-trash"></i>
-            </button>` : ''}
+            </button>
         </div>
+
         <div class="task-title">${urgentIcon}${escapeHtml(task.title)}</div>
         ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
-        
+
         <div class="task-badges">
             <span class="priority-badge priority-${task.priority}">${priorityText[task.priority]}</span>
             <span class="status-badge status-${task.status}">${statusText[task.status]}</span>
             ${task.is_overdue ? '<span class="priority-badge priority-urgent">ПРОСРОЧЕНО</span>' : ''}
         </div>
-        
-        ${task.deadline ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;"><i class="fas fa-clock"></i> ${formatDate(task.deadline)}</div>` : ''}
+
+        ${task.deadline ? `<div class="task-deadline-info"><i class="far fa-calendar"></i> ${formatDate(task.deadline)}</div>` : ''}
+
+        ${task.status !== 'completed' ? `
+        <div class="task-footer-modern">
+            <div class="progress-modern" onclick="openProgressModal(${task.id}, ${progress}); event.stopPropagation();" title="Изменить прогресс">
+                <div class="progress-bar-modern">
+                    <div class="progress-fill-modern" style="width: ${progress}%"></div>
+                </div>
+                <span class="progress-label-modern">${progress}%</span>
+            </div>
+            <div class="timer-modern">
+                <i class="far fa-clock"></i>
+                <span class="timer-value-modern ${timerRunning ? 'active' : ''}" id="timer-${task.id}">${timeFormatted}</span>
+                <button class="timer-btn-modern ${timerRunning ? 'stop' : 'play'}"
+                        onclick="${timerRunning ? `stopTimer(${task.id})` : `startTimer(${task.id})`}; event.stopPropagation();">
+                    <i class="fas fa-${timerRunning ? 'stop' : 'play'}"></i>
+                </button>
+            </div>
+        </div>
+        ` : ''}
     `;
     
     card.addEventListener('click', (e) => {
@@ -1676,6 +1850,202 @@ async function importProjects() {
         showNotification('Ошибка при импорте проектов', 'error');
     }
 }
+
+// === ПРОГРЕСС-БАР И ЗАГРУЗКА ИЗОБРАЖЕНИЙ ===
+
+// Функция обновления прогресса
+async function updateTaskProgress(taskId, progress) {
+    try {
+        const response = await fetch(`/admin/tasks/api/tasks/${taskId}/progress`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ progress })
+        });
+        const data = await response.json();
+        if (data.success) {
+            const taskIndex = allTasks.findIndex(t => t.id === taskId);
+            if (taskIndex !== -1) allTasks[taskIndex].progress = progress;
+            return true;
+        }
+        return false;
+    } catch (error) {
+        console.error('Ошибка обновления прогресса:', error);
+        return false;
+    }
+}
+
+// Модальное окно изменения прогресса
+function openProgressModal(taskId, currentProgress) {
+    const task = allTasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal fade';
+    modal.id = 'progressModal';
+    modal.innerHTML = `
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Изменить прогресс: ${escapeHtml(task.title)}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label fw-semibold">Прогресс: <span id="progressValue">${currentProgress}</span>%</label>
+                    <input type="range" class="form-range" id="progressRange" min="0" max="100" value="${currentProgress}" step="5">
+                    <div class="progress mt-3" style="height: 30px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" id="progressPreview"
+                             style="width: ${currentProgress}%">${currentProgress}%</div>
+                    </div>
+                    <div class="mt-4">
+                        <label class="form-label fw-semibold">Прикрепить скриншоты</label>
+                        <div class="alert alert-info"><i class="fas fa-info-circle"></i> Можно вставить скриншот (Ctrl+V)</div>
+                        <input type="file" class="form-control" id="progressImages" multiple accept="image/*">
+                        <div id="imagePreview" class="mt-2"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="saveProgress(${taskId})">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal);
+
+    const rangeInput = modal.querySelector('#progressRange');
+    const valueDisplay = modal.querySelector('#progressValue');
+    const previewBar = modal.querySelector('#progressPreview');
+
+    rangeInput.addEventListener('input', (e) => {
+        const value = e.target.value;
+        valueDisplay.textContent = value;
+        previewBar.style.width = value + '%';
+        previewBar.textContent = value + '%';
+    });
+
+    const fileInput = modal.querySelector('#progressImages');
+    const imagePreview = modal.querySelector('#imagePreview');
+
+    fileInput.addEventListener('change', (e) => {
+        displayImagePreviews(e.target.files, imagePreview);
+    });
+
+    modal.addEventListener('paste', (e) => {
+        const items = e.clipboardData.items;
+        const files = [];
+        for (let item of items) {
+            if (item.type.indexOf('image') !== -1) files.push(item.getAsFile());
+        }
+        if (files.length > 0) {
+            const dt = new DataTransfer();
+            for (let f of fileInput.files) dt.items.add(f);
+            for (let f of files) dt.items.add(f);
+            fileInput.files = dt.files;
+            displayImagePreviews(fileInput.files, imagePreview);
+            showNotification('Изображение добавлено из буфера обмена!', 'success');
+        }
+    });
+
+    modal.addEventListener('hidden.bs.modal', () => modal.remove());
+    bsModal.show();
+}
+
+function displayImagePreviews(files, container) {
+    container.innerHTML = '';
+    for (let file of files) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const preview = document.createElement('div');
+            preview.className = 'd-inline-block position-relative m-2';
+            preview.innerHTML = `
+                <img src="${e.target.result}" style="max-width: 150px; max-height: 150px; border-radius: 8px;" class="shadow-sm">
+                <span class="badge bg-secondary position-absolute top-0 start-100 translate-middle">${file.name}</span>
+            `;
+            container.appendChild(preview);
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+async function saveProgress(taskId) {
+    const modal = document.getElementById('progressModal');
+    const progress = parseInt(modal.querySelector('#progressRange').value);
+    const fileInput = modal.querySelector('#progressImages');
+
+    try {
+        const result = await updateTaskProgress(taskId, progress);
+
+        if (!result) {
+            showNotification('Ошибка обновления прогресса', 'error');
+            return;
+        }
+
+        if (fileInput.files.length > 0) {
+            const formData = new FormData();
+            for (let file of fileInput.files) formData.append('files', file);
+
+            const response = await fetch(`/admin/tasks/api/tasks/${taskId}/upload-image`, {
+                method: 'POST',
+                credentials: 'include',
+                body: formData
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                showNotification(`Прогресс обновлён и загружено ${data.files.length} файлов!`, 'success');
+            }
+        } else {
+            showNotification('Прогресс обновлён!', 'success');
+        }
+
+        bootstrap.Modal.getInstance(modal).hide();
+
+        // Перезагружаем задачи с сервера для отображения актуальных данных
+        await loadAllTasks();
+
+    } catch (error) {
+        console.error('Ошибка сохранения прогресса:', error);
+        showNotification('Ошибка сохранения', 'error');
+    }
+}
+
+// Таймер задачи
+async function startTimer(taskId) {
+    try {
+        const response = await fetch(`/admin/tasks/${taskId}/timer/start`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        const data = await response.json();
+        if (data.success) {
+            showNotification('Таймер запущен', 'success');
+            loadTasksToBoard();
+        }
+    } catch (error) {
+        console.error('Ошибка запуска таймера:', error);
+    }
+}
+
+async function stopTimer(taskId) {
+    try {
+        const response = await fetch(`/admin/tasks/${taskId}/timer/stop`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        const data = await response.json();
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadTasksToBoard();
+        }
+    } catch (error) {
+        console.error('Ошибка остановки таймера:', error);
+    }
+}
+
+console.log('✅ Функции прогресса и загрузки изображений инициализированы');
 
 </script>
 </body>

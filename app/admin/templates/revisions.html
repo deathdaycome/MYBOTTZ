@@ -110,7 +110,10 @@
                         <option value="">Все статусы</option>
                         <option value="pending">В ожидании</option>
                         <option value="in_progress">В работе</option>
+                        <option value="review">На проверке</option>
                         <option value="completed">Выполнено</option>
+                        <option value="approved">Принято клиентом</option>
+                        <option value="needs_rework">Требует доработки</option>
                         <option value="rejected">Отклонено</option>
                     </select>
                 </div>
@@ -158,6 +161,8 @@
                             <th>Заголовок</th>
                             <th>Статус</th>
                             <th>Приоритет</th>
+                            <th>Прогресс</th>
+                            <th>Время</th>
                             <th>Создал</th>
                             <th>Исполнитель</th>
                             <th>Дата создания</th>
@@ -305,6 +310,9 @@
             <div class="modal-footer">
                 <div class="d-flex justify-content-between w-100">
                     <div>
+                        <button type="button" class="btn btn-primary" id="sendForReviewBtn" onclick="sendRevisionForReview()" style="display: none;">
+                            <i class="fas fa-paper-plane"></i> Отправить на проверку
+                        </button>
                         <button type="button" class="btn btn-success" id="completeRevisionBtn" onclick="updateRevisionStatus('completed')" style="display: none;">
                             <i class="fas fa-check"></i> Завершить правку
                         </button>
@@ -374,7 +382,10 @@
 
 .status-pending { color: #ffc107; }
 .status-in_progress { color: #007bff; }
+.status-review { color: #17a2b8; }
 .status-completed { color: #28a745; }
+.status-approved { color: #20c997; }
+.status-needs_rework { color: #fd7e14; }
 .status-rejected { color: #dc3545; }
 
 .message-item {
@@ -439,6 +450,105 @@
     border: 1px solid #dee2e6;
     border-radius: 5px;
     background-color: #f8f9fa;
+}
+
+/* Современный прогресс-бар и таймер для правок */
+.revision-progress-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 120px;
+}
+
+.progress-modern {
+    flex: 1;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.progress-modern:hover {
+    transform: scale(1.02);
+}
+
+.progress-bar-modern {
+    height: 8px;
+    background: rgba(99, 102, 241, 0.15);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-fill-modern {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1 0%, #818cf8 100%);
+    border-radius: 10px;
+    transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+}
+
+.progress-label-modern {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #6366f1;
+    display: block;
+    text-align: center;
+    margin-top: 2px;
+}
+
+.timer-modern {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.5rem;
+    background: rgba(99, 102, 241, 0.08);
+    border-radius: 8px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    min-width: 90px;
+}
+
+.timer-modern i {
+    color: #6366f1;
+    font-size: 0.9rem;
+}
+
+.timer-value-modern {
+    font-weight: 600;
+    color: #4b5563;
+    font-variant-numeric: tabular-nums;
+}
+
+.timer-value-modern.active {
+    color: #6366f1;
+}
+
+.timer-btn-modern {
+    border: none;
+    background: none;
+    color: #6366f1;
+    padding: 0.15rem;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+
+.timer-btn-modern:hover {
+    background: rgba(99, 102, 241, 0.15);
+    transform: scale(1.1);
+}
+
+.timer-btn-modern.stop {
+    color: #ef4444;
+}
+
+.timer-btn-modern.stop:hover {
+    background: rgba(239, 68, 68, 0.15);
 }
 </style>
 
@@ -539,6 +649,16 @@ function renderRevisionsTable(revisions) {
     }
     
     revisions.forEach(revision => {
+        // Обрабатываем прогресс и таймер
+        const progress = revision.progress || 0;
+        const timeSpentSeconds = revision.time_spent_seconds || 0;
+        const timerRunning = revision.timer_started_at !== null && revision.timer_started_at !== undefined;
+
+        // Форматируем время
+        const hours = Math.floor(timeSpentSeconds / 3600);
+        const minutes = Math.floor((timeSpentSeconds % 3600) / 60);
+        const timeFormatted = hours > 0 ? `${hours}ч ${minutes}м` : `${minutes}м`;
+
         const row = document.createElement('tr');
         row.innerHTML = `
             <td>#${revision.revision_number}</td>
@@ -552,6 +672,28 @@ function renderRevisionsTable(revisions) {
             </td>
             <td><span class="badge bg-secondary status-${revision.status}">${getStatusName(revision.status)}</span></td>
             <td><span class="priority-${revision.priority}">${getPriorityName(revision.priority)}</span></td>
+            <td>
+                ${revision.status !== 'completed' ? `
+                <div class="progress-modern" onclick="openRevisionProgressModal(${revision.id}, ${progress}); event.stopPropagation();">
+                    <div class="progress-bar-modern">
+                        <div class="progress-fill-modern" style="width: ${progress}%"></div>
+                    </div>
+                    <span class="progress-label-modern">${progress}%</span>
+                </div>
+                ` : `<span class="text-success">✓ ${progress}%</span>`}
+            </td>
+            <td>
+                ${revision.status !== 'completed' ? `
+                <div class="timer-modern">
+                    <i class="far fa-clock"></i>
+                    <span class="timer-value-modern ${timerRunning ? 'active' : ''}" id="revision-timer-${revision.id}">${timeFormatted}</span>
+                    <button class="timer-btn-modern ${timerRunning ? 'stop' : 'play'}"
+                            onclick="${timerRunning ? `stopRevisionTimer(${revision.id})` : `startRevisionTimer(${revision.id})`}; event.stopPropagation();">
+                        <i class="fas fa-${timerRunning ? 'stop' : 'play'}"></i>
+                    </button>
+                </div>
+                ` : `<span class="text-muted">${timeFormatted}</span>`}
+            </td>
             <td>${revision.created_by ? revision.created_by.first_name || 'Клиент' : 'Неизвестно'}</td>
             <td>${revision.assigned_to ? revision.assigned_to.username : 'Не назначен'}</td>
             <td>${formatDateTime(revision.created_at)}</td>
@@ -565,6 +707,13 @@ function renderRevisionsTable(revisions) {
             </td>
         `;
         tbody.appendChild(row);
+    });
+
+    // Обновляем таймеры для запущенных правок
+    revisions.forEach(revision => {
+        if (revision.timer_started_at && revision.status !== 'completed') {
+            updateRevisionTimerDisplay(revision.id, revision.time_spent_seconds, revision.timer_started_at);
+        }
     });
 }
 
@@ -750,15 +899,21 @@ function renderRevisionModal(revision) {
     `;
     
     // Кнопки управления статусом
+    const sendForReviewBtn = document.getElementById('sendForReviewBtn');
     const completeBtn = document.getElementById('completeRevisionBtn');
     const inProgressBtn = document.getElementById('inProgressRevisionBtn');
-    
+
+    // Показываем кнопку "Отправить на проверку" только если правка в работе
+    sendForReviewBtn.style.display = revision.status === 'in_progress' ? 'inline-block' : 'none';
     completeBtn.style.display = revision.status === 'completed' ? 'none' : 'inline-block';
     inProgressBtn.style.display = revision.status === 'pending' ? 'inline-block' : 'none';
     
     // Загрузка файлов и сообщений
     loadRevisionFiles(revision.id);
     loadRevisionMessages(revision.id);
+
+    // Запускаем автообновление сообщений каждые 5 секунд
+    startMessagesAutoRefresh(revision.id);
 }
 
 // Загрузка файлов правки
@@ -811,30 +966,62 @@ async function loadRevisionFiles(revisionId) {
     }
 }
 
+// Переменная для хранения интервала автообновления
+let messagesRefreshInterval = null;
+
+// Запуск автообновления сообщений
+function startMessagesAutoRefresh(revisionId) {
+    // Очищаем предыдущий интервал если есть
+    if (messagesRefreshInterval) {
+        clearInterval(messagesRefreshInterval);
+    }
+
+    // Устанавливаем новый интервал (обновление каждые 5 секунд)
+    messagesRefreshInterval = setInterval(() => {
+        loadRevisionMessages(revisionId, true); // true = silent update (без скролла)
+    }, 5000);
+}
+
+// Остановка автообновления сообщений
+function stopMessagesAutoRefresh() {
+    if (messagesRefreshInterval) {
+        clearInterval(messagesRefreshInterval);
+        messagesRefreshInterval = null;
+    }
+}
+
 // Загрузка сообщений правки
-async function loadRevisionMessages(revisionId) {
+async function loadRevisionMessages(revisionId, silent = false) {
     try {
-        console.log('Loading revision messages for:', revisionId);
-        
+        if (!silent) {
+            console.log('Loading revision messages for:', revisionId);
+        }
+
         const response = await fetch(`/admin/api/revisions/${revisionId}/messages`);
-        console.log('Messages response status:', response.status);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        console.log('Messages data:', data);
-        
+        if (!silent) {
+            console.log('Messages data:', data);
+        }
+
         const messagesContainer = document.getElementById('revisionMessages');
         if (data.success && data.data && data.data.length > 0) {
+            // Получаем информацию о правке для кнопок
+            const revisionResponse = await fetch(`/admin/api/revisions/${revisionId}`);
+            const revisionData = await revisionResponse.json();
+            const revision = revisionData.data;
+
             messagesContainer.innerHTML = data.data.map(message => `
                 <div class="message-item ${message.is_internal ? 'internal' : ''} ${message.sender_type}">
                     <div class="d-flex justify-content-between align-items-start">
                         <strong>${message.sender_name || 'Неизвестно'}</strong>
                         <small class="text-muted">${formatDateTime(message.created_at)}</small>
                     </div>
-                    <div class="mt-2">${message.content || message.message || 'Нет сообщения'}</div>
+                    <div class="mt-2">${(message.message || message.content || 'Нет сообщения').replace(/\n/g, '<br>')}</div>
                     ${message.files && message.files.length > 0 ? `
                         <div class="mt-2">
                             ${message.files.map(file => `
@@ -862,6 +1049,19 @@ async function loadRevisionMessages(revisionId) {
                         </div>
                     ` : ''}
                     ${message.is_internal ? '<small class="text-warning"><i class="fas fa-eye-slash"></i> Внутреннее сообщение</small>' : ''}
+                    ${revision.test_link ? `
+                        <div class="mt-3 d-flex gap-2">
+                            <a href="${revision.test_link}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-external-link-alt"></i> Проверить правку
+                            </a>
+                            <button class="btn btn-sm btn-success" onclick="approveRevisionFromChat(${revision.id})">
+                                <i class="fas fa-check"></i> Принять
+                            </button>
+                            <button class="btn btn-sm btn-warning" onclick="rejectRevisionFromChat(${revision.id})">
+                                <i class="fas fa-times"></i> На доработку
+                            </button>
+                        </div>
+                    ` : ''}
                 </div>
             `).join('');
         } else {
@@ -954,9 +1154,9 @@ async function updateRevisionStatus(status) {
             },
             body: JSON.stringify({ status: status })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             showAlert('success', 'Статус правки обновлен');
             loadRevisions();
@@ -971,12 +1171,44 @@ async function updateRevisionStatus(status) {
     }
 }
 
+async function sendRevisionForReview() {
+    if (!confirm('Отправить правку на проверку клиенту?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/admin/api/revisions/${currentRevisionId}/send-for-review`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showAlert('success', 'Правка отправлена клиенту на проверку!');
+            loadRevisions();
+            loadStats();
+            viewRevision(currentRevisionId); // Обновляем модальное окно
+        } else {
+            showAlert('error', data.error || 'Ошибка при отправке на проверку');
+        }
+    } catch (error) {
+        console.error('Error sending revision for review:', error);
+        showAlert('error', 'Ошибка при отправке на проверку');
+    }
+}
+
 // Вспомогательные функции
 function getStatusName(status) {
     const statuses = {
         'pending': 'В ожидании',
         'in_progress': 'В работе',
+        'review': 'На проверке',
         'completed': 'Выполнено',
+        'approved': 'Принято клиентом',
+        'needs_rework': 'Требует доработки',
         'rejected': 'Отклонено'
     };
     return statuses[status] || status;
@@ -1075,5 +1307,169 @@ document.addEventListener('keydown', function(event) {
         closeAllModals();
     }
 });
+
+// Функции для работы с прогрессом и таймером правок
+function openRevisionProgressModal(revisionId, currentProgress) {
+    const newProgress = prompt(`Укажите прогресс выполнения правки (0-100):`, currentProgress);
+    if (newProgress !== null) {
+        const progress = parseInt(newProgress);
+        if (isNaN(progress) || progress < 0 || progress > 100) {
+            showAlert('error', 'Прогресс должен быть числом от 0 до 100');
+            return;
+        }
+        updateRevisionProgress(revisionId, progress);
+    }
+}
+
+async function updateRevisionProgress(revisionId, progress) {
+    try {
+        const response = await fetch(`/admin/api/revisions/${revisionId}/progress`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ progress })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showAlert('success', 'Прогресс обновлён');
+            loadRevisions();
+        } else {
+            showAlert('error', data.error || 'Ошибка при обновлении прогресса');
+        }
+    } catch (error) {
+        console.error('Error updating revision progress:', error);
+        showAlert('error', 'Ошибка при обновлении прогресса');
+    }
+}
+
+async function startRevisionTimer(revisionId) {
+    try {
+        const response = await fetch(`/admin/api/revisions/${revisionId}/timer/start`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            loadRevisions();
+        } else {
+            showAlert('error', data.error || 'Ошибка при запуске таймера');
+        }
+    } catch (error) {
+        console.error('Error starting revision timer:', error);
+        showAlert('error', 'Ошибка при запуске таймера');
+    }
+}
+
+async function stopRevisionTimer(revisionId) {
+    try {
+        const response = await fetch(`/admin/api/revisions/${revisionId}/timer/stop`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            loadRevisions();
+        } else {
+            showAlert('error', data.error || 'Ошибка при остановке таймера');
+        }
+    } catch (error) {
+        console.error('Error stopping revision timer:', error);
+        showAlert('error', 'Ошибка при остановке таймера');
+    }
+}
+
+function updateRevisionTimerDisplay(revisionId, baseSeconds, startedAt) {
+    const timerElement = document.getElementById(`revision-timer-${revisionId}`);
+    if (!timerElement) return;
+
+    const startTime = new Date(startedAt).getTime();
+
+    function updateTime() {
+        const now = Date.now();
+        const elapsedSeconds = Math.floor((now - startTime) / 1000);
+        const totalSeconds = baseSeconds + elapsedSeconds;
+
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+        timerElement.textContent = hours > 0 ? `${hours}ч ${minutes}м` : `${minutes}м`;
+    }
+
+    updateTime();
+    setInterval(updateTime, 1000);
+}
+
+// Обработчик закрытия модального окна правки
+document.getElementById('viewRevisionModal')?.addEventListener('hidden.bs.modal', function () {
+    stopMessagesAutoRefresh();
+});
+
+// Принять правку из чата
+async function approveRevisionFromChat(revisionId) {
+    if (!confirm('Вы уверены, что хотите принять эту правку?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/admin/api/revisions/${revisionId}/approve`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showAlert('success', 'Правка принята!');
+            // Закрываем модальное окно
+            const modal = bootstrap.Modal.getInstance(document.getElementById('viewRevisionModal'));
+            modal?.hide();
+            // Обновляем список правок
+            loadRevisions();
+        } else {
+            showAlert('error', data.error || 'Ошибка при принятии правки');
+        }
+    } catch (error) {
+        console.error('Error approving revision:', error);
+        showAlert('error', 'Ошибка при принятии правки');
+    }
+}
+
+// Отправить правку на доработку из чата
+async function rejectRevisionFromChat(revisionId) {
+    const reason = prompt('Укажите причину отправки на доработку:');
+    if (!reason) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/admin/api/revisions/${revisionId}/reject`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ reason })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            showAlert('success', 'Правка отправлена на доработку');
+            // Закрываем модальное окно
+            const modal = bootstrap.Modal.getInstance(document.getElementById('viewRevisionModal'));
+            modal?.hide();
+            // Обновляем список правок
+            loadRevisions();
+        } else {
+            showAlert('error', data.error || 'Ошибка при отправке на доработку');
+        }
+    } catch (error) {
+        console.error('Error rejecting revision:', error);
+        showAlert('error', 'Ошибка при отправке на доработку');
+    }
+}
 </script>
 {% endblock %}

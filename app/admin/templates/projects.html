@@ -1439,128 +1439,7 @@ tr .project-color-indicator {
 </div>
 
 <!-- Edit Project Modal -->
-<div class="modal fade" id="editProjectModal" tabindex="-1" aria-labelledby="editProjectModalLabel">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editProjectModalLabel">Редактирование проекта</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="editProjectForm">
-                    <input type="hidden" id="editProjectId">
-                    <div class="mb-3">
-                        <label for="editProjectTitle" class="form-label">Название проекта</label>
-                        <input type="text" class="form-control" id="editProjectTitle" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="editProjectDescription" class="form-label">Описание</label>
-                        <textarea class="form-control" id="editProjectDescription" rows="4"></textarea>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectType" class="form-label">Тип проекта</label>
-                            <select class="form-select" id="editProjectType">
-                                <option value="web">Веб-сайт</option>
-                                <option value="bot">Telegram Bot</option>
-                                <option value="mobile">Мобильное приложение</option>
-                                <option value="desktop">Десктопное приложение</option>
-                                <option value="integration">Интеграция</option>
-                                <option value="consultation">Консультация</option>
-                                <option value="other">Другое</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectStatus" class="form-label">Статус</label>
-                            <select class="form-select" id="editProjectStatus">
-                                <option value="new">Новый</option>
-                                <option value="review">На рассмотрении</option>
-                                <option value="accepted">Принят</option>
-                                <option value="in_progress">В работе</option>
-                                <option value="testing">Тестирование</option>
-                                <option value="completed">Завершен</option>
-                                <option value="cancelled">Отменен</option>
-                                <option value="on_hold">Приостановлен</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectComplexity" class="form-label">Сложность</label>
-                            <select class="form-select" id="editProjectComplexity">
-                                <option value="simple">Простой</option>
-                                <option value="medium">Средний</option>
-                                <option value="complex">Сложный</option>
-                                <option value="premium">Премиум</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectPriority" class="form-label">Приоритет</label>
-                            <select class="form-select" id="editProjectPriority">
-                                <option value="low">Низкий</option>
-                                <option value="normal">Обычный</option>
-                                <option value="high">Высокий</option>
-                                <option value="urgent">Срочный</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectEstimatedCost" class="form-label">Ориентировочная стоимость (₽)</label>
-                            <input type="number" class="form-control" id="editProjectEstimatedCost" min="0" step="1000">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectExecutorCost" class="form-label">Стоимость для исполнителя (₽)</label>
-                            <input type="number" class="form-control" id="editProjectExecutorCost" min="0" step="500">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectFinalCost" class="form-label">Финальная стоимость (₽)</label>
-                            <input type="number" class="form-control" id="editProjectFinalCost" min="0">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectEstimatedHours" class="form-label">Часы (прогноз)</label>
-                            <input type="number" class="form-control" id="editProjectEstimatedHours" min="1" step="1">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectPrepaymentAmount" class="form-label">Предоплата (₽)</label>
-                            <input type="number" class="form-control" id="editProjectPrepaymentAmount" min="0" step="1000">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectClientPaidTotal" class="form-label">Уже заплачено клиентом (₽)</label>
-                            <input type="number" class="form-control" id="editProjectClientPaidTotal" min="0" step="1000">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectExecutorPaidTotal" class="form-label">Выплачено исполнителю (₽)</label>
-                            <input type="number" class="form-control" id="editProjectExecutorPaidTotal" min="0" step="500">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectAssignedExecutor" class="form-label">Назначить исполнителя</label>
-                            <select class="form-select" id="editProjectAssignedExecutor">
-                                <option value="">Выберите исполнителя</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="editProjectDeadline" class="form-label">Дедлайн</label>
-                            <input type="datetime-local" class="form-control" id="editProjectDeadline">
-                        </div>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                <button type="button" class="btn btn-primary" onclick="submitProjectEdit()">Сохранить изменения</button>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Старое статическое модальное окно удалено - используется только динамическое кастомное модальное окно из openEditModal() -->
 
 <!-- Модальное окно для смены статуса проекта -->
 <div class="modal fade" id="changeStatusModal" tabindex="-1" aria-labelledby="changeStatusModalLabel" aria-hidden="true">
@@ -3022,7 +2901,18 @@ tr .project-color-indicator {
                                             <input type="datetime-local" class="form-control" id="editProjectDeadline" value="${formattedDeadline}">
                                         </div>
                                     </div>
-                                    
+
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            🧪 Ссылка на тестовую версию
+                                            <small class="text-muted">(опционально)</small>
+                                        </label>
+                                        <input type="text" class="form-control" id="editProjectTestLink" value="${project.project_metadata?.test_link || ''}" placeholder="https://t.me/your_bot или @your_bot">
+                                        <small class="form-text text-muted">
+                                            Укажите ссылку или username бота (например: https://t.me/test_bot или @test_bot)
+                                        </small>
+                                    </div>
+
                                     <div class="row">
                                         <div class="col-md-4 mb-3">
                                             <label class="form-label">Предоплата (₽)</label>
@@ -3107,12 +2997,26 @@ tr .project-color-indicator {
         const executorPaidTotal = document.getElementById('editProjectExecutorPaidTotal').value;
         const assignedExecutor = document.getElementById('editProjectAssignedExecutor').value;
         const deadline = document.getElementById('editProjectDeadline').value;
-        
-        if (!title.trim()) {
+        let testLink = document.getElementById('editProjectTestLink').value;
+
+        console.log('submitProjectEdit вызван:', {projectId, title, testLink});
+
+        if (!title || !title.trim()) {
+            console.error('Ошибка: название пустое', title);
             showNotification('Название проекта обязательно', 'warning');
             return;
         }
-        
+
+        // Конвертируем @username в ссылку
+        if (testLink && testLink.trim()) {
+            testLink = testLink.trim();
+            if (testLink.startsWith('@')) {
+                testLink = `https://t.me/${testLink.substring(1)}`;
+            } else if (!testLink.startsWith('http://') && !testLink.startsWith('https://')) {
+                testLink = `https://t.me/${testLink}`;
+            }
+        }
+
         try {
             const response = await fetch(`/admin/api/projects/${projectId}`, {
                 method: 'PUT',
@@ -3135,7 +3039,8 @@ tr .project-color-indicator {
                     client_paid_total: clientPaidTotal ? parseFloat(clientPaidTotal) : null,
                     executor_paid_total: executorPaidTotal ? parseFloat(executorPaidTotal) : null,
                     assigned_executor_id: assignedExecutor || null,
-                    deadline: deadline || null
+                    deadline: deadline || null,
+                    test_link: testLink || null
                 })
             });
             

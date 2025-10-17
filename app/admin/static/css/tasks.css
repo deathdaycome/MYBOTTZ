@@ -1026,30 +1026,64 @@ h4 {
         width: 100%;
     }
 }
-/* Прогресс-бар для задач */
-.task-progress-container {
-    margin: 0.5rem 0;
+/* Дедлайн */
+.task-deadline-info {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-top: 0.625rem;
 }
 
-.task-progress-bar {
-    width: 100%;
+.task-deadline-info i {
+    color: #94a3b8;
+}
+
+/* Современный футер с прогрессом и таймером */
+.task-footer-modern {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Прогресс (занимает больше места) */
+.progress-modern {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.progress-modern:hover {
+    transform: translateY(-1px);
+}
+
+.progress-bar-modern {
+    flex: 1;
     height: 8px;
-    background: #e5e7eb;
+    background: rgba(99, 102, 241, 0.1);
     border-radius: 10px;
     overflow: hidden;
     position: relative;
 }
 
-.task-progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #10b981, #34d399);
-    border-radius: 10px;
-    transition: width 0.3s ease;
-    position: relative;
-    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
+.progress-modern:hover .progress-bar-modern {
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
-.task-progress-fill::after {
+.progress-fill-modern {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1 0%, #818cf8 100%);
+    border-radius: 10px;
+    transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+}
+
+.progress-fill-modern::after {
     content: '';
     position: absolute;
     top: 0;
@@ -1057,80 +1091,85 @@ h4 {
     right: 0;
     bottom: 0;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-    animation: shimmer 2s infinite;
+    animation: shimmer-slide 2s infinite;
 }
 
-@keyframes shimmer {
+@keyframes shimmer-slide {
     0% { transform: translateX(-100%); }
     100% { transform: translateX(100%); }
 }
 
-.task-progress-text {
+.progress-label-modern {
     font-size: 0.75rem;
-    color: #6b7280;
-    margin-top: 0.25rem;
+    font-weight: 700;
+    color: #6366f1;
+    min-width: 38px;
     text-align: right;
-    font-weight: 600;
 }
 
-.task-progress-input {
-    width: 100%;
-    margin: 0.5rem 0;
-}
-
-/* Таймер */
-.task-timer {
+/* Таймер (компактный) */
+.timer-modern {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background: #f3f4f6;
-    border-radius: 8px;
-    margin: 0.5rem 0;
-}
-
-.timer-display {
-    font-family: 'Courier New', monospace;
-    font-size: 1rem;
-    font-weight: bold;
-    color: #374151;
-    flex: 1;
-}
-
-.timer-display.running {
-    color: #10b981;
-    animation: pulse-timer 2s ease-in-out infinite;
-}
-
-@keyframes pulse-timer {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-
-.timer-btn {
-    padding: 0.25rem 0.75rem;
-    border: none;
-    border-radius: 6px;
+    gap: 0.4rem;
     font-size: 0.75rem;
+    color: #64748b;
+}
+
+.timer-modern i {
+    color: #94a3b8;
+}
+
+.timer-value-modern {
+    font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
     font-weight: 600;
+    letter-spacing: 0.3px;
+    min-width: 40px;
+}
+
+.timer-value-modern.active {
+    color: #10b981;
+    animation: pulse-timer-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-timer-glow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.65; }
+}
+
+.timer-btn-modern {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.2s ease;
+    font-size: 0.65rem;
 }
 
-.timer-btn-start {
-    background: #10b981;
+.timer-btn-modern.play {
+    background: linear-gradient(135deg, #10b981, #34d399);
     color: white;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.25);
 }
 
-.timer-btn-start:hover {
-    background: #059669;
+.timer-btn-modern.play:hover {
+    background: linear-gradient(135deg, #059669, #10b981);
+    transform: scale(1.08);
+    box-shadow: 0 3px 6px rgba(16, 185, 129, 0.35);
 }
 
-.timer-btn-stop {
-    background: #ef4444;
+.timer-btn-modern.stop {
+    background: linear-gradient(135deg, #ef4444, #f87171);
     color: white;
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.25);
 }
 
-.timer-btn-stop:hover {
-    background: #dc2626;
+.timer-btn-modern.stop:hover {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    transform: scale(1.08);
+    box-shadow: 0 3px 6px rgba(239, 68, 68, 0.35);
 }

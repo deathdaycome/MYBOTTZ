@@ -888,14 +888,27 @@ class RevisionsHandler:
                     'completed_at': revision.completed_at,
                     'estimated_time': revision.estimated_time,
                     'actual_time': revision.actual_time,
+                    'progress': getattr(revision, 'progress', 0),
+                    'time_spent_seconds': getattr(revision, 'time_spent_seconds', 0),
                     'project_title': revision.project.title if revision.project else 'Неизвестно',
                     'assigned_to_username': revision.assigned_to.username if revision.assigned_to else 'Не назначен'
                 }
-                
+
                 # Получаем количество сообщений и файлов
                 messages_count = len(revision.messages) if revision.messages else 0
                 files_count = len(revision.files) if revision.files else 0
             
+            # Форматируем время работы
+            hours = revision_data['time_spent_seconds'] // 3600
+            minutes = (revision_data['time_spent_seconds'] % 3600) // 60
+            time_formatted = f"{hours}ч {minutes}м" if hours > 0 else f"{minutes}м"
+
+            # Создаем визуальный прогресс-бар
+            progress = revision_data['progress']
+            bar_length = 10
+            filled = int(bar_length * progress / 100)
+            progress_bar = '▓' * filled + '░' * (bar_length - filled)
+
             text = f"""
 📋 <b>Правка #{revision_data['revision_number']}</b>
 
@@ -903,6 +916,10 @@ class RevisionsHandler:
 
 <b>📄 Описание:</b>
 {revision_data['description']}
+
+<b>📊 Прогресс выполнения:</b>
+{progress_bar} {progress}%
+⏱ Потрачено времени: {time_formatted}
 
 <b>📊 Информация:</b>
 • Статус: {self._get_revision_status_emoji(revision_data['status'])} {self._get_revision_status_name(revision_data['status'])}

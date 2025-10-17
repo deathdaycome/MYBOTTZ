@@ -104,18 +104,22 @@ class NotificationService:
     async def notify_project_status_changed(self, project: Project, old_status: str, user: User) -> bool:
         """Уведомление об изменении статуса проекта"""
         status_names = {
-            'new': 'Новый',
+            'new': 'Новый запрос',
             'review': 'На рассмотрении',
-            'accepted': 'Принят',
-            'in_progress': 'В работе',
+            'clarification': 'Требуется уточнение',
+            'proposal_sent': 'Предложение отправлено',
+            'accepted': 'Принят в работу',
+            'in_progress': 'Разрабатывается',
             'testing': 'Тестирование',
             'completed': 'Завершен',
             'cancelled': 'Отменен'
         }
-        
+
         status_emojis = {
             'new': '🆕',
             'review': '👀',
+            'clarification': '❓',
+            'proposal_sent': '📄',
             'accepted': '✅',
             'in_progress': '🔄',
             'testing': '🧪',
@@ -173,15 +177,17 @@ class NotificationService:
     def _get_status_description(self, status: str) -> str:
         """Получение описания статуса для клиента"""
         descriptions = {
-            'new': 'Ваш проект зарегистрирован в системе. Мы скоро свяжемся с вами для уточнения деталей.',
-            'review': 'Мы изучаем ваш проект и готовим предложение. Ожидайте звонка в ближайшее время.',
+            'new': 'Ваш запрос зарегистрирован в системе. Мы скоро свяжемся с вами для уточнения деталей.',
+            'review': 'Мы изучаем ваш запрос и готовим предложение. Ожидайте звонка в ближайшее время.',
+            'clarification': 'Нам нужны дополнительные детали по вашему запросу. Менеджер свяжется с вами в ближайшее время.',
+            'proposal_sent': 'Мы подготовили коммерческое предложение. Ознакомьтесь с ним и дайте знать, если есть вопросы.',
             'accepted': 'Отлично! Ваш проект принят в работу. Мы свяжемся с вами для подписания договора.',
             'in_progress': 'Разработка началась! Мы будем регулярно информировать вас о прогрессе.',
             'testing': 'Проект находится на стадии тестирования. Скоро пришлем вам демо для ознакомления.',
             'completed': 'Поздравляем! Ваш проект готов. Спасибо за доверие!',
             'cancelled': 'К сожалению, проект был отменен. Если у вас есть вопросы, свяжитесь с нами.'
         }
-        
+
         return descriptions.get(status, 'Статус проекта обновлен.')
     
     async def notify_error(self, error_message: str, context: Dict[str, Any] = None) -> bool:
@@ -497,42 +503,104 @@ class NotificationService:
         
         return admin_sent and client_sent
     
-    async def notify_revision_message(self, revision, project: Project, message, sender_user: User, recipient_user: User) -> bool:
-        """Уведомление о новом сообщении в правке"""
-        # Проверяем, что пользователи существуют и имеют telegram_id
+    async def notify_revision_message(self, revision, project: Project, message, sender_user, recipient_user: User) -> bool:
+        """Отправка простого сообщения о новом ответе от исполнителя"""
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        from datetime import datetime
+
+        # Проверяем, что получатель существует и имеет telegram_id
         if not recipient_user or not recipient_user.telegram_id:
             logger.warning(f"Recipient user not found or missing telegram_id for revision {revision.id}")
             return False
-            
+
+        # Определяем отправителя
         if not sender_user:
             sender_name = "Команда"
-            sender_type = "исполнитель"
+        elif isinstance(sender_user, AdminUser):
+            sender_name = f"{sender_user.first_name or ''} {sender_user.last_name or ''}".strip() or sender_user.username or "Команда"
         else:
             sender_name = sender_user.first_name or 'Неизвестно'
-            if hasattr(sender_user, 'telegram_id') and sender_user.telegram_id:
-                sender_type = "клиент" if sender_user.telegram_id == project.user_id else "исполнитель"
-            else:
-                sender_type = "исполнитель"
-        
+
+        # Эмодзи статусов
+        status_emoji = {
+            'open': '🆕',
+            'in_progress': '🔄',
+            'completed': '✅',
+            'rejected': '❌'
+        }
+
+        status_names = {
+            'open': 'Новая',
+            'in_progress': 'В работе',
+            'completed': 'Выполнена',
+            'rejected': 'Доработка'
+        }
+
+        current_status = status_emoji.get(revision.status, '📋')
+        status_text = status_names.get(revision.status, 'В обработке')
+
+        # Вычисляем время
+        time_diff = datetime.utcnow() - message.created_at
+        if time_diff.seconds < 60:
+            time_ago = "только что"
+        elif time_diff.seconds < 3600:
+            minutes = time_diff.seconds // 60
+            time_ago = f"{minutes} мин. назад"
+        else:
+            hours = time_diff.seconds // 3600
+            time_ago = f"{hours} ч. назад"
+
+        # Формируем простое сообщение как в обычном чате
         message_text = f"""
-💬 <b>Новое сообщение по правке</b>
+👨‍💼 <b>{sender_name}</b> ответил:
 
-📋 <b>Проект:</b> {project.title}
-🔢 <b>Правка:</b> #{revision.revision_number}
-👤 <b>От:</b> {sender_name} ({sender_type})
+📋 <b>Правка #{revision.revision_number}:</b> {revision.title}
+{current_status} <i>{status_text}</i>
 
-📝 <b>Сообщение:</b>
-{message.message[:300]}{'...' if len(message.message) > 300 else ''}
+{message.message}
 
-⏰ <b>Время:</b> {message.created_at.strftime('%d.%m.%Y %H:%M')}
+<i>{time_ago}</i>
         """
-        
-        # Отправляем текстовое сообщение
-        result = await self.send_user_notification(recipient_user.telegram_id, message_text)
-        
-        # Отправляем изображения если есть
-        await self._send_revision_message_images(recipient_user.telegram_id, message, sender_name, sender_type)
-        
+
+        logger.info(f"Отправка сообщения клиенту {recipient_user.telegram_id} о новом ответе в правке {revision.id}")
+
+        # Формируем URL для открытия мини-аппа сразу на странице чата с правкой
+        from telegram import WebAppInfo
+        miniapp_url = f"{settings.MINIAPP_URL}/revisions/{revision.id}/chat"
+
+        # Создаем удобные кнопки
+        keyboard_buttons = [
+            [InlineKeyboardButton("💬 Открыть чат", web_app=WebAppInfo(url=miniapp_url))],
+            [InlineKeyboardButton("✍️ Ответить в боте", callback_data=f"revision_write_{revision.id}")],
+            [InlineKeyboardButton("📋 Все правки", callback_data="my_revisions")]
+        ]
+
+        # Добавляем контекстные кнопки в зависимости от статуса
+        if revision.status == 'completed':
+            keyboard_buttons.insert(2, [
+                InlineKeyboardButton("✅ Принять работу", callback_data=f"revision_approve_{revision.id}"),
+                InlineKeyboardButton("🔄 Доработка", callback_data=f"revision_reject_{revision.id}")
+            ])
+
+        keyboard = InlineKeyboardMarkup(keyboard_buttons)
+
+        # Отправляем простое сообщение с кнопками
+        try:
+            await self.bot.send_message(
+                chat_id=recipient_user.telegram_id,
+                text=message_text,
+                parse_mode='HTML',
+                reply_markup=keyboard
+            )
+            result = True
+            logger.info(f"Сообщение успешно отправлено клиенту {recipient_user.telegram_id}")
+        except Exception as e:
+            logger.error(f"Не удалось отправить сообщение клиенту {recipient_user.telegram_id}: {e}")
+            result = False
+
+        # Отправляем изображения/файлы если есть (как обычные сообщения в чате)
+        await self._send_revision_message_images(recipient_user.telegram_id, message, sender_name, "")
+
         return result
     
     def _get_revision_status_description(self, status: str) -> str:
@@ -648,3 +716,21 @@ async def notify_error(error: str, context: Dict[str, Any] = None) -> bool:
 async def notify_avito_message(chat_id: str, client_name: str, message_text: str) -> bool:
     """Быстрое уведомление о новом сообщении с Avito"""
     return await notification_service.send_avito_notification(chat_id, client_name, message_text)
+
+async def notify_new_project_request(project_id: int, user_id: int, project_type: str) -> bool:
+    """Уведомление о новом быстром запросе проекта"""
+    message = f"""
+⚡ <b>Новый быстрый запрос!</b>
+
+📋 <b>Проект:</b> #{project_id}
+🎯 <b>Тип:</b> {project_type}
+👤 <b>Клиент ID:</b> {user_id}
+
+⏰ <b>Действия:</b>
+• Свяжитесь с клиентом в течение 1-2 часов
+• Уточните требования к проекту
+• Подготовьте коммерческое предложение
+
+Откройте админ-панель для управления запросом.
+    """
+    return await notification_service.send_admin_notification(message)

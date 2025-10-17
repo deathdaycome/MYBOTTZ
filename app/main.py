@@ -24,6 +24,7 @@ from app.bot.handlers.admin import AdminHandler, admin_command, stats_command, r
 from app.bot.handlers.consultant import ConsultantHandler
 from app.bot.handlers.projects import ProjectsHandler
 from app.bot.handlers.revisions import RevisionsHandler
+from app.bot.handlers.revision_chat_handlers import RevisionChatHandlers
 from app.bot.handlers.tz_creation import TZCreationHandler
 from app.bot.handlers.common import CommonHandler
 from app.bot.handlers.portfolio import PortfolioHandler
@@ -54,11 +55,60 @@ except Exception as e:
 async def lifespan(app: FastAPI):
     """Управление жизненным циклом приложения"""
     # Startup
+    print("=" * 80)
+    print("🚀🚀🚀 LIFESPAN STARTUP НАЧАЛСЯ!!!")
+    print("=" * 80)
     logger.info("🚀 Запуск приложения...")
-    
-    # Запускаем Telegram-бот
-    logger.info("📱 Запускаем Telegram-бот...")
-    asyncio.create_task(bot_instance.run())
+
+    # Запускаем Telegram-бот НАПРЯМУЮ без create_task
+    try:
+        print("=" * 80)
+        print("📱📱📱 НАЧИНАЕМ ЗАПУСК TELEGRAM-БОТА НАПРЯМУЮ!!!")
+        print("=" * 80)
+        logger.info("📱 Запускаем Telegram-бот...")
+
+        # Инициализируем бота
+        print("🔧 Инициализация бота...")
+        await bot_instance.application.initialize()
+        print("✅ Бот инициализирован")
+
+        # Запускаем бота
+        print("🚀 Запуск бота...")
+        await bot_instance.application.start()
+        print("✅ Бот запущен")
+
+        # Запускаем polling в фоне с обработкой ошибок
+        async def start_polling_with_logging():
+            try:
+                print("📡📡📡 Запуск UPDATER.start_polling()...")
+                await bot_instance.application.updater.start_polling(
+                    allowed_updates=["message", "callback_query"],
+                    drop_pending_updates=True
+                )
+                print("✅ Updater запущен, polling работает!")
+                print("⏳ Ждём updates от Telegram...")
+
+                # Бесконечный цикл чтобы держать polling alive
+                while True:
+                    await asyncio.sleep(60)
+                    print("💓 Polling жив и работает...")
+
+            except Exception as e:
+                print(f"❌❌❌ ОШИБКА В POLLING: {e}")
+                import traceback
+                traceback.print_exc()
+
+        asyncio.create_task(start_polling_with_logging())
+        print("✅✅✅ POLLING TASK СОЗДАН! БОТ ГОТОВ К РАБОТЕ!")
+
+    except Exception as e:
+        print("=" * 80)
+        print(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА ПРИ ЗАПУСКЕ БОТА: {e}")
+        print("=" * 80)
+        logger.error(f"❌❌❌ КРИТИЧЕСКАЯ ОШИБКА ПРИ ЗАПУСКЕ БОТА: {e}", exc_info=True)
+        import traceback
+        traceback.print_exc()
+        raise
     
     # Запускаем планировщик автоматизации
     try:
@@ -162,6 +212,10 @@ app.include_router(admin_router, prefix="/admin")
 # Это позволит работать как с /admin/projects, так и с /projects
 app.include_router(admin_router)
 
+# Подключаем API для Telegram Mini App
+from app.api.miniapp import router as miniapp_router
+app.include_router(miniapp_router)
+
 # Подключаем статические файлы
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/admin/static", StaticFiles(directory="app/admin/static"), name="admin_static")
@@ -174,12 +228,28 @@ class TelegramBot:
         """Инициализация бота, логгера и других компонентов."""
         self.settings = get_settings()
         self.logger = logging.getLogger(__name__)
-        
+
+        # Настройки для httpx - ФИКС СЕТЕВЫХ ПРОБЛЕМ!
+        from telegram.request import HTTPXRequest
+        import httpx
+
+        # Создаём request с правильными настройками
+        request = HTTPXRequest(
+            connection_pool_size=100,
+            connect_timeout=30.0,
+            read_timeout=30.0,
+            write_timeout=30.0,
+            pool_timeout=30.0,
+            http_version="1.1"
+        )
+
         persistence = PicklePersistence(filepath=self.settings.bot_persistence_file)
         self.application = (
             Application.builder()
             .token(self.settings.bot_token)
             .persistence(persistence)
+            .request(request)  # Используем наш настроенный request
+            .get_updates_request(request)  # И для get_updates тоже
             .build()
         )
         
@@ -188,23 +258,42 @@ class TelegramBot:
 
     def setup_handlers(self):
         """Настройка обработчиков команд и сообщений."""
+
+        # ГЛОБАЛЬНЫЙ ЛОГГЕР ВСЕХ UPDATES - САМЫЙ ПЕРВЫЙ!
+        async def log_all_updates(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Логирует ВСЕ updates от Telegram"""
+            print("=" * 80)
+            print(f"🔔🔔🔔 ПОЛУЧЕН UPDATE ОТ TELEGRAM!")
+            print(f"Update ID: {update.update_id}")
+            if update.message:
+                print(f"📨 Тип: MESSAGE, текст: {update.message.text}")
+            if update.callback_query:
+                print(f"🔘 Тип: CALLBACK_QUERY, data: {update.callback_query.data}")
+            print("=" * 80)
+
+        # Добавляем глобальный обработчик ПЕРВЫМ!
+        from telegram.ext import TypeHandler
+        self.application.add_handler(TypeHandler(Update, log_all_updates), group=-1)
+
         start_handler = StartHandler()
         admin_handler_instance = AdminHandler()
         consultant_handler_instance = ConsultantHandler()
         projects_handler_instance = ProjectsHandler()
         revisions_handler_instance = RevisionsHandler()
+        revision_chat_handler_instance = RevisionChatHandlers()  # ДОБАВЛЕН!
         tz_creation_handler_instance = TZCreationHandler()
         common_handler_instance = CommonHandler()
         portfolio_handler_instance = PortfolioHandler()
-        
+
         # Получаем централизованный роутер
         router = get_callback_router()
         
         # Регистрируем все маршруты в роутере только если они еще не зарегистрированы
         if len(router.routes) == 0:
-            self.register_callback_routes(router, start_handler, admin_handler_instance, 
+            self.register_callback_routes(router, start_handler, admin_handler_instance,
                                         consultant_handler_instance, projects_handler_instance,
-                                        revisions_handler_instance, tz_creation_handler_instance,
+                                        revisions_handler_instance, revision_chat_handler_instance,
+                                        tz_creation_handler_instance,
                                         common_handler_instance, portfolio_handler_instance)
 
         # КРИТИЧЕСКИЙ ПРИОРИТЕТ: Специальный перехватчик (САМЫЙ ПЕРВЫЙ!)
@@ -238,9 +327,44 @@ class TelegramBot:
         
         # ЕДИНЫЙ ОБРАБОТЧИК ВСЕХ CALLBACK'ОВ ЧЕРЕЗ РОУТЕР
         self.application.add_handler(CallbackQueryHandler(router.route))
-        
-        # MessageHandler для настроек (ВРЕМЕННО ОТКЛЮЧЕН для тестирования)
-        # self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, settings_interceptor))
+
+        # MessageHandler для быстрого создания проекта
+        from app.bot.handlers.quick_project_request import QuickProjectRequestHandler
+        quick_project_handler_instance = QuickProjectRequestHandler()
+
+        async def text_message_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+            """Роутер для текстовых сообщений"""
+            try:
+                # Проверяем состояние быстрого создания проекта
+                quick_state = context.user_data.get('quick_project_state')
+
+                if quick_state == 'waiting_project_name':
+                    await quick_project_handler_instance.handle_project_name(update, context)
+                    return
+                elif quick_state == 'waiting_project_description':
+                    await quick_project_handler_instance.handle_project_description(update, context)
+                    return
+                elif quick_state == 'waiting_project_budget':
+                    await quick_project_handler_instance.handle_project_budget(update, context)
+                    return
+
+                # Проверяем флаги настроек
+                if context.user_data.get('waiting_bot_token_settings'):
+                    await common_handler_instance.save_bot_token_settings(update, context)
+                    return
+
+                if context.user_data.get('waiting_timeweb_settings'):
+                    await common_handler_instance.save_timeweb_settings(update, context)
+                    return
+
+                # Остальная обработка текста
+                await common_handler_instance.handle_text_input(update, context)
+
+            except Exception as e:
+                logger.error(f"Ошибка в text_message_router: {e}")
+                await common_handler_instance.handle_text_input(update, context)
+
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message_router))
         
         # Админские команды
         self.application.add_handler(CommandHandler("admin", admin_command))
@@ -319,8 +443,8 @@ class TelegramBot:
             universal_text_router
         ))
     
-    def register_callback_routes(self, router, start_handler, admin_handler, consultant_handler, 
-                               projects_handler, revisions_handler, tz_handler, common_handler, portfolio_handler):
+    def register_callback_routes(self, router, start_handler, admin_handler, consultant_handler,
+                               projects_handler, revisions_handler, revision_chat_handler, tz_handler, common_handler, portfolio_handler):
         """Регистрирует все callback маршруты в централизованном роутере"""
         
         # ПРИОРИТЕТ 1 (САМЫЙ ВЫСОКИЙ): Специфичные ID-based маршруты
@@ -350,7 +474,27 @@ class TelegramBot:
         # Приоритеты правок
         router.register(r"^priority_(low|normal|high|urgent)_\d+$", revisions_handler.handle_revision_priority,
                        priority=10, description="Установить приоритет правки")
-        
+
+        # ЧАТ ПРАВОК - НОВЫЕ ХЕНДЛЕРЫ!
+        router.register(r"^revision_chat_\d+$", revision_chat_handler.show_revision_chat,
+                       priority=10, description="Открыть чат правки")
+        router.register(r"^revision_write_\d+$", revision_chat_handler.start_write_message,
+                       priority=10, description="Начать писать сообщение в чат правки")
+        router.register(r"^revision_close_chat_\d+$", revision_chat_handler.close_chat,
+                       priority=10, description="Закрыть чат правки")
+        router.register(r"^my_revisions$", revision_chat_handler.show_all_my_revisions,
+                       priority=10, description="Показать все правки пользователя")
+        router.register(r"^revision_approve_\d+$", revision_chat_handler.approve_revision,
+                       priority=10, description="Принять правку")
+        router.register(r"^revision_reject_\d+$", revision_chat_handler.reject_revision,
+                       priority=10, description="Отправить правку на доработку")
+        router.register(r"^revision_client_approve_\d+$", revision_chat_handler.client_approve_revision,
+                       priority=10, description="Клиент принимает правку")
+        router.register(r"^revision_client_reject_\d+$", revision_chat_handler.client_reject_revision,
+                       priority=10, description="Клиент отправляет правку на доработку")
+        router.register(r"^revision_cancel_reject_\d+$", revision_chat_handler.cancel_reject_revision,
+                       priority=10, description="Отменить отправку на доработку")
+
         # ПРИОРИТЕТ 2: Проекты общие
         router.register(r"^list_projects$", projects_handler.show_user_projects,
                        priority=20, description="Показать проекты пользователя")
@@ -374,6 +518,18 @@ class TelegramBot:
         # router.register(r"^portfolio_nav_\d+$", portfolio_handler.navigate_project,
         #                priority=30, description="Навигация между проектами")
         
+        # ПРИОРИТЕТ 3.5: Quick Request (ВЫСОКИЙ ПРИОРИТЕТ!)
+        from app.bot.handlers.quick_project_request import QuickProjectRequestHandler
+        quick_handler = QuickProjectRequestHandler()
+        router.register(r"^quick_request$", quick_handler.show_quick_request_menu,
+                       priority=35, description="Быстрый запрос проекта")
+        router.register(r"^quick_(telegram|miniapp|whatsapp|android|ios)$", quick_handler.handle_quick_request,
+                       priority=35, description="Обработка быстрого запроса")
+        router.register(r"^budget_(50000|100000|200000|500000|500000plus|unknown)$", quick_handler.handle_project_budget,
+                       priority=35, description="Выбор бюджета проекта")
+        router.register(r"^deadline_(asap|month|3months|6months|6plus|flexible)$", quick_handler.handle_project_deadline,
+                       priority=35, description="Выбор срока проекта")
+
         # ПРИОРИТЕТ 4: ТЗ Creation (ConversationHandler маршруты)
         router.register(r"^create_tz$", tz_handler.show_tz_creation_menu,
                        priority=40, description="Создать техническое задание")
@@ -462,10 +618,27 @@ class TelegramBot:
 
     async def run(self):
         """Запуск бота в режиме polling."""
-        self.logger.info("Запуск бота в режиме polling...")
-        await self.application.initialize()
-        await self.application.start()
-        await self.application.updater.start_polling()
+        print("=" * 80)
+        print("🤖🤖🤖 МЕТОД RUN() ВЫЗВАН!")
+        print("=" * 80)
+        self.logger.info("🤖🤖🤖 Запуск бота в режиме polling...")
+        try:
+            print("🤖 Шаг 1: Инициализация приложения...")
+            self.logger.info("🤖 Шаг 1: Инициализация приложения...")
+            await self.application.initialize()
+            print("✅ Приложение инициализировано")
+            self.logger.info("✅ Приложение инициализировано")
+
+            self.logger.info("🤖 Шаг 2: Запуск приложения...")
+            await self.application.start()
+            self.logger.info("✅ Приложение запущено")
+
+            self.logger.info("🤖 Шаг 3: Запуск polling...")
+            await self.application.updater.start_polling()
+            self.logger.info("✅✅✅ БОТ УСПЕШНО ЗАПУЩЕН И ПОЛУЧАЕТ UPDATES!")
+        except Exception as e:
+            self.logger.error(f"❌❌❌ ОШИБКА ПРИ ЗАПУСКЕ БОТА: {e}", exc_info=True)
+            raise
 
     async def stop(self):
         """Остановка бота."""
