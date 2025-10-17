@@ -46,12 +46,14 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Копируем код приложения
 COPY app/ ./app/
 COPY migrations/ ./migrations/
+COPY start_services.sh ./
 
 # Копируем собранный Mini App из первой стадии
 COPY --from=miniapp-builder /app/miniapp/dist ./miniapp/dist
 
-# Создаём необходимые директории
-RUN mkdir -p /app/data /app/uploads /app/logs
+# Создаём необходимые директории и делаем скрипт исполняемым
+RUN mkdir -p /app/data /app/uploads /app/logs && \
+    chmod +x /app/start_services.sh
 
 # Переменные окружения
 ENV PYTHONPATH=/app \
@@ -68,10 +70,5 @@ EXPOSE 8000 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/docs || exit 1
 
-# Запускаем приложение
-CMD ["sh", "-c", "\
-    python3 migrations/add_revision_progress_timer.py 2>/dev/null || true && \
-    python3 migrations/add_task_attachments.py 2>/dev/null || true && \
-    python3 migrations/create_crm_tables.py 2>/dev/null || true && \
-    uvicorn app.main:app --host 0.0.0.0 --port 8000 \
-"]
+# Запускаем оба сервиса (API + Admin)
+CMD ["/app/start_services.sh"]
