@@ -86,6 +86,7 @@ pytest.ini
 redeploy_server.sh
 deploy.sh
 *.sh
+!start_services.sh
 
 # Environment
 .env
