@@ -70,8 +70,9 @@ export interface CreateRevisionData {
 
 export interface RevisionStats {
   total: number;
+  open: number;
   pending: number;
   in_progress: number;
   completed: number;
-  rejected: number;
+  needs_rework: number;
 }
