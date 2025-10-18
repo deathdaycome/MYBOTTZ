@@ -8,7 +8,7 @@ from sqlalchemy import and_, or_, desc, asc, func
 from pydantic import BaseModel
 
 from ...database.database import get_db
-from ...database.models import User, AdminUser, ContractorPayment
+from ...database.models import User, AdminUser, ContractorPayment, Task
 from ...config.logging import get_logger
 from ..middleware.auth import require_admin_auth
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -317,33 +317,61 @@ async def delete_contractor(
     """Удалить исполнителя."""
     try:
         logger.info(f"Запрос на удаление исполнителя: {contractor_id}")
-        
+
         # Находим исполнителя
         contractor = db.query(AdminUser).filter(
             AdminUser.id == contractor_id,
             AdminUser.role == 'executor'
         ).first()
-        
+
         if not contractor:
             logger.warning(f"Исполнитель с ID {contractor_id} не найден")
             return {"success": False, "message": "Исполнитель не найден"}
-        
+
         # Проверяем, что не удаляем самого себя
         if contractor.id == current_user.id:
             logger.warning(f"Попытка удалить самого себя: {contractor_id}")
             return {"success": False, "message": "Нельзя удалить самого себя"}
-        
+
+        # Проверяем наличие задач, назначенных на исполнителя
+        assigned_tasks = db.query(Task).filter(Task.assigned_to_id == contractor_id).all()
+
+        if assigned_tasks:
+            # Подсчитываем активные и завершенные задачи
+            active_tasks = [t for t in assigned_tasks if t.status not in ['completed', 'cancelled']]
+
+            if active_tasks:
+                logger.warning(f"Попытка удалить исполнителя {contractor_id} с активными задачами: {len(active_tasks)} шт.")
+                return {
+                    "success": False,
+                    "message": f"Невозможно удалить исполнителя. У него есть {len(active_tasks)} активных задач. Сначала переназначьте или завершите эти задачи."
+                }
+
+            # Если есть только завершенные задачи, переназначаем их на текущего пользователя для истории
+            logger.info(f"Переназначение {len(assigned_tasks)} завершенных задач с исполнителя {contractor_id} на {current_user.id}")
+            for task in assigned_tasks:
+                task.assigned_to_id = current_user.id
+                task.updated_at = datetime.utcnow()
+
+        # Также проверяем задачи, созданные исполнителем
+        created_tasks = db.query(Task).filter(Task.created_by_id == contractor_id).all()
+        if created_tasks:
+            logger.info(f"Переназначение {len(created_tasks)} задач, созданных исполнителем {contractor_id}, на {current_user.id}")
+            for task in created_tasks:
+                task.created_by_id = current_user.id
+                task.updated_at = datetime.utcnow()
+
         # Удаляем исполнителя
         db.delete(contractor)
         db.commit()
-        
+
         logger.info(f"Исполнитель успешно удален: ID={contractor_id}, username={contractor.username}")
-        
+
         return {
             "success": True,
             "message": f"Исполнитель {contractor.username} успешно удален"
         }
-        
+
     except Exception as e:
         logger.error(f"Ошибка при удалении исполнителя {contractor_id}: {str(e)}", exc_info=True)
         db.rollback()
