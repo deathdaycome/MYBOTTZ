@@ -13,7 +13,7 @@ from ..database.database import get_db, get_or_create_user, create_project
 from ..database.models import User, Project, ProjectRevision, RevisionMessage, RevisionMessageFile, RevisionFile
 from ..config.settings import get_settings
 
-router = APIRouter(prefix="/api/miniapp", tags=["miniapp"])
+router = APIRouter(prefix="/api", tags=["miniapp"])
 settings = get_settings()
 
 
