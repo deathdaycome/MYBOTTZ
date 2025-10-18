@@ -3782,67 +3782,142 @@ tr .project-color-indicator {
                         <div class="col-md-8">
                             <h4>${project.title}</h4>
                             <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <strong>Техническое задание:</strong>
-                                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="expandTZ(this)">
-                                        <i class="fas fa-expand-arrows-alt"></i> Развернуть
-                                    </button>
-                                </div>
-                                <div class="description-container" style="max-height: 300px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 0.375rem; padding: 15px; background-color: #f8f9fa;">
-                                    <div class="description-text" style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.5;">
-                                        ${formatTechnicalSpecification(project) || 'Описание отсутствует'}
+                                <div class="card shadow-sm border-0" style="border-left: 4px solid #0d6efd !important;">
+                                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                        <strong><i class="fas fa-file-alt me-2 text-primary"></i>Техническое задание</strong>
+                                        <button type="button" class="btn btn-sm btn-primary shadow-sm" onclick="expandTZ(this)" style="border-radius: 20px;">
+                                            <i class="fas fa-expand-arrows-alt me-1"></i> Развернуть
+                                        </button>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="description-container" style="max-height: 300px; overflow-y: auto;">
+                                            <div class="description-text" style="white-space: pre-wrap; font-size: 0.95rem; line-height: 1.6;">
+                                                ${formatTechnicalSpecification(project) || 'Описание отсутствует'}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <div class="row mt-3">
+                            <!-- Карточки с основной информацией -->
+                            <div class="row mt-3 g-3">
                                 <div class="col-md-6">
-                                    <strong>Статус:</strong>
-                                    <span class="badge status-${project.status} ms-2">${getStatusName(project.status)}</span>
+                                    <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #0d6efd !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-info-circle text-primary me-2" style="font-size: 1.2rem;"></i>
+                                                <strong>Статус</strong>
+                                            </div>
+                                            <span class="badge status-${project.status} fs-6">${getStatusName(project.status)}</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <strong>Сложность:</strong>
-                                    <span class="badge complexity-${project.complexity} ms-2">${project.complexity}</span>
-                                </div>
-                            </div>
-                            
-                            <div class="row mt-2">
-                                <div class="col-md-6">
-                                    <strong>Стоимость:</strong> ${(project.estimated_cost || 0)}₽
-                                    ${project.final_cost && project.final_cost != project.estimated_cost ? 
-                                        `<br><small class="text-success">Финальная: ${project.final_cost}₽</small>` : ''}
-                                </div>
-                                <div class="col-md-6">
-                                    <strong>Дата создания:</strong> ${project.created_at ? new Date(project.created_at).toLocaleDateString() : 'Н/Д'}
-                                    ${project.updated_at && project.updated_at != project.created_at ? 
-                                        `<br><small class="text-muted">Обновлен: ${new Date(project.updated_at).toLocaleDateString()}</small>` : ''}
-                                </div>
-                            </div>
-                            
-                            <div class="row mt-2">
-                                <div class="col-md-6">
-                                    <strong>Тип проекта:</strong> ${project.project_type || 'Не указан'}
-                                </div>
-                                <div class="col-md-6">
-                                    <strong>Приоритет:</strong> ${project.priority || 'Обычный'}
+                                    <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #6c757d !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-layer-group text-secondary me-2" style="font-size: 1.2rem;"></i>
+                                                <strong>Сложность</strong>
+                                            </div>
+                                            <span class="badge complexity-${project.complexity} fs-6">${project.complexity}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            
+
+                            <div class="row mt-3 g-3">
+                                <div class="col-md-6">
+                                    <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #198754 !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-ruble-sign text-success me-2" style="font-size: 1.2rem;"></i>
+                                                <strong>Стоимость</strong>
+                                            </div>
+                                            <div class="fs-5 fw-bold text-success">${(project.estimated_cost || 0)}₽</div>
+                                            ${project.final_cost && project.final_cost != project.estimated_cost ?
+                                                `<small class="text-success">Финальная: ${project.final_cost}₽</small>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #0dcaf0 !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-calendar text-info me-2" style="font-size: 1.2rem;"></i>
+                                                <strong>Дата создания</strong>
+                                            </div>
+                                            <div class="fs-6">${project.created_at ? new Date(project.created_at).toLocaleDateString() : 'Н/Д'}</div>
+                                            ${project.updated_at && project.updated_at != project.created_at ?
+                                                `<small class="text-muted">Обновлен: ${new Date(project.updated_at).toLocaleDateString()}</small>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row mt-3 g-3">
+                                <div class="col-md-6">
+                                    <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #6610f2 !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-cube text-purple me-2" style="font-size: 1.2rem; color: #6610f2;"></i>
+                                                <strong>Тип проекта</strong>
+                                            </div>
+                                            <div class="fs-6">${project.project_type || 'Не указан'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #fd7e14 !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-flag text-warning me-2" style="font-size: 1.2rem; color: #fd7e14;"></i>
+                                                <strong>Приоритет</strong>
+                                            </div>
+                                            <div class="fs-6">${project.priority || 'Обычный'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             ${project.deadline ? `
-                            <div class="row mt-2">
+                            <div class="row mt-3">
                                 <div class="col-md-12">
-                                    <strong>Дедлайн:</strong> <span class="text-warning">${new Date(project.deadline).toLocaleDateString()}</span>
+                                    <div class="card shadow-sm border-0" style="border-left: 4px solid #ffc107 !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-clock text-warning me-2" style="font-size: 1.2rem;"></i>
+                                                <strong class="me-3">Дедлайн:</strong>
+                                                <span class="badge bg-warning text-dark fs-6">${new Date(project.deadline).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             ` : ''}
-                            
+
                             ${project.estimated_hours ? `
-                            <div class="row mt-2">
+                            <div class="row mt-3 g-3">
                                 <div class="col-md-6">
-                                    <strong>Планируемое время:</strong> ${project.estimated_hours}ч
+                                    <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #20c997 !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-hourglass-start text-success me-2" style="font-size: 1.2rem; color: #20c997;"></i>
+                                                <strong>Планируемое время</strong>
+                                            </div>
+                                            <div class="fs-5 fw-bold">${project.estimated_hours}ч</div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <strong>Затрачено времени:</strong> ${project.actual_hours || 0}ч
+                                    <div class="card h-100 shadow-sm border-0" style="border-left: 4px solid #dc3545 !important;">
+                                        <div class="card-body">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <i class="fas fa-hourglass-end text-danger me-2" style="font-size: 1.2rem;"></i>
+                                                <strong>Затрачено времени</strong>
+                                            </div>
+                                            <div class="fs-5 fw-bold">${project.actual_hours || 0}ч</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             ` : ''}
@@ -3899,8 +3974,8 @@ tr .project-color-indicator {
                                             </div>
                                             <div class="col-md-4 text-end">
                                                 ${project.user.telegram_id ? `
-                                                <button class="btn btn-outline-primary btn-sm" onclick="contactClient('${project.user.telegram_id}')">
-                                                    <i class="fas fa-comment me-1"></i>Написать
+                                                <button class="btn btn-primary btn-sm shadow-sm" onclick="contactClient('${project.user.telegram_id}')" style="border-radius: 20px;">
+                                                    <i class="fas fa-paper-plane me-1"></i>Написать
                                                 </button>
                                                 ` : ''}
                                             </div>
@@ -3919,57 +3994,67 @@ tr .project-color-indicator {
                                             <div class="col-md-6">
                                                 <h6><i class="fas fa-robot me-2"></i>Telegram Bot</h6>
                                                 ${project.bot_token ? `
-                                                <div class="mb-2">
-                                                    <small class="text-muted">Токен бота:</small><br>
-                                                    <code class="text-break">${project.bot_token}</code>
-                                                    <button class="btn btn-link btn-sm p-0 ms-2" onclick="copyToClipboard('${project.bot_token}')">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
+                                                <div class="mb-3 p-2 bg-light rounded">
+                                                    <small class="text-muted d-block mb-1"><i class="fas fa-key me-1"></i>Токен бота:</small>
+                                                    <div class="d-flex align-items-center">
+                                                        <code class="text-break flex-grow-1">${project.bot_token}</code>
+                                                        <button class="btn btn-outline-primary btn-sm ms-2" onclick="copyToClipboard('${project.bot_token}')" style="border-radius: 15px;">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                ` : '<p class="text-muted">Токен бота не указан</p>'}
-                                                
+                                                ` : '<p class="text-muted"><i class="fas fa-info-circle me-1"></i>Токен бота не указан</p>'}
+
                                                 ${project.user_telegram_id ? `
-                                                <div class="mb-2">
-                                                    <small class="text-muted">Telegram ID клиента:</small><br>
-                                                    <code>${project.user_telegram_id}</code>
-                                                    <button class="btn btn-link btn-sm p-0 ms-2" onclick="copyToClipboard('${project.user_telegram_id}')">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
+                                                <div class="mb-3 p-2 bg-light rounded">
+                                                    <small class="text-muted d-block mb-1"><i class="fas fa-user me-1"></i>Telegram ID клиента:</small>
+                                                    <div class="d-flex align-items-center">
+                                                        <code class="flex-grow-1">${project.user_telegram_id}</code>
+                                                        <button class="btn btn-outline-primary btn-sm ms-2" onclick="copyToClipboard('${project.user_telegram_id}')" style="border-radius: 15px;">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 ` : ''}
-                                                
+
                                                 ${project.chat_id ? `
-                                                <div class="mb-2">
-                                                    <small class="text-muted">ID чата для уведомлений:</small><br>
-                                                    <code>${project.chat_id}</code>
-                                                    <button class="btn btn-link btn-sm p-0 ms-2" onclick="copyToClipboard('${project.chat_id}')">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
+                                                <div class="mb-3 p-2 bg-light rounded">
+                                                    <small class="text-muted d-block mb-1"><i class="fas fa-comments me-1"></i>ID чата для уведомлений:</small>
+                                                    <div class="d-flex align-items-center">
+                                                        <code class="flex-grow-1">${project.chat_id}</code>
+                                                        <button class="btn btn-outline-primary btn-sm ms-2" onclick="copyToClipboard('${project.chat_id}')" style="border-radius: 15px;">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 ` : ''}
                                             </div>
                                             <div class="col-md-6">
                                                 <h6><i class="fas fa-server me-2"></i>Timeweb</h6>
                                                 ${project.timeweb && project.timeweb.has_credentials ? `
-                                                <div class="mb-2">
-                                                    <small class="text-muted">Логин:</small><br>
-                                                    <code>${project.timeweb.login || 'Не указан'}</code>
-                                                    ${project.timeweb.login ? `
-                                                    <button class="btn btn-link btn-sm p-0 ms-2" onclick="copyToClipboard('${project.timeweb.login}')">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
-                                                    ` : ''}
+                                                <div class="mb-3 p-2 bg-light rounded">
+                                                    <small class="text-muted d-block mb-1"><i class="fas fa-user-circle me-1"></i>Логин:</small>
+                                                    <div class="d-flex align-items-center">
+                                                        <code class="flex-grow-1">${project.timeweb.login || 'Не указан'}</code>
+                                                        ${project.timeweb.login ? `
+                                                        <button class="btn btn-outline-success btn-sm ms-2" onclick="copyToClipboard('${project.timeweb.login}')" style="border-radius: 15px;">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                        ` : ''}
+                                                    </div>
                                                 </div>
                                                 ${project.timeweb.password ? `
-                                                <div class="mb-2">
-                                                    <small class="text-muted">Пароль:</small><br>
-                                                    <code>${project.timeweb.password}</code>
-                                                    <button class="btn btn-link btn-sm p-0 ms-2" onclick="copyToClipboard('${project.timeweb.password}')">
-                                                        <i class="fas fa-copy"></i>
-                                                    </button>
+                                                <div class="mb-3 p-2 bg-light rounded">
+                                                    <small class="text-muted d-block mb-1"><i class="fas fa-lock me-1"></i>Пароль:</small>
+                                                    <div class="d-flex align-items-center">
+                                                        <code class="flex-grow-1">${project.timeweb.password}</code>
+                                                        <button class="btn btn-outline-success btn-sm ms-2" onclick="copyToClipboard('${project.timeweb.password}')" style="border-radius: 15px;">
+                                                            <i class="fas fa-copy"></i>
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 ` : ''}
-                                                ` : '<p class="text-muted">Данные Timeweb не указаны</p>'}
+                                                ` : '<p class="text-muted"><i class="fas fa-info-circle me-1"></i>Данные Timeweb не указаны</p>'}
                                             </div>
                                         </div>
                                     </div>
