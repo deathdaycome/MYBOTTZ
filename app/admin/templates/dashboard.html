@@ -13,9 +13,11 @@
                 <i class="fas fa-arrow-up"></i>
             </div>
             <div class="metric-content">
-                <h4 id="monthlyIncome">0 ₽</h4>
+                <h4 id="monthlyIncome">{{ "{:,.0f}".format(financial_data.income).replace(",", " ") }} ₽</h4>
                 <p>Доход за месяц</p>
-                <small class="metric-change positive" id="incomeChange">+0%</small>
+                <small class="metric-change {{ 'positive' if financial_data.income_change > 0 else ('negative' if financial_data.income_change < 0 else '') }}">
+                    {{ "+" if financial_data.income_change > 0 else "" }}{{ financial_data.income_change }}% к прошлому месяцу
+                </small>
             </div>
         </div>
     </div>
@@ -25,9 +27,11 @@
                 <i class="fas fa-arrow-down"></i>
             </div>
             <div class="metric-content">
-                <h4 id="monthlyExpense">0 ₽</h4>
+                <h4 id="monthlyExpense">{{ "{:,.0f}".format(financial_data.expenses).replace(",", " ") }} ₽</h4>
                 <p>Расходы за месяц</p>
-                <small class="metric-change negative" id="expenseChange">-0%</small>
+                <small class="metric-change {{ 'negative' if financial_data.expense_change > 0 else ('positive' if financial_data.expense_change < 0 else '') }}">
+                    {{ "+" if financial_data.expense_change > 0 else "" }}{{ financial_data.expense_change }}% к прошлому месяцу
+                </small>
             </div>
         </div>
     </div>
@@ -37,9 +41,11 @@
                 <i class="fas fa-chart-line"></i>
             </div>
             <div class="metric-content">
-                <h4 id="monthlyProfit">0 ₽</h4>
+                <h4 id="monthlyProfit">{{ "{:,.0f}".format(financial_data.profit).replace(",", " ") }} ₽</h4>
                 <p>Прибыль за месяц</p>
-                <small class="metric-change" id="profitChange">0%</small>
+                <small class="metric-change {{ 'positive' if financial_data.profit_change > 0 else ('negative' if financial_data.profit_change < 0 else '') }}">
+                    {{ "+" if financial_data.profit_change > 0 else "" }}{{ financial_data.profit_change }}% к прошлому месяцу
+                </small>
             </div>
         </div>
     </div>
@@ -49,9 +55,9 @@
                 <i class="fas fa-percentage"></i>
             </div>
             <div class="metric-content">
-                <h4 id="profitMargin">0%</h4>
+                <h4 id="profitMargin">{{ financial_data.profit_margin }}%</h4>
                 <p>Рентабельность</p>
-                <small id="marginTrend">Целевая: 30%</small>
+                <small>{{ "Отлично" if financial_data.profit_margin >= 30 else ("Хорошо" if financial_data.profit_margin >= 20 else "Нужно улучшить") }}</small>
             </div>
         </div>
     </div>
@@ -116,6 +122,139 @@
                     </div>
                 </form>
                 <div id="quickTransactionAlert" class="alert mt-3 d-none"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Smart Widgets Row (только для owner и admin) -->
+{% if user_role in ['owner', 'admin'] %}
+<div class="row mb-4">
+    <!-- Воронка продаж -->
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-gradient-primary text-white">
+                <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Воронка продаж</h6>
+            </div>
+            <div class="card-body">
+                <div class="funnel-step mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span>👥 Пользователи</span>
+                        <strong>{{ sales_funnel.users }}</strong>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-info" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div class="funnel-step mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span>📋 Проекты</span>
+                        <strong>{{ sales_funnel.projects }}</strong>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-primary" style="width: {{ sales_funnel.conversion_to_project }}%"></div>
+                    </div>
+                    <small class="text-muted">{{ sales_funnel.conversion_to_project }}% конверсия</small>
+                </div>
+                <div class="funnel-step">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span>💰 Оплачено</span>
+                        <strong>{{ sales_funnel.paid }}</strong>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-success" style="width: {{ sales_funnel.conversion_to_paid }}%"></div>
+                    </div>
+                    <small class="text-muted">{{ sales_funnel.conversion_to_paid }}% конверсия</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Финансовый прогноз -->
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-gradient-success text-white">
+                <h6 class="mb-0"><i class="fas fa-chart-line me-2"></i>Финансовый прогноз</h6>
+            </div>
+            <div class="card-body">
+                <div class="text-center mb-3">
+                    <h3 class="text-success mb-0">{{ "{:,.0f}".format(financial_data.expected_income).replace(",", " ") }} ₽</h3>
+                    <small class="text-muted">Ожидается от активных проектов</small>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Текущий доход:</span>
+                    <strong>{{ "{:,.0f}".format(financial_data.income).replace(",", " ") }} ₽</strong>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="text-muted">Прогноз к концу месяца:</span>
+                    <strong class="text-success">{{ "{:,.0f}".format(financial_data.income + financial_data.expected_income).replace(",", " ") }} ₽</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Срочные проекты -->
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-gradient-warning text-dark">
+                <h6 class="mb-0"><i class="fas fa-exclamation-triangle me-2"></i>Срочные проекты</h6>
+            </div>
+            <div class="card-body p-2">
+                {% if urgent_projects %}
+                    <div class="list-group list-group-flush">
+                        {% for project in urgent_projects %}
+                        <div class="list-group-item px-2 py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="flex-grow-1" style="min-width: 0;">
+                                    <h6 class="mb-0 text-truncate" style="font-size: 0.85rem;">{{ project.title }}</h6>
+                                    <small class="text-muted">{{ project.executor }}</small>
+                                </div>
+                                <span class="badge bg-{{ 'danger' if project.days_left <= 1 else ('warning' if project.days_left <= 3 else 'info') }} ms-2">
+                                    {{ project.days_left }}д
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-check-circle fa-3x mb-2"></i>
+                        <p class="mb-0">Нет срочных проектов</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Активные исполнители -->
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100 shadow-sm">
+            <div class="card-header bg-gradient-info text-white">
+                <h6 class="mb-0"><i class="fas fa-users-cog me-2"></i>Активные исполнители</h6>
+            </div>
+            <div class="card-body p-2">
+                {% if active_executors %}
+                    <div class="list-group list-group-flush">
+                        {% for executor in active_executors %}
+                        <div class="list-group-item px-2 py-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <i class="fas fa-user-circle text-info me-1"></i>
+                                    <span style="font-size: 0.85rem;">{{ executor.name }}</span>
+                                </div>
+                                <span class="badge bg-info">{{ executor.active_projects }} {{ "проект" if executor.active_projects == 1 else "проектов" }}</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted py-4">
+                        <i class="fas fa-user-slash fa-3x mb-2"></i>
+                        <p class="mb-0">Нет активных исполнителей</p>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>

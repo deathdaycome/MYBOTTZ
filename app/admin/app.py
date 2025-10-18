@@ -446,37 +446,280 @@ async def dashboard(request: Request, username: str = Depends(authenticate)):
         
         if user_role == "executor":
             # Получаем данные для исполнителя
+            now = datetime.now()
+            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
             with get_db_context() as db:
                 # Получаем исполнителя
                 admin_user = db.query(AdminUser).filter(AdminUser.username == username).first()
-                
+
                 # Получаем проекты назначенные исполнителю
                 executor_projects = []
                 if admin_user:
                     projects_raw = db.query(Project).filter(
                         Project.assigned_executor_id == admin_user.id
                     ).order_by(Project.created_at.desc()).all()
-                    
+
                     # Конвертируем в словари
                     for p in projects_raw:
                         project_dict = p.to_dict()
                         # Добавляем информацию о пользователе
                         user = db.query(User).filter(User.id == p.user_id).first()
                         project_dict['user'] = user.to_dict() if user else None
+
+                        # Рассчитываем прогресс
+                        if p.planned_end_date and p.start_date:
+                            total_days = (p.planned_end_date - p.start_date).days
+                            passed_days = (now - p.start_date).days
+                            progress = min(100, max(0, int(passed_days / total_days * 100))) if total_days > 0 else 0
+                        else:
+                            progress = 0
+                        project_dict['progress'] = progress
+
+                        # Дни до дедлайна
+                        if p.planned_end_date:
+                            days_left = (p.planned_end_date - now).days
+                            project_dict['days_left'] = days_left
+                        else:
+                            project_dict['days_left'] = None
+
                         executor_projects.append(project_dict)
-            
+
+                    # Финансовые данные исполнителя
+                    total_income = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id,
+                        Project.updated_at >= month_start
+                    ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+
+                    # За прошлый месяц
+                    prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
+                    prev_month_end = month_start - timedelta(days=1)
+
+                    prev_income = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id,
+                        Project.updated_at >= prev_month_start,
+                        Project.updated_at <= prev_month_end
+                    ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+
+                    income_change = round(((total_income - prev_income) / prev_income * 100) if prev_income > 0 else 0, 1)
+
+                    # Всего заработано
+                    total_earned = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id
+                    ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+
+                    # Ожидается к получению
+                    expected_income = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id,
+                        Project.status.in_(['in_progress', 'review'])
+                    ).with_entities(func.sum(Project.executor_cost)).scalar() or 0
+
+                    already_paid = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id,
+                        Project.status.in_(['in_progress', 'review'])
+                    ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+
+                    expected_income -= (already_paid or 0)
+
+                    # Срочные проекты
+                    week_ahead = now + timedelta(days=7)
+                    urgent_projects_raw = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id,
+                        Project.status.in_(['in_progress', 'review']),
+                        Project.planned_end_date <= week_ahead,
+                        Project.planned_end_date >= now
+                    ).order_by(Project.planned_end_date).limit(5).all()
+
+                    urgent_projects = []
+                    for p in urgent_projects_raw:
+                        days_left = (p.planned_end_date - now).days
+                        urgent_projects.append({
+                            'id': p.id,
+                            'title': p.title,
+                            'deadline': p.planned_end_date.strftime('%d.%m.%Y'),
+                            'days_left': days_left
+                        })
+
+                    # Статистика по времени
+                    total_estimated_hours = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id,
+                        Project.status.in_(['in_progress', 'review'])
+                    ).with_entities(func.sum(Project.estimated_hours)).scalar() or 0
+
+                    total_actual_hours = db.query(Project).filter(
+                        Project.assigned_executor_id == admin_user.id,
+                        Project.status.in_(['in_progress', 'review'])
+                    ).with_entities(func.sum(Project.actual_hours)).scalar() or 0
+
+                    executor_financial_data = {
+                        'income': total_income,
+                        'income_change': income_change,
+                        'total_earned': total_earned,
+                        'expected_income': expected_income,
+                        'estimated_hours': total_estimated_hours,
+                        'actual_hours': total_actual_hours or 0
+                    }
+
             return templates.TemplateResponse("executor_dashboard.html", {
                 "request": request,
                 "username": username,
                 "user_role": user_role,
                 "navigation_items": navigation_items,
-                "projects": executor_projects
+                "projects": executor_projects,
+                "financial_data": executor_financial_data,
+                "urgent_projects": urgent_projects
             })
         
         # Получаем статистику используя правильную функцию
         from ..services.analytics_service import get_dashboard_data
         stats = get_dashboard_data(7)
-        
+
+        # Получаем финансовые данные за текущий месяц
+        now = datetime.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        current_user = get_current_user(username)
+
+        with get_db_context() as db:
+            # Финансовые индикаторы
+            base_query = db.query(FinanceTransaction)
+
+            # Доходы и расходы за месяц из транзакций
+            total_income = base_query.filter(
+                FinanceTransaction.type == "income",
+                FinanceTransaction.date >= month_start
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+            total_expenses = base_query.filter(
+                FinanceTransaction.type == "expense",
+                FinanceTransaction.date >= month_start
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+            # Добавляем данные из проектов
+            projects_income = db.query(Project).filter(
+                Project.updated_at >= month_start
+            ).with_entities(func.sum(Project.client_paid_total)).scalar() or 0
+
+            projects_expenses = db.query(Project).filter(
+                Project.updated_at >= month_start
+            ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+
+            total_income += projects_income or 0
+            total_expenses += projects_expenses or 0
+            profit = total_income - total_expenses
+            profit_margin = round((profit / total_income * 100) if total_income > 0 else 0, 1)
+
+            # Расчет изменений относительно прошлого месяца
+            prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
+            prev_month_end = month_start - timedelta(days=1)
+
+            prev_income = base_query.filter(
+                FinanceTransaction.type == "income",
+                FinanceTransaction.date >= prev_month_start,
+                FinanceTransaction.date <= prev_month_end
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+            prev_expenses = base_query.filter(
+                FinanceTransaction.type == "expense",
+                FinanceTransaction.date >= prev_month_start,
+                FinanceTransaction.date <= prev_month_end
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+            prev_projects_income = db.query(Project).filter(
+                Project.updated_at >= prev_month_start,
+                Project.updated_at <= prev_month_end
+            ).with_entities(func.sum(Project.client_paid_total)).scalar() or 0
+
+            prev_projects_expenses = db.query(Project).filter(
+                Project.updated_at >= prev_month_start,
+                Project.updated_at <= prev_month_end
+            ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+
+            prev_income += prev_projects_income or 0
+            prev_expenses += prev_projects_expenses or 0
+            prev_profit = prev_income - prev_expenses
+
+            income_change = round(((total_income - prev_income) / prev_income * 100) if prev_income > 0 else 0, 1)
+            expense_change = round(((total_expenses - prev_expenses) / prev_expenses * 100) if prev_expenses > 0 else 0, 1)
+            profit_change = round(((profit - prev_profit) / prev_profit * 100) if prev_profit > 0 else (100 if profit > 0 else 0), 1)
+
+            # Финансовый прогноз - ожидаемый доход от активных проектов
+            active_projects_value = db.query(Project).filter(
+                Project.status.in_(['new', 'in_progress', 'review', 'accepted'])
+            ).with_entities(func.sum(Project.estimated_cost)).scalar() or 0
+
+            already_paid = db.query(Project).filter(
+                Project.status.in_(['new', 'in_progress', 'review', 'accepted'])
+            ).with_entities(func.sum(Project.client_paid_total)).scalar() or 0
+
+            expected_income = active_projects_value - (already_paid or 0)
+
+            # Срочные проекты (дедлайн в ближайшие 7 дней)
+            week_ahead = now + timedelta(days=7)
+            urgent_projects_raw = db.query(Project).filter(
+                Project.status.in_(['new', 'in_progress', 'review']),
+                Project.planned_end_date <= week_ahead,
+                Project.planned_end_date >= now
+            ).order_by(Project.planned_end_date).limit(5).all()
+
+            urgent_projects = []
+            for p in urgent_projects_raw:
+                days_left = (p.planned_end_date - now).days
+                urgent_projects.append({
+                    'id': p.id,
+                    'title': p.title,
+                    'status': p.status,
+                    'deadline': p.planned_end_date.strftime('%d.%m.%Y'),
+                    'days_left': days_left,
+                    'executor': p.assigned_executor.username if p.assigned_executor else 'Не назначен'
+                })
+
+            # Активные исполнители
+            active_executors_raw = db.query(
+                AdminUser.id,
+                AdminUser.username,
+                AdminUser.first_name,
+                AdminUser.last_name,
+                func.count(Project.id).label('active_projects')
+            ).join(
+                Project, Project.assigned_executor_id == AdminUser.id
+            ).filter(
+                Project.status.in_(['in_progress', 'review']),
+                AdminUser.role == 'executor'
+            ).group_by(AdminUser.id).all()
+
+            active_executors = []
+            for e in active_executors_raw:
+                active_executors.append({
+                    'id': e.id,
+                    'name': f"{e.first_name or e.username} {e.last_name or ''}".strip(),
+                    'active_projects': e.active_projects
+                })
+
+            # Воронка продаж
+            total_users = db.query(User).count()
+            total_projects_count = db.query(Project).count()
+            paid_projects = db.query(Project).filter(Project.client_paid_total > 0).count()
+
+            sales_funnel = {
+                'users': total_users,
+                'projects': total_projects_count,
+                'paid': paid_projects,
+                'conversion_to_project': round((total_projects_count / total_users * 100) if total_users > 0 else 0, 1),
+                'conversion_to_paid': round((paid_projects / total_projects_count * 100) if total_projects_count > 0 else 0, 1)
+            }
+
+            # Сохраняем финансовые данные
+            financial_data = {
+                'income': total_income,
+                'expenses': total_expenses,
+                'profit': profit,
+                'profit_margin': profit_margin,
+                'income_change': income_change,
+                'expense_change': expense_change,
+                'profit_change': profit_change,
+                'expected_income': expected_income
+            }
+
         # Получаем последние проекты и пользователей в отдельных сессиях
         with get_db_context() as db:
             recent_projects_raw = db.query(Project).order_by(
@@ -530,7 +773,11 @@ async def dashboard(request: Request, username: str = Depends(authenticate)):
             "navigation_items": navigation_items,
             "stats": stats,
             "recent_projects": recent_projects,
-            "recent_users": recent_users
+            "recent_users": recent_users,
+            "financial_data": financial_data,
+            "urgent_projects": urgent_projects,
+            "active_executors": active_executors,
+            "sales_funnel": sales_funnel
         })
         
     except Exception as e:
