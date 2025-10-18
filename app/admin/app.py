@@ -14,7 +14,7 @@ import calendar
 from ..config.settings import settings
 from ..config.logging import get_logger
 from ..database.database import get_db_context
-from ..database.models import User, Project, ConsultantSession, Portfolio, Settings as DBSettings, AdminUser, ProjectFile
+from ..database.models import User, Project, ConsultantSession, Portfolio, Settings as DBSettings, AdminUser, ProjectFile, FinanceTransaction
 from ..services.analytics_service import analytics_service, get_dashboard_data
 from ..services.auth_service import AuthService
 from .middleware.roles import RoleMiddleware
