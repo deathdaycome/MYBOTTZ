@@ -668,3 +668,326 @@ async def update_revision_status(
             'completed_at': revision.completed_at.isoformat() if revision.completed_at else None,
         }
     }
+
+
+# ============================================
+# ДОКУМЕНТЫ (Documents)
+# ============================================
+
+@router.get("/documents")
+async def get_documents(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить список документов клиента"""
+
+    # Получаем все проекты пользователя
+    user_projects = db.query(Project).filter(
+        Project.user_id == current_user.id
+    ).all()
+
+    project_ids = [p.id for p in user_projects]
+
+    if not project_ids:
+        return {'documents': []}
+
+    # Получаем документы для этих проектов
+    query = """
+        SELECT
+            id, type, name, number, project_id, file_path, file_size, file_type,
+            status, date, signed_at, description, created_at
+        FROM documents
+        WHERE project_id IN ({})
+        ORDER BY created_at DESC
+    """.format(','.join('?' * len(project_ids)))
+
+    cursor = db.execute(query, project_ids)
+    documents = cursor.fetchall()
+
+    return {
+        'documents': [
+            {
+                'id': doc[0],
+                'type': doc[1],
+                'name': doc[2],
+                'number': doc[3],
+                'project_id': doc[4],
+                'file_path': doc[5],
+                'file_url': f'/{doc[5]}' if doc[5] else None,
+                'file_size': doc[6],
+                'file_type': doc[7],
+                'status': doc[8],
+                'date': doc[9],
+                'signed_at': doc[10],
+                'description': doc[11],
+                'created_at': doc[12],
+            }
+            for doc in documents
+        ]
+    }
+
+
+@router.get("/documents/{document_id}")
+async def get_document(
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить информацию о конкретном документе"""
+
+    # Проверяем доступ: документ должен принадлежать проекту пользователя
+    query = """
+        SELECT d.*, p.name as project_name
+        FROM documents d
+        JOIN projects p ON d.project_id = p.id
+        WHERE d.id = ? AND p.user_id = ?
+    """
+
+    cursor = db.execute(query, (document_id, current_user.id))
+    doc = cursor.fetchone()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return {
+        'document': {
+            'id': doc[0],
+            'type': doc[1],
+            'name': doc[2],
+            'number': doc[3],
+            'project_id': doc[5],
+            'project_name': doc[-1],
+            'file_path': doc[6],
+            'file_url': f'/{doc[6]}' if doc[6] else None,
+            'file_size': doc[7],
+            'file_type': doc[8],
+            'status': doc[12],
+            'date': doc[13],
+            'signed_at': doc[15],
+            'description': doc[16],
+        }
+    }
+
+
+# ============================================
+# ФИНАНСЫ / ПЛАТЕЖИ (Finance / Payments)
+# ============================================
+
+@router.get("/finance/summary")
+async def get_finance_summary(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить сводку по финансам клиента"""
+
+    # Получаем все проекты пользователя
+    user_projects = db.query(Project).filter(
+        Project.user_id == current_user.id
+    ).all()
+
+    project_ids = [p.id for p in user_projects]
+
+    if not project_ids:
+        return {
+            'total_amount': 0,
+            'paid_amount': 0,
+            'balance': 0,
+            'projects_count': 0
+        }
+
+    # Получаем сводку по сделкам
+    query = """
+        SELECT
+            COUNT(*) as projects_count,
+            COALESCE(SUM(amount), 0) as total_amount,
+            COALESCE(SUM(paid_amount), 0) as paid_amount
+        FROM deals
+        WHERE project_id IN ({})
+    """.format(','.join('?' * len(project_ids)))
+
+    cursor = db.execute(query, project_ids)
+    summary = cursor.fetchone()
+
+    total_amount = summary[1] if summary else 0
+    paid_amount = summary[2] if summary else 0
+    balance = total_amount - paid_amount
+
+    return {
+        'total_amount': total_amount,
+        'paid_amount': paid_amount,
+        'balance': balance,
+        'projects_count': summary[0] if summary else 0
+    }
+
+
+@router.get("/finance/transactions")
+async def get_transactions(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить список транзакций клиента"""
+
+    # Получаем проекты пользователя
+    user_projects = db.query(Project).filter(
+        Project.user_id == current_user.id
+    ).all()
+
+    project_ids = [p.id for p in user_projects]
+
+    if not project_ids:
+        return {'transactions': []}
+
+    # Получаем транзакции
+    query = """
+        SELECT
+            t.id, t.transaction_type, t.project_id, t.amount, t.currency,
+            t.description, t.payment_method, t.status, t.transaction_date,
+            p.name as project_name
+        FROM transactions t
+        LEFT JOIN projects p ON t.project_id = p.id
+        WHERE t.project_id IN ({})
+        ORDER BY t.transaction_date DESC
+    """.format(','.join('?' * len(project_ids)))
+
+    cursor = db.execute(query, project_ids)
+    transactions = cursor.fetchall()
+
+    return {
+        'transactions': [
+            {
+                'id': tr[0],
+                'type': tr[1],
+                'project_id': tr[2],
+                'project_name': tr[9],
+                'amount': tr[3],
+                'currency': tr[4],
+                'description': tr[5],
+                'payment_method': tr[6],
+                'status': tr[7],
+                'date': tr[8],
+            }
+            for tr in transactions
+        ]
+    }
+
+
+@router.get("/finance/deals")
+async def get_deals(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить список сделок клиента"""
+
+    # Получаем client_id пользователя
+    query_client = """
+        SELECT id FROM clients WHERE telegram_id = ?
+    """
+    cursor = db.execute(query_client, (current_user.telegram_id,))
+    client = cursor.fetchone()
+
+    if not client:
+        return {'deals': []}
+
+    client_id = client[0]
+
+    # Получаем сделки
+    query = """
+        SELECT
+            d.id, d.title, d.status, d.description, d.amount, d.paid_amount,
+            d.start_date, d.end_date, d.prepayment_percent, d.prepayment_amount,
+            p.name as project_name, p.id as project_id
+        FROM deals d
+        LEFT JOIN projects p ON d.project_id = p.id
+        WHERE d.client_id = ?
+        ORDER BY d.start_date DESC
+    """
+
+    cursor = db.execute(query, (client_id,))
+    deals = cursor.fetchall()
+
+    return {
+        'deals': [
+            {
+                'id': deal[0],
+                'title': deal[1],
+                'status': deal[2],
+                'description': deal[3],
+                'amount': deal[4],
+                'paid_amount': deal[5],
+                'balance': (deal[4] or 0) - (deal[5] or 0),
+                'start_date': deal[6],
+                'end_date': deal[7],
+                'prepayment_percent': deal[8],
+                'prepayment_amount': deal[9],
+                'project_name': deal[10],
+                'project_id': deal[11],
+            }
+            for deal in deals
+        ]
+    }
+
+
+# ============================================
+# УВЕДОМЛЕНИЯ (Notifications)
+# ============================================
+
+@router.get("/notifications")
+async def get_notifications(
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить список уведомлений для клиента"""
+
+    # Получаем уведомления из notification_log
+    query = """
+        SELECT
+            id, notification_type, title, message, status,
+            sent_at, entity_type, entity_id
+        FROM notification_log
+        WHERE telegram_user_id = ?
+        ORDER BY sent_at DESC
+        LIMIT ?
+    """
+
+    cursor = db.execute(query, (str(current_user.telegram_id), limit))
+    notifications = cursor.fetchall()
+
+    return {
+        'notifications': [
+            {
+                'id': notif[0],
+                'type': notif[1],
+                'title': notif[2],
+                'message': notif[3],
+                'status': notif[4],
+                'sent_at': notif[5],
+                'entity_type': notif[6],
+                'entity_id': notif[7],
+            }
+            for notif in notifications
+        ]
+    }
+
+
+@router.get("/notifications/unread-count")
+async def get_unread_notifications_count(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить количество непрочитанных уведомлений"""
+
+    # Для простоты считаем непрочитанными уведомления за последние 7 дней
+    query = """
+        SELECT COUNT(*)
+        FROM notification_log
+        WHERE telegram_user_id = ?
+        AND sent_at >= datetime('now', '-7 days')
+    """
+
+    cursor = db.execute(query, (str(current_user.telegram_id),))
+    count = cursor.fetchone()[0]
+
+    return {
+        'unread_count': count
+    }

@@ -8,6 +8,9 @@ import { RevisionChat } from './pages/RevisionChat';
 import { CreateRevision } from './pages/CreateRevision';
 import { TestRevisions } from './pages/TestRevisions';
 import { QuickProjectCreate } from './pages/QuickProjectCreate';
+import Documents from './pages/Documents';
+import Finance from './pages/Finance';
+import Notifications from './pages/Notifications';
 import { useTelegram } from './hooks/useTelegram';
 import './index.css';
 
@@ -46,6 +49,9 @@ function App() {
           <Route path="/revisions" element={<AllRevisions />} />
           <Route path="/revisions/:revisionId" element={<RevisionChat />} />
           <Route path="/test-revisions" element={<TestRevisions />} />
+          <Route path="/documents" element={<Documents />} />
+          <Route path="/finance" element={<Finance />} />
+          <Route path="/notifications" element={<Notifications />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

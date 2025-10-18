@@ -12,7 +12,10 @@ import {
   TrendingUp,
   Clock,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  Wallet,
+  Bell
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { useTelegram } from '../hooks/useTelegram';
@@ -91,13 +94,33 @@ export const Dashboard: React.FC = () => {
       },
     },
     {
-      title: 'AI Консультант',
-      description: 'Задать вопрос',
-      icon: <Bot className="w-6 h-6" />,
-      gradient: 'from-green-500 to-emerald-500',
+      title: 'Документы',
+      description: 'Договоры и акты',
+      icon: <FileText className="w-6 h-6" />,
+      gradient: 'from-indigo-500 to-purple-500',
       action: () => {
         hapticFeedback('medium');
-        navigate('/ai-consultant');
+        navigate('/documents');
+      },
+    },
+    {
+      title: 'Финансы',
+      description: 'Платежи и счета',
+      icon: <Wallet className="w-6 h-6" />,
+      gradient: 'from-emerald-500 to-teal-500',
+      action: () => {
+        hapticFeedback('medium');
+        navigate('/finance');
+      },
+    },
+    {
+      title: 'Уведомления',
+      description: 'История событий',
+      icon: <Bell className="w-6 h-6" />,
+      gradient: 'from-pink-500 to-rose-500',
+      action: () => {
+        hapticFeedback('medium');
+        navigate('/notifications');
       },
     },
   ];
