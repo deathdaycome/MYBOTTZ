@@ -136,7 +136,17 @@ echo "✅ Код обновлён"
 ENDSSH
 
 echo ""
-echo "🐳 ШАГ 5: Сборка Docker образа"
+echo "📝 ШАГ 5: Копирование конфигурации Nginx"
+echo "=========================================="
+echo "📤 Копирование nginx.conf на сервер..."
+scp nginx.conf $SERVER:/root/bot_business_card/
+echo "📤 Копирование setup_nginx_ssl.sh на сервер..."
+scp setup_nginx_ssl.sh $SERVER:/root/bot_business_card/
+ssh $SERVER "chmod +x /root/bot_business_card/setup_nginx_ssl.sh"
+echo "✅ Конфигурация скопирована"
+
+echo ""
+echo "🐳 ШАГ 6: Сборка Docker образа"
 echo "=========================================="
 ssh $SERVER << 'ENDSSH'
 set -e
@@ -151,7 +161,7 @@ echo "✅ Образ собран"
 ENDSSH
 
 echo ""
-echo "🚀 ШАГ 6: Запуск контейнера"
+echo "🚀 ШАГ 7: Запуск контейнера"
 echo "=========================================="
 ssh $SERVER << 'ENDSSH'
 set -e
@@ -174,7 +184,7 @@ echo "✅ Контейнер запущен"
 ENDSSH
 
 echo ""
-echo "🔍 ШАГ 7: Проверка статуса"
+echo "🔍 ШАГ 8: Проверка статуса"
 echo "=========================================="
 ssh $SERVER << 'ENDSSH'
 set -e
@@ -208,13 +218,17 @@ echo "  ✅ Запущен контейнер"
 echo ""
 echo "🔗 Проверьте работу:"
 echo "  - Бот: https://t.me/NikolaevCodeBot"
+echo "  - Mini App: https://nikolaevcodev.ru"
 echo "  - API: http://147.45.215.199:8000/docs"
-echo "  - Mini App: http://147.45.215.199:8000"
 echo "  - Админка: http://147.45.215.199:8001/admin/"
+echo ""
+echo "🔐 ВАЖНО: Настройте SSL сертификат!"
+echo "  На сервере выполните: cd /root/bot_business_card && ./setup_nginx_ssl.sh"
 echo ""
 echo "📝 Полезные команды на сервере:"
 echo "  docker-compose logs -f              # Смотреть логи"
 echo "  docker-compose restart              # Перезапуск"
 echo "  docker-compose down                 # Остановка"
 echo "  docker-compose up -d                # Запуск"
+echo "  systemctl status nginx              # Статус Nginx"
 echo ""

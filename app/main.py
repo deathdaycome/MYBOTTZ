@@ -170,7 +170,12 @@ app = FastAPI(
 # Добавляем CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Разрешаем все домены для разработки
+    allow_origins=[
+        "https://nikolaevcodev.ru",
+        "http://nikolaevcodev.ru",
+        "http://147.45.215.199:8000",
+        "https://147.45.215.199:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -205,12 +210,8 @@ async def add_templates(request: Request, call_next):
     response = await call_next(request)
     return response
 
-# Подключаем роутер админки
+# Подключаем роутер админки только с префиксом /admin
 app.include_router(admin_router, prefix="/admin")
-
-# ВАЖНО: Дублируем все роуты админки без префикса /admin для совместимости
-# Это позволит работать как с /admin/projects, так и с /projects
-app.include_router(admin_router)
 
 # Подключаем API для Telegram Mini App
 from app.api.miniapp import router as miniapp_router
