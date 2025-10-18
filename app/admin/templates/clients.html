@@ -465,7 +465,7 @@ async function loadClients(page = 1) {
     if (segment) params.append('segment', segment);
     
     try {
-        const response = await fetch(`/admin/api/clients/?${params}`, {
+        const response = await fetch(`/admin/clients/?${params}`, {
             headers: {
                 'Authorization': 'Basic ' + btoa(`${username}:${password}`)
             }
@@ -610,7 +610,7 @@ async function createClient() {
     }
     
     try {
-        const response = await fetch('/admin/api/clients/api', {
+        const response = await fetch('/admin/clients/api', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -635,7 +635,7 @@ async function createClient() {
 // Просмотр клиента
 async function viewClient(clientId) {
     try {
-        const response = await fetch(`/admin/api/clients/api/${clientId}`, {
+        const response = await fetch(`/admin/clients/api/${clientId}`, {
             headers: {
                 'Authorization': 'Basic ' + btoa(`${username}:${password}`)
             }
@@ -887,7 +887,7 @@ async function deleteClient(clientId) {
     }
 
     try {
-        const response = await fetch(`/admin/api/clients/api/${clientId}`, {
+        const response = await fetch(`/admin/clients/api/${clientId}`, {
             method: 'DELETE',
             headers: {
                 'Authorization': 'Basic ' + btoa(`${username}:${password}`)
@@ -949,8 +949,8 @@ function showAlert(type, message) {
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
-    
-    const container = document.querySelector('.container-fluid');
+
+    const container = document.querySelector('.main-content') || document.body;
     container.insertAdjacentHTML('afterbegin', alertHtml);
     
     setTimeout(() => {
@@ -984,7 +984,7 @@ async function createDealFromClient(clientId) {
         }
 
         // Получаем данные клиента
-        const clientResponse = await fetch(`/admin/api/clients/api/${clientId}`, {
+        const clientResponse = await fetch(`/admin/clients/api/${clientId}`, {
             method: 'GET',
             credentials: 'include'
         });
