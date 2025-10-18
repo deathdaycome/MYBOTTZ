@@ -4465,60 +4465,63 @@ tr .project-color-indicator {
         // Если есть structured_tz, используем его
         if (project.structured_tz && typeof project.structured_tz === 'object') {
             let formatted = '';
-            
+
             // Добавляем основные разделы ТЗ
             if (project.structured_tz.title) {
                 formatted += `📋 НАЗВАНИЕ ПРОЕКТА\n${project.structured_tz.title}\n\n`;
             }
-            
+
             if (project.structured_tz.description) {
                 formatted += `📝 ОПИСАНИЕ ПРОЕКТА\n${project.structured_tz.description}\n\n`;
             }
-            
+
             if (project.structured_tz.goals) {
                 formatted += `🎯 ЦЕЛИ И ЗАДАЧИ\n${project.structured_tz.goals}\n\n`;
             }
-            
+
             if (project.structured_tz.target_audience) {
                 formatted += `👥 ЦЕЛЕВАЯ АУДИТОРИЯ\n${project.structured_tz.target_audience}\n\n`;
             }
-            
+
             if (project.structured_tz.detailed_functions) {
                 formatted += `⚙️ ФУНКЦИОНАЛЬНЫЕ ТРЕБОВАНИЯ\n${project.structured_tz.detailed_functions}\n\n`;
             }
-            
+
             if (project.structured_tz.technology_stack) {
                 formatted += `🛠 ТЕХНОЛОГИЧЕСКИЙ СТЕК\n${project.structured_tz.technology_stack}\n\n`;
             }
-            
+
             if (project.structured_tz.integrations) {
                 formatted += `🔌 ИНТЕГРАЦИИ\n${project.structured_tz.integrations}\n\n`;
             }
-            
+
             if (project.structured_tz.admin_panel_requirements) {
                 formatted += `👑 АДМИН-ПАНЕЛЬ\n${project.structured_tz.admin_panel_requirements}\n\n`;
             }
-            
+
             if (project.structured_tz.development_stages) {
                 formatted += `📅 ЭТАПЫ РАЗРАБОТКИ\n${project.structured_tz.development_stages}\n\n`;
             }
-            
+
             if (project.structured_tz.risks_and_challenges) {
                 formatted += `⚠️ РИСКИ И СЛОЖНОСТИ\n${project.structured_tz.risks_and_challenges}\n\n`;
             }
-            
+
             if (project.structured_tz.cost_breakdown) {
                 formatted += `💰 РАСЧЕТ СТОИМОСТИ\n${project.structured_tz.cost_breakdown}\n\n`;
             }
-            
+
             // Если есть полный текст ТЗ, добавляем его
             if (project.structured_tz.tz_text) {
                 formatted += `📄 ПОЛНОЕ ТЕХНИЧЕСКОЕ ЗАДАНИЕ\n${project.structured_tz.tz_text}`;
             }
-            
-            return formatted;
+
+            // Если structured_tz был пустым объектом, используем fallback
+            if (formatted.trim().length > 0) {
+                return formatted;
+            }
         }
-        
+
         // Fallback к обычному описанию
         return project.description || project.original_request || 'Описание отсутствует';
     }
