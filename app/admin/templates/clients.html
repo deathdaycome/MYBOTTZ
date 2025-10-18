@@ -618,16 +618,41 @@ async function createClient() {
             },
             body: JSON.stringify(data)
         });
-        
+
         const result = await response.json();
         if (result.success) {
-            showAlert('success', result.message);
-            bootstrap.Modal.getInstance(document.getElementById('createClientModal')).hide();
-            loadClients(currentPage);
+            // Закрываем модалку
+            const modalElement = document.getElementById('createClientModal');
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+            if (modalInstance) {
+                modalInstance.hide();
+            } else {
+                // Fallback: закрываем модалку напрямую
+                modalElement.classList.remove('show');
+                modalElement.style.display = 'none';
+                document.body.classList.remove('modal-open');
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
+            }
+
+            // Очищаем форму
+            form.reset();
+
+            // Показываем сообщение
+            showAlert('success', result.message || 'Клиент успешно создан');
+
+            // Обновляем список клиентов
+            if (typeof loadClients === 'function') {
+                loadClients(currentPage);
+            } else {
+                // Перезагружаем страницу если функция не найдена
+                setTimeout(() => window.location.reload(), 1000);
+            }
         } else {
-            showAlert('danger', result.message);
+            showAlert('danger', result.message || 'Ошибка создания клиента');
         }
     } catch (error) {
+        console.error('Error creating client:', error);
         showAlert('danger', 'Ошибка создания клиента: ' + error.message);
     }
 }
