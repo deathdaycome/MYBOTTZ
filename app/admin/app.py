@@ -905,37 +905,125 @@ async def finance_page(request: Request, username: str = Depends(authenticate)):
             base_query = db.query(FinanceTransaction)
             if user_role == "executor":
                 base_query = base_query.filter(FinanceTransaction.created_by_id == current_user["id"])
-            
-            # Доходы за месяц
+
+            # Доходы за месяц из транзакций
             total_income = base_query.filter(
-            FinanceTransaction.type == "income",
-            FinanceTransaction.date >= month_start
-        ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
-        
-            # Расходы за месяц
+                FinanceTransaction.type == "income",
+                FinanceTransaction.date >= month_start
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+            # Расходы за месяц из транзакций
             total_expenses = base_query.filter(
-            FinanceTransaction.type == "expense",
-            FinanceTransaction.date >= month_start
-        ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
-        
-            # Общий баланс - считаем отдельно для избежания проблем с SQLAlchemy case
-            total_income_all = base_query.filter(
-                FinanceTransaction.type == "income"
+                FinanceTransaction.type == "expense",
+                FinanceTransaction.date >= month_start
             ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
-            
-            total_expenses_all = base_query.filter(
-                FinanceTransaction.type == "expense"
-            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
-            
+
+            # Добавляем данные из проектов
+            if user_role == "executor":
+                # Для исполнителя - его заработок из проектов
+                projects_income = db.query(Project).filter(
+                    Project.assigned_executor_id == current_user["id"],
+                    Project.updated_at >= month_start
+                ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+                total_income += projects_income
+
+                # Общий заработок исполнителя за все время
+                total_income_all = base_query.filter(
+                    FinanceTransaction.type == "income"
+                ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+                total_executor_earnings = db.query(Project).filter(
+                    Project.assigned_executor_id == current_user["id"]
+                ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+                total_income_all += total_executor_earnings or 0
+
+                total_expenses_all = base_query.filter(
+                    FinanceTransaction.type == "expense"
+                ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+            else:
+                # Для владельца/админа - оплаты от клиентов минус выплаты исполнителям
+                projects_income = db.query(Project).filter(
+                    Project.updated_at >= month_start
+                ).with_entities(func.sum(Project.client_paid_total)).scalar() or 0
+
+                projects_expenses = db.query(Project).filter(
+                    Project.updated_at >= month_start
+                ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+
+                total_income += projects_income or 0
+                total_expenses += projects_expenses or 0
+
+                # Общий баланс - считаем отдельно для избежания проблем с SQLAlchemy case
+                total_income_all = base_query.filter(
+                    FinanceTransaction.type == "income"
+                ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+                total_client_payments = db.query(Project).with_entities(
+                    func.sum(Project.client_paid_total)
+                ).scalar() or 0
+                total_income_all += total_client_payments
+
+                total_expenses_all = base_query.filter(
+                    FinanceTransaction.type == "expense"
+                ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+                total_executor_payments = db.query(Project).with_entities(
+                    func.sum(Project.executor_paid_total)
+                ).scalar() or 0
+                total_expenses_all += total_executor_payments or 0
+
             balance = total_income_all - total_expenses_all
-        
-            # Прибыль
+
+            # Прибыль за месяц
             profit = total_income - total_expenses
-            
-            # Расчет изменений (пример)
-            income_change = 12.5
-            expense_change = 8.2
-            profit_change = 15.0 if profit > 0 else -5.0
+
+            # Расчет изменений относительно прошлого месяца
+            prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
+            prev_month_end = month_start - timedelta(days=1)
+
+            # Доходы за прошлый месяц
+            prev_income = base_query.filter(
+                FinanceTransaction.type == "income",
+                FinanceTransaction.date >= prev_month_start,
+                FinanceTransaction.date <= prev_month_end
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+            # Расходы за прошлый месяц
+            prev_expenses = base_query.filter(
+                FinanceTransaction.type == "expense",
+                FinanceTransaction.date >= prev_month_start,
+                FinanceTransaction.date <= prev_month_end
+            ).with_entities(func.sum(FinanceTransaction.amount)).scalar() or 0
+
+            # Проекты за прошлый месяц
+            if user_role == "executor":
+                prev_projects_income = db.query(Project).filter(
+                    Project.assigned_executor_id == current_user["id"],
+                    Project.updated_at >= prev_month_start,
+                    Project.updated_at <= prev_month_end
+                ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+                prev_income += prev_projects_income or 0
+            else:
+                prev_projects_income = db.query(Project).filter(
+                    Project.updated_at >= prev_month_start,
+                    Project.updated_at <= prev_month_end
+                ).with_entities(func.sum(Project.client_paid_total)).scalar() or 0
+
+                prev_projects_expenses = db.query(Project).filter(
+                    Project.updated_at >= prev_month_start,
+                    Project.updated_at <= prev_month_end
+                ).with_entities(func.sum(Project.executor_paid_total)).scalar() or 0
+
+                prev_income += prev_projects_income or 0
+                prev_expenses += prev_projects_expenses or 0
+
+            prev_profit = prev_income - prev_expenses
+
+            # Вычисляем изменения в процентах
+            income_change = round(((total_income - prev_income) / prev_income * 100) if prev_income > 0 else 0, 1)
+            expense_change = round(((total_expenses - prev_expenses) / prev_expenses * 100) if prev_expenses > 0 else 0, 1)
+            profit_change = round(((profit - prev_profit) / prev_profit * 100) if prev_profit > 0 else (100 if profit > 0 else 0), 1)
             savings_rate = round((profit / total_income * 100) if total_income > 0 else 0, 1)
             
             # Последние транзакции

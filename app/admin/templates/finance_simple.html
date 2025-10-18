@@ -240,17 +240,25 @@
 
 .transaction-details {
     flex: 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .transaction-title {
     font-weight: 600;
     font-size: 15px;
     margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .transaction-meta {
     font-size: 13px;
     color: #6b7280;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .transaction-amount {
