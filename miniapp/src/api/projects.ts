@@ -4,19 +4,19 @@ import type { Project, ProjectStats } from '../types/project';
 export const projectsApi = {
   // Получить все проекты пользователя
   getMyProjects: async (): Promise<Project[]> => {
-    const response = await apiClient.get('/miniapp/projects');
+    const response = await apiClient.get('/projects');
     return response.data;
   },
 
   // Получить один проект по ID
   getProject: async (id: number): Promise<Project> => {
-    const response = await apiClient.get(`/miniapp/projects/${id}`);
+    const response = await apiClient.get(`/projects/${id}`);
     return response.data;
   },
 
   // Получить статистику по проектам
   getProjectsStats: async (): Promise<ProjectStats> => {
-    const response = await apiClient.get('/miniapp/projects/stats');
+    const response = await apiClient.get('/projects/stats');
     return response.data;
   },
 
@@ -28,7 +28,7 @@ export const projectsApi = {
     budget: string;
     deadline: string;
   }): Promise<Project> => {
-    const response = await apiClient.post('/miniapp/projects/quick', data);
+    const response = await apiClient.post('/projects/quick', data);
     return response.data;
   },
 
@@ -41,7 +41,7 @@ export const projectsApi = {
     complexity: string;
     [key: string]: any;
   }): Promise<Project> => {
-    const response = await apiClient.post('/miniapp/projects/tz', data);
+    const response = await apiClient.post('/projects/tz', data);
     return response.data;
   },
 };
