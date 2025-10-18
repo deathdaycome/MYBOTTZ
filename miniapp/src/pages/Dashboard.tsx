@@ -6,7 +6,6 @@ import {
   Zap,
   FolderKanban,
   FileEdit,
-  Bot,
   Briefcase,
   PlusCircle,
   TrendingUp,

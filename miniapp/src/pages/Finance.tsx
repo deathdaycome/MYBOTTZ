@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Wallet, TrendingUp, AlertCircle, DollarSign, CreditCard } from 'lucide-react';
-import { financeApi, FinanceSummary, Transaction, Deal } from '../api/finance';
+import { financeApi } from '../api/finance';
+import type { FinanceSummary, Transaction, Deal } from '../api/finance';
 
 const Finance: React.FC = () => {
   const [summary, setSummary] = useState<FinanceSummary | null>(null);

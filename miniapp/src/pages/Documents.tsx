@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FileText, Download, AlertCircle } from 'lucide-react';
-import { documentsApi, Document } from '../api/documents';
+import { documentsApi } from '../api/documents';
+import type { Document } from '../api/documents';
 
 const Documents: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
