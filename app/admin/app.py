@@ -850,8 +850,8 @@ async def projects_page(request: Request, show_archived: bool = False, username:
             else:
                 query = query.filter((Project.is_archived == False) | (Project.is_archived == None))
             
-            if user_role == "owner":
-                # Владелец видит все проекты
+            if user_role in ["owner", "admin"]:
+                # Владелец и админ видят все проекты
                 projects_raw = query.order_by(Project.created_at.desc()).all()
             else:
                 # Исполнитель видит только назначенные ему проекты
