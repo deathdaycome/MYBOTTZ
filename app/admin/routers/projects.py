@@ -109,11 +109,14 @@ class ProjectCreateModel(BaseModel):
 
 def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> dict:
     """Получение текущего пользователя с проверкой аутентификации"""
+    logger.info(f"[API] Аутентификация пользователя: {credentials.username}")
+
     # Сначала проверяем старую систему (владелец)
     correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
     correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
-    
+
     if correct_username and correct_password:
+        logger.info(f"[API] Пользователь {credentials.username} = OWNER")
         # Возвращаем объект владельца
         return {
             "id": 1,
@@ -121,7 +124,7 @@ def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> d
             "role": "owner",
             "is_active": True
         }
-    
+
     # Если не подошло, проверяем новую систему (исполнители)
     try:
         with get_db_context() as db:
@@ -130,8 +133,9 @@ def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> d
                 AdminUser.username == credentials.username,
                 AdminUser.is_active == True
             ).first()
-            
+
             if admin_user and AuthService.verify_password(credentials.password, admin_user.password_hash):
+                logger.info(f"[API] Пользователь {credentials.username} = {admin_user.role.upper()} (ID: {admin_user.id})")
                 return {
                     "id": admin_user.id,
                     "username": admin_user.username,
@@ -140,7 +144,7 @@ def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> d
                 }
     except Exception as e:
         logger.error(f"Ошибка проверки в новой системе: {e}")
-    
+
     # Если ничего не подошло
     raise HTTPException(
         status_code=401,
@@ -177,8 +181,9 @@ PROJECT_STATUSES = {
     "в работе": "В работе"
 }
 
-@router.get("/")
+@router.get("/", response_class=JSONResponse)
 async def get_projects(
+    request: Request,
     page: int = 1,
     per_page: int = 20,
     status: Optional[str] = None,
@@ -191,19 +196,24 @@ async def get_projects(
 ):
     """Получить список проектов с фильтрами (с учетом ролей доступа)"""
     try:
+        logger.info(f"[API] GET /api/projects/ - Пользователь: {current_user['username']}, Роль: {current_user['role']}, ID: {current_user['id']}")
+
         # Начинаем с базового запроса
         query = db.query(Project).join(User, Project.user_id == User.id)
-        
+
         # Фильтр архивных проектов
         if show_archived:
             query = query.filter(Project.is_archived == True)
         else:
             query = query.filter(or_(Project.is_archived == False, Project.is_archived == None))
-        
+
         # Фильтрация по роли пользователя
         if current_user["role"] == "executor":
             # Исполнитель видит только назначенные ему проекты
+            logger.info(f"[API] Фильтрация для исполнителя: assigned_executor_id == {current_user['id']}")
             query = query.filter(Project.assigned_executor_id == current_user["id"])
+        else:
+            logger.info(f"[API] Роль {current_user['role']} - показываем все проекты")
         # Владелец видит все проекты (без дополнительных фильтров)
         
         # Применяем остальные фильтры
@@ -229,10 +239,12 @@ async def get_projects(
         
         # Подсчитываем общее количество
         total = query.count()
-        
+        logger.info(f"[API] После фильтрации найдено проектов: {total}")
+
         # Применяем пагинацию
         offset = (page - 1) * per_page
         projects = query.offset(offset).limit(per_page).all()
+        logger.info(f"[API] Возвращаем проектов на странице: {len(projects)}")
         
         # Конвертируем в словари с дополнительной информацией
         projects_data = []
@@ -318,7 +330,7 @@ async def get_projects(
             
             projects_data.append(project_dict)
         
-        return {
+        response_data = {
             "success": True,
             "projects": projects_data,
             "pagination": {
@@ -329,6 +341,16 @@ async def get_projects(
             },
             "user_role": current_user["role"]
         }
+
+        # Возвращаем ответ с заголовками против кеширования
+        return JSONResponse(
+            content=response_data,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
         
     except Exception as e:
         logger.error(f"Ошибка получения проектов: {e}")
