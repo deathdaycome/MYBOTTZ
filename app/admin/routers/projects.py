@@ -273,9 +273,15 @@ async def get_projects(
             # Добавляем читаемые названия статуса и приоритета
             project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)
             
-            # Для исполнителей скрываем полную стоимость
+            # Для исполнителей скрываем полную стоимость и показываем только их цену
             if current_user["role"] == "executor":
-                project_dict["estimated_cost"] = project.executor_cost or 0
+                executor_price = project.executor_cost or 0
+                project_dict["estimated_cost"] = executor_price
+                project_dict["final_cost"] = executor_price
+                # Скрываем реальные суммы от клиента
+                project_dict["client_paid_total"] = None
+                project_dict["prepayment_amount"] = None
+                project_dict["paid_amount"] = None
                 project_dict.pop("executor_cost", None)  # Убираем дублирование
             
             # Добавляем информацию о новых полях из metadata

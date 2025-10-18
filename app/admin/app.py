@@ -838,7 +838,9 @@ async def projects_page(request: Request, show_archived: bool = False, username:
     try:
         user_role = get_user_role(username)
         navigation_items = get_navigation_items(user_role)
-        
+
+        logger.info(f"Загрузка страницы проектов для пользователя {username}, роль: {user_role}")
+
         projects = []
         with get_db_context() as db:
             # Базовый запрос с присоединением пользователя для избежания N+1
@@ -849,18 +851,22 @@ async def projects_page(request: Request, show_archived: bool = False, username:
                 query = query.filter(Project.is_archived == True)
             else:
                 query = query.filter((Project.is_archived == False) | (Project.is_archived == None))
-            
+
             if user_role in ["owner", "admin"]:
                 # Владелец и админ видят все проекты
                 projects_raw = query.order_by(Project.created_at.desc()).all()
+                logger.info(f"Владелец/админ: загружено {len(projects_raw)} проектов")
             else:
                 # Исполнитель видит только назначенные ему проекты
                 admin_user = db.query(AdminUser).filter(AdminUser.username == username).first()
                 if admin_user:
+                    logger.info(f"Исполнитель ID {admin_user.id}: фильтрация по assigned_executor_id")
                     projects_raw = query.filter(
                         Project.assigned_executor_id == admin_user.id
                     ).order_by(Project.created_at.desc()).all()
+                    logger.info(f"Исполнитель: загружено {len(projects_raw)} назначенных проектов")
                 else:
+                    logger.warning(f"Пользователь {username} не найден в admin_users")
                     projects_raw = []
 
             # Конвертируем в словари, добавляя информацию о пользователе
@@ -868,11 +874,15 @@ async def projects_page(request: Request, show_archived: bool = False, username:
                 project_dict = p.to_dict()
                 # Добавляем связанный объект пользователя
                 project_dict['user'] = p.user.to_dict() if p.user else None
-                
-                # Для исполнителя скрываем полную стоимость
+
+                # Для исполнителя скрываем полную стоимость и показываем только его цену
                 if user_role == "executor":
                     project_dict["estimated_cost"] = p.executor_cost or 0
-                
+                    project_dict["final_cost"] = p.executor_cost or 0
+                    # Скрываем реальные суммы клиента
+                    project_dict["client_paid_total"] = None
+                    project_dict["prepayment_amount"] = None
+
                 projects.append(project_dict)
         
         # Добавляем функцию для расчета прогресса в контекст шаблона
