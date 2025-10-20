@@ -1495,6 +1495,187 @@ tr .project-color-indicator {
     color: #6c757d;
     font-weight: 500;
 }
+
+/* Секция с исполнителем */
+.executor-section {
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.executor-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.executor-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.executor-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.executor-label {
+    font-size: 11px;
+    color: #6c757d;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.executor-name {
+    font-weight: 600;
+    color: #212529;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.assign-executor-btn {
+    padding: 6px 12px;
+    border: 2px dashed #dee2e6;
+    background: white;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.assign-executor-btn:hover {
+    border-color: #0d6efd;
+    color: #0d6efd;
+    background: #e7f1ff;
+}
+
+/* Секция с оплатами */
+.payments-section {
+    padding: 12px 20px;
+    background: #fff8e1;
+    border-top: 1px solid #ffe082;
+    border-bottom: 1px solid #ffe082;
+}
+
+.payments-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.payments-label {
+    font-size: 11px;
+    color: #856404;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.payments-amount {
+    font-size: 16px;
+    font-weight: 700;
+    color: #212529;
+}
+
+.payments-amount .paid {
+    color: #28a745;
+}
+
+.payments-amount .total {
+    color: #6c757d;
+}
+
+.payment-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dashed #ffe082;
+    font-size: 12px;
+}
+
+.payment-history-item:last-child {
+    border-bottom: none;
+}
+
+.payment-date {
+    color: #6c757d;
+    font-size: 11px;
+}
+
+.payment-amount {
+    font-weight: 600;
+    color: #28a745;
+}
+
+.add-payment-btn {
+    width: 100%;
+    padding: 8px;
+    border: 2px solid #ffc107;
+    background: white;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #856404;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 8px;
+}
+
+.add-payment-btn:hover {
+    background: #ffc107;
+    color: white;
+}
+
+/* Дополнительные кнопки действий */
+.action-btn-assign {
+    color: #6f42c1;
+}
+
+.action-btn-assign:hover {
+    background: #6f42c1;
+    color: white;
+    border-color: #6f42c1;
+}
+
+.action-btn-payment {
+    color: #ffc107;
+}
+
+.action-btn-payment:hover {
+    background: #ffc107;
+    color: white;
+    border-color: #ffc107;
+}
+
+.action-btn-archive {
+    color: #6c757d;
+}
+
+.action-btn-archive:hover {
+    background: #6c757d;
+    color: white;
+    border-color: #6c757d;
+}
 </style>
 {% endblock %}
 
@@ -1975,6 +2156,29 @@ tr .project-color-indicator {
                         </div>
                     </div>
 
+                    <!-- Executor Section -->
+                    <div class="executor-section">
+                        {% if project.assigned_to %}
+                        <div class="executor-info">
+                            <div class="executor-avatar">
+                                {{ (project.assigned_to.username or 'E')[0] }}
+                            </div>
+                            <div class="executor-details">
+                                <div class="executor-label">Исполнитель</div>
+                                <div class="executor-name">{{ project.assigned_to.username or 'Не назначен' }}</div>
+                            </div>
+                            <button class="action-btn action-btn-assign" onclick="showAssignExecutorModal({{ project.id }})" title="Сменить исполнителя">
+                                <i class="fas fa-exchange-alt"></i>
+                            </button>
+                        </div>
+                        {% else %}
+                        <button class="assign-executor-btn" onclick="showAssignExecutorModal({{ project.id }})">
+                            <i class="fas fa-user-plus"></i>
+                            Назначить исполнителя
+                        </button>
+                        {% endif %}
+                    </div>
+
                     <!-- Project Stats Row -->
                     <div class="project-stats-row">
                         <div class="stat-item">
@@ -2010,6 +2214,38 @@ tr .project-color-indicator {
                         </div>
                     </div>
 
+                    <!-- Payments Section -->
+                    {% if user_role == 'owner' %}
+                    <div class="payments-section">
+                        <div class="payments-summary">
+                            <span class="payments-label">Оплаты</span>
+                            <div class="payments-amount">
+                                <span class="paid">{{ (project.client_paid_total or 0)|round|int }}₽</span>
+                                <span> / </span>
+                                <span class="total">{{ (project.estimated_cost or 0)|round|int }}₽</span>
+                            </div>
+                        </div>
+
+                        {% if project.payments and project.payments|length > 0 %}
+                        <div class="payment-history">
+                            {% for payment in project.payments[-3:] %}
+                            <div class="payment-history-item">
+                                <span>{{ payment.payment_type or 'Оплата' }}</span>
+                                <div>
+                                    <span class="payment-amount">+{{ payment.amount|round|int }}₽</span>
+                                    <span class="payment-date">{{ payment.payment_date[:10] if payment.payment_date else '' }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <button class="add-payment-btn" onclick="showAddPaymentModal({{ project.id }})">
+                            <i class="fas fa-plus-circle"></i> Добавить оплату
+                        </button>
+                    </div>
+                    {% endif %}
+
                     <!-- Deadline Info -->
                     {% if project.deadline %}
                     <div class="deadline-info">
@@ -2026,11 +2262,17 @@ tr .project-color-indicator {
                         <button class="action-btn action-btn-edit" onclick="openEditModal({{ project.id }})" title="Редактировать">
                             <i class="fas fa-edit"></i>
                         </button>
+                        <button class="action-btn action-btn-payment" onclick="showAddPaymentModal({{ project.id }})" title="Добавить оплату">
+                            <i class="fas fa-dollar-sign"></i>
+                        </button>
                         {% if project.user and project.user.telegram_id %}
                         <button class="action-btn action-btn-chat" onclick="contactClient({{ project.user.telegram_id }})" title="Связаться">
                             <i class="fas fa-comment"></i>
                         </button>
                         {% endif %}
+                        <button class="action-btn action-btn-archive" onclick="archiveProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="{% if project.is_archived %}Восстановить{% else %}В архив{% endif %}">
+                            <i class="fas fa-{% if project.is_archived %}box-open{% else %}archive{% endif %}"></i>
+                        </button>
                         <button class="action-btn action-btn-delete" onclick="confirmDeleteProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="Удалить">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -2199,6 +2441,95 @@ tr .project-color-indicator {
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для назначения исполнителя -->
+<div class="modal fade" id="assignExecutorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Назначить исполнителя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="assignExecutorProjectId" />
+
+                <div class="mb-3">
+                    <label class="form-label">Выберите исполнителя:</label>
+                    <select class="form-select" id="assignExecutorSelect">
+                        <option value="">Выберите исполнителя...</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Стоимость для исполнителя (₽):</label>
+                    <input type="number" class="form-control" id="assignExecutorCost" placeholder="0">
+                    <small class="text-muted">Сумма, которую получит исполнитель</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="assignExecutor()">
+                    <i class="fas fa-user-check me-2"></i>Назначить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для добавления оплаты -->
+<div class="modal fade" id="addPaymentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Добавить оплату</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="addPaymentProjectId" />
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Тип оплаты:</label>
+                        <select class="form-select" id="paymentType">
+                            <option value="prepayment">Предоплата</option>
+                            <option value="stage">Оплата этапа</option>
+                            <option value="final">Финальная оплата</option>
+                            <option value="other">Другое</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Сумма (₽):</label>
+                        <input type="number" class="form-control" id="paymentAmount" placeholder="0" required>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Дата оплаты:</label>
+                    <input type="date" class="form-control" id="paymentDate">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Комментарий (необязательно):</label>
+                    <textarea class="form-control" id="paymentComment" rows="3" placeholder="Например: Оплата за 1 этап разработки"></textarea>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Текущий баланс:</strong>
+                    <div class="mt-2">
+                        Оплачено: <strong id="currentPaidAmount">0</strong>₽ / Всего: <strong id="currentTotalAmount">0</strong>₽
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-success" onclick="addPayment()">
+                    <i class="fas fa-plus-circle me-2"></i>Добавить оплату
+                </button>
             </div>
         </div>
     </div>
@@ -5650,7 +5981,161 @@ tr .project-color-indicator {
             card.style.transform = 'scale(1)';
             card.style.transition = 'all 0.3s ease';
         });
+
+        // Загружаем список исполнителей для модального окна
+        loadExecutorsForAssignment();
     });
+
+    // ============================================
+    // ФУНКЦИИ ДЛЯ НАЗНАЧЕНИЯ ИСПОЛНИТЕЛЯ
+    // ============================================
+
+    async function loadExecutorsForAssignment() {
+        try {
+            const response = await fetch('/admin/api/contractors/', {
+                headers: {
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const executors = data.contractors || [];
+
+                const select = document.getElementById('assignExecutorSelect');
+                if (select) {
+                    select.innerHTML = '<option value="">Выберите исполнителя...</option>';
+                    executors.forEach(executor => {
+                        const option = document.createElement('option');
+                        option.value = executor.id;
+                        option.textContent = `${executor.username} (${executor.full_name || 'Без имени'})`;
+                        select.appendChild(option);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки исполнителей:', error);
+        }
+    }
+
+    function showAssignExecutorModal(projectId) {
+        document.getElementById('assignExecutorProjectId').value = projectId;
+
+        // Получаем текущего исполнителя проекта
+        const project = allProjects.find(p => p.id === projectId);
+        if (project && project.assigned_to) {
+            document.getElementById('assignExecutorSelect').value = project.assigned_to.id || '';
+            document.getElementById('assignExecutorCost').value = project.executor_cost || 0;
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('assignExecutorModal'));
+        modal.show();
+    }
+
+    async function assignExecutor() {
+        const projectId = document.getElementById('assignExecutorProjectId').value;
+        const executorId = document.getElementById('assignExecutorSelect').value;
+        const executorCost = document.getElementById('assignExecutorCost').value;
+
+        if (!executorId) {
+            alert('Пожалуйста, выберите исполнителя');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/admin/api/projects/${projectId}/assign`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                },
+                body: JSON.stringify({
+                    executor_id: parseInt(executorId),
+                    executor_cost: parseFloat(executorCost) || 0
+                })
+            });
+
+            if (response.ok) {
+                showNotification('Исполнитель успешно назначен', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('assignExecutorModal')).hide();
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                const data = await response.json();
+                showNotification(data.message || 'Ошибка назначения исполнителя', 'danger');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            showNotification('Ошибка при назначении исполнителя', 'danger');
+        }
+    }
+
+    // ============================================
+    // ФУНКЦИИ ДЛЯ ДОБАВЛЕНИЯ ОПЛАТ
+    // ============================================
+
+    function showAddPaymentModal(projectId) {
+        document.getElementById('addPaymentProjectId').value = projectId;
+
+        // Получаем информацию о проекте
+        const project = allProjects.find(p => p.id === projectId);
+        if (project) {
+            document.getElementById('currentPaidAmount').textContent = (project.client_paid_total || 0).toLocaleString('ru-RU');
+            document.getElementById('currentTotalAmount').textContent = (project.estimated_cost || 0).toLocaleString('ru-RU');
+        }
+
+        // Устанавливаем текущую дату
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('paymentDate').value = today;
+
+        const modal = new bootstrap.Modal(document.getElementById('addPaymentModal'));
+        modal.show();
+    }
+
+    async function addPayment() {
+        const projectId = document.getElementById('addPaymentProjectId').value;
+        const paymentType = document.getElementById('paymentType').value;
+        const amount = document.getElementById('paymentAmount').value;
+        const paymentDate = document.getElementById('paymentDate').value;
+        const comment = document.getElementById('paymentComment').value;
+
+        if (!amount || parseFloat(amount) <= 0) {
+            alert('Пожалуйста, укажите сумму оплаты');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/admin/api/projects/${projectId}/payments`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Basic ' + btoa(`${window.username}:${window.password}`)
+                },
+                body: JSON.stringify({
+                    payment_type: paymentType,
+                    amount: parseFloat(amount),
+                    payment_date: paymentDate,
+                    comment: comment
+                })
+            });
+
+            if (response.ok) {
+                showNotification('Оплата успешно добавлена', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('addPaymentModal')).hide();
+
+                // Очищаем форму
+                document.getElementById('paymentAmount').value = '';
+                document.getElementById('paymentComment').value = '';
+
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                const data = await response.json();
+                showNotification(data.message || 'Ошибка добавления оплаты', 'danger');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            showNotification('Ошибка при добавлении опл��ты', 'danger');
+        }
+    }
 
 </script>
 </div> <!-- content-wrapper -->
