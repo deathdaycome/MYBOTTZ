@@ -944,6 +944,557 @@ tr .project-color-indicator {
     text-align: center;
     flex-grow: 1;
 }
+
+/* ============================================ */
+/* НОВЫЕ СТИЛИ ДЛЯ СОВРЕМЕННЫХ КАРТОЧЕК ПРОЕКТОВ */
+/* ============================================ */
+
+/* Toolbar с фильтрами */
+.projects-toolbar {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px 12px 0 0;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Фильтр-чипсы */
+.filter-chips {
+    gap: 8px;
+}
+
+.filter-chip {
+    padding: 8px 16px;
+    border: 2px solid #dee2e6;
+    background: white;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.filter-chip:hover {
+    border-color: #0d6efd;
+    background: #e7f1ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.2);
+}
+
+.filter-chip.active {
+    background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+    color: white;
+    border-color: #0d6efd;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+}
+
+.filter-chip i {
+    font-size: 14px;
+}
+
+/* Sort dropdown */
+.sort-dropdown select {
+    min-width: 200px;
+    border-radius: 8px;
+    border: 2px solid #dee2e6;
+    font-weight: 500;
+}
+
+/* Projects Grid - 4 карточки в ряд */
+.projects-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    padding: 24px;
+}
+
+/* Адаптивность */
+@media (max-width: 1600px) {
+    .projects-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 1200px) {
+    .projects-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .projects-grid {
+        grid-template-columns: 1fr;
+    }
+    .filter-chips {
+        flex-direction: column;
+        width: 100%;
+    }
+    .filter-chip {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* Wrapper карточки */
+.project-card-wrapper {
+    transition: transform 0.3s ease;
+}
+
+/* Современная карточка проекта */
+.modern-project-card {
+    background: white;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 2px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+}
+
+.modern-project-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+    border-color: #0d6efd;
+}
+
+/* Статус-градиенты для карточек */
+.modern-project-card[data-status="new"] {
+    border-left: 4px solid #2196F3;
+}
+
+.modern-project-card[data-status="review"] {
+    border-left: 4px solid #FF9800;
+}
+
+.modern-project-card[data-status="accepted"] {
+    border-left: 4px solid #9C27B0;
+}
+
+.modern-project-card[data-status="in_progress"] {
+    border-left: 4px solid #FFC107;
+}
+
+.modern-project-card[data-status="testing"] {
+    border-left: 4px solid #4CAF50;
+}
+
+.modern-project-card[data-status="completed"] {
+    border-left: 4px solid #66BB6A;
+}
+
+.modern-project-card[data-status="cancelled"] {
+    border-left: 4px solid #f44336;
+}
+
+.modern-project-card[data-status="on_hold"] {
+    border-left: 4px solid #9E9E9E;
+}
+
+/* Хедер карточки со статусом */
+.card-status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px 12px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+/* Бейдж статуса */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Цвета статусов */
+.status-badge.status-new {
+    background: linear-gradient(135deg, #2196F3, #1976D2);
+    color: white;
+}
+
+.status-badge.status-new .status-dot {
+    background: #E3F2FD;
+}
+
+.status-badge.status-review {
+    background: linear-gradient(135deg, #FF9800, #F57C00);
+    color: white;
+}
+
+.status-badge.status-review .status-dot {
+    background: #FFF3E0;
+}
+
+.status-badge.status-accepted {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+    color: white;
+}
+
+.status-badge.status-accepted .status-dot {
+    background: #F3E5F5;
+}
+
+.status-badge.status-in_progress {
+    background: linear-gradient(135deg, #FFC107, #FFA000);
+    color: white;
+}
+
+.status-badge.status-in_progress .status-dot {
+    background: #FFF8E1;
+}
+
+.status-badge.status-testing {
+    background: linear-gradient(135deg, #4CAF50, #388E3C);
+    color: white;
+}
+
+.status-badge.status-testing .status-dot {
+    background: #E8F5E9;
+}
+
+.status-badge.status-completed {
+    background: linear-gradient(135deg, #66BB6A, #43A047);
+    color: white;
+}
+
+.status-badge.status-completed .status-dot {
+    background: #C8E6C9;
+}
+
+.status-badge.status-cancelled {
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    color: white;
+}
+
+.status-badge.status-cancelled .status-dot {
+    background: #FFEBEE;
+}
+
+.status-badge.status-on_hold {
+    background: linear-gradient(135deg, #9E9E9E, #757575);
+    color: white;
+}
+
+.status-badge.status-on_hold .status-dot {
+    background: #F5F5F5;
+}
+
+/* ID проекта */
+.project-id-badge {
+    padding: 4px 12px;
+    background: #6c757d;
+    color: white;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Секция заголовка */
+.card-title-section {
+    padding: 16px 20px;
+}
+
+.project-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #212529;
+    margin: 0 0 8px 0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.project-type-tag {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #e9ecef;
+    color: #495057;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Информация о клиенте */
+.client-info-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.client-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.client-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.client-name {
+    font-weight: 600;
+    color: #212529;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.client-username {
+    color: #6c757d;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Строка со статистикой */
+.project-stats-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 16px 20px;
+    gap: 12px;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+}
+
+.stat-item i {
+    color: #6c757d;
+    font-size: 14px;
+}
+
+.stat-label {
+    font-size: 13px;
+    color: #495057;
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: 16px;
+    font-weight: 700;
+    color: #212529;
+}
+
+/* Прогресс */
+.project-progress {
+    padding: 16px 20px;
+}
+
+.progress-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.progress-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.progress-value {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0d6efd;
+}
+
+.progress-bar-container {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    transition: width 0.6s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.3),
+        transparent
+    );
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+/* Информация о дедлайне */
+.deadline-info {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fff3cd;
+    border-top: 1px solid #ffc107;
+    border-bottom: 1px solid #ffc107;
+}
+
+.deadline-info i {
+    color: #856404;
+}
+
+.deadline-info span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #856404;
+}
+
+/* Действия */
+.card-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 20px;
+    background: #f8f9fa;
+}
+
+.action-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 2px solid #dee2e6;
+    background: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 16px;
+}
+
+.action-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.action-btn-view {
+    color: #0d6efd;
+}
+
+.action-btn-view:hover {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+
+.action-btn-edit {
+    color: #17a2b8;
+}
+
+.action-btn-edit:hover {
+    background: #17a2b8;
+    color: white;
+    border-color: #17a2b8;
+}
+
+.action-btn-chat {
+    color: #28a745;
+}
+
+.action-btn-chat:hover {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+}
+
+.action-btn-delete {
+    color: #dc3545;
+}
+
+.action-btn-delete:hover {
+    background: #dc3545;
+    color: white;
+    border-color: #dc3545;
+}
+
+/* Футер карточки */
+.card-footer-info {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    border-top: 1px solid #e9ecef;
+    margin-top: auto;
+}
+
+.card-footer-info i {
+    color: #6c757d;
+    font-size: 13px;
+}
+
+.card-footer-info span {
+    font-size: 12px;
+    color: #6c757d;
+    font-weight: 500;
+}
 </style>
 {% endblock %}
 
@@ -1202,7 +1753,7 @@ tr .project-color-indicator {
     </div>
     <div class="card-body p-0">
         <!-- Table View -->
-        <div id="tableViewContainer">
+        <div id="tableViewContainer" class="d-none">
             <div class="table-responsive">
                 <table class="table table-hover mb-0" id="projectsTable">
                     <thead class="table-dark">
@@ -1331,86 +1882,164 @@ tr .project-color-indicator {
         </div>
     </div>
 
-    <!-- Cards View -->
-    <div id="cardsViewContainer" class="d-none">
-        <div class="row p-3" id="projectsCards">
-            {% for project in projects %}
-            <div class="col-md-6 col-lg-4 mb-4 project-card color-{{ project.get('color', 'default') }}" data-project-id="{{ project.id }}" data-status="{{ project.status }}" data-complexity="{{ project.complexity }}" data-priority="{{ project.priority }}" data-title="{{ project.title.lower() }}" data-client="{{ (project.user.first_name or '').lower() }}">
-                <div class="card h-100 shadow-sm project-card-item" data-status="{{ project.status }}" style="position: relative;">
-                    <button class="color-indicator-btn {{ project.get('color', 'default') }}" 
-                          onclick="changeProjectColor({{ project.id }}, '{{ project.get('color', 'default') }}'); event.stopPropagation();"
-                          title="Изменить цветовую метку"></button>
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h6 class="mb-0 text-truncate" title="{{ project.title }}">{{ project.title }}</h6>
-                        <span class="badge bg-secondary">#{{ project.id }}</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="d-flex align-items-center mb-2 user-info">
-                            <div class="user-avatar me-2">
-                                {{ (project.user.first_name or 'U')[0] if project.user else 'U' }}
-                            </div>
-                            <div>
-                                <div class="fw-medium">{{ project.user.first_name or 'Неизвестно' if project.user else 'Неизвестно' }}</div>
-                                <small class="text-muted">@{{ project.user.username or 'нет' if project.user else 'нет' }}</small>
-                            </div>
-                        </div>
+    <!-- Cards View - NEW STYLISH DESIGN -->
+    <div id="cardsViewContainer">
+        <!-- Filters and Sorting Bar -->
+        <div class="projects-toolbar px-3 pt-3 pb-2">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <!-- Quick Filters -->
+                <div class="filter-chips d-flex gap-2 flex-wrap">
+                    <button class="filter-chip active" data-filter="all" onclick="filterProjects('all')">
+                        <i class="fas fa-layer-group"></i> Все проекты
+                    </button>
+                    <button class="filter-chip" data-filter="my" onclick="filterProjects('my')">
+                        <i class="fas fa-user"></i> Мои проекты
+                    </button>
+                    <button class="filter-chip" data-filter="in_progress" onclick="filterProjects('in_progress')">
+                        <i class="fas fa-spinner"></i> В работе
+                    </button>
+                    <button class="filter-chip" data-filter="overdue" onclick="filterProjects('overdue')">
+                        <i class="fas fa-exclamation-triangle"></i> Просроченные
+                    </button>
+                    <button class="filter-chip" data-filter="completed" onclick="filterProjects('completed')">
+                        <i class="fas fa-check-circle"></i> Завершенные
+                    </button>
+                </div>
 
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="badge status-{{ project.status }}">
-                                {% if project.status == 'new' %}🆕 Новый
-                                {% elif project.status == 'review' %}👀 На рассмотрении
-                                {% elif project.status == 'accepted' %}✅ Принят
-                                {% elif project.status == 'in_progress' %}🔄 В работе
-                                {% elif project.status == 'testing' %}🧪 Тестирование
-                                {% elif project.status == 'completed' %}🎉 Завершен
-                                {% elif project.status == 'cancelled' %}❌ Отменен
-                                {% elif project.status == 'on_hold' %}⏸️ Приостановлен
-                                {% else %}{{ project.status }}{% endif %}
-                            </span>
-                            <span class="badge complexity-{{ project.complexity }}">
-                                {% if project.complexity == 'simple' %}🟢 Простой
-                                {% elif project.complexity == 'medium' %}🟡 Средний
-                                {% elif project.complexity == 'complex' %}🟠 Сложный
-                                {% elif project.complexity == 'premium' %}🔴 Премиум
+                <!-- Sort Dropdown -->
+                <div class="sort-dropdown">
+                    <select class="form-select form-select-sm" onchange="sortProjects(this.value)">
+                        <option value="date-desc">По дате (новые)</option>
+                        <option value="date-asc">По дате (старые)</option>
+                        <option value="price-desc">По цене (дорогие)</option>
+                        <option value="price-asc">По цене (дешевые)</option>
+                        <option value="status">По статусу</option>
+                        <option value="client">По клиенту</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects Grid -->
+        <div class="projects-grid p-3" id="projectsCards">
+            {% for project in projects %}
+            <div class="project-card-wrapper"
+                 data-project-id="{{ project.id }}"
+                 data-status="{{ project.status }}"
+                 data-complexity="{{ project.complexity }}"
+                 data-created="{{ project.created_at }}"
+                 data-price="{{ project.estimated_cost or 0 }}"
+                 data-client="{{ (project.user.first_name or '').lower() if project.user else '' }}">
+
+                <div class="modern-project-card" data-status="{{ project.status }}">
+                    <!-- Card Header with Status Badge -->
+                    <div class="card-status-header">
+                        <div class="status-badge status-{{ project.status }}">
+                            {% if project.status == 'new' %}
+                                <span class="status-dot"></span> Новый
+                            {% elif project.status == 'review' %}
+                                <span class="status-dot"></span> Рассмотрение
+                            {% elif project.status == 'accepted' %}
+                                <span class="status-dot"></span> Принят
+                            {% elif project.status == 'in_progress' %}
+                                <span class="status-dot"></span> В работе
+                            {% elif project.status == 'testing' %}
+                                <span class="status-dot"></span> Тестирование
+                            {% elif project.status == 'completed' %}
+                                <span class="status-dot"></span> Завершен
+                            {% elif project.status == 'cancelled' %}
+                                <span class="status-dot"></span> Отменен
+                            {% elif project.status == 'on_hold' %}
+                                <span class="status-dot"></span> Приостановлен
+                            {% else %}
+                                <span class="status-dot"></span> {{ project.status }}
+                            {% endif %}
+                        </div>
+                        <div class="project-id-badge">#{{ project.id }}</div>
+                    </div>
+
+                    <!-- Project Title -->
+                    <div class="card-title-section">
+                        <h5 class="project-title" title="{{ project.title }}">{{ project.title }}</h5>
+                        <span class="project-type-tag">{{ project.project_type or 'Не указано' }}</span>
+                    </div>
+
+                    <!-- Client Info -->
+                    <div class="client-info-row">
+                        <div class="client-avatar">
+                            {{ (project.user.first_name or 'U')[0] if project.user else 'U' }}
+                        </div>
+                        <div class="client-details">
+                            <div class="client-name">{{ project.user.first_name or 'Неизвестно' if project.user else 'Неизвестно' }}</div>
+                            <div class="client-username">@{{ project.user.username or 'нет' if project.user else 'нет' }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Project Stats Row -->
+                    <div class="project-stats-row">
+                        <div class="stat-item">
+                            <i class="fas fa-layer-group"></i>
+                            <span class="stat-label">
+                                {% if project.complexity == 'simple' %}Простой
+                                {% elif project.complexity == 'medium' %}Средний
+                                {% elif project.complexity == 'complex' %}Сложный
+                                {% elif project.complexity == 'premium' %}Премиум
                                 {% else %}{{ project.complexity }}{% endif %}
                             </span>
                         </div>
-
-                        <div class="progress mb-2">
-                            <div class="progress-bar" role="progressbar" style="width: {{ calculate_progress(project.status) }}%;" aria-valuenow="{{ calculate_progress(project.status) }}" aria-valuemin="0" aria-valuemax="100"></div>
-                        </div>
-
-                        <p class="card-text text-muted small description-preview">{{ project.description if project.description else 'Нет описания' }}</p>
-
-                        <div class="d-flex justify-content-between mt-auto">
-                            <div class="fw-bold">{{ (project.estimated_cost or 0)|round|int }}₽</div>
-                            <small class="text-muted">{{ project.created_at[:10] if project.created_at else 'Н/Д' }}</small>
+                        <div class="stat-item">
+                            <i class="fas fa-ruble-sign"></i>
+                            <span class="stat-value">
+                                {% if user_role == 'owner' %}
+                                    {{ (project.estimated_cost or 0)|round|int }}₽
+                                {% else %}
+                                    {{ (project.executor_cost or 0)|round|int }}₽
+                                {% endif %}
+                            </span>
                         </div>
                     </div>
-                    <div class="card-footer bg-light d-flex justify-content-end">
-                        <div class="btn-group btn-group-sm">
-                            <button class="btn btn-outline-primary" onclick="viewProject({{ project.id }})" title="Просмотр">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                            <button class="btn btn-outline-secondary" onclick="window.location.href='/admin/projects/{{ project.id }}/detail'" title="Детали">
-                                <i class="fas fa-info-circle"></i>
-                            </button>
-                            <button class="btn btn-outline-info" onclick="openEditModal({{ project.id }})" title="Редактировать">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-outline-secondary" onclick="showFilesModal({{ project.id }})" title="Файлы">
-                                <i class="fas fa-folder-open"></i>
-                            </button>
-                            {% if project.user and project.user.telegram_id %}
-                            <button class="btn btn-outline-success" onclick="contactClient({{ project.user.telegram_id }})" title="Связаться">
-                                <i class="fas fa-comment"></i>
-                            </button>
-                            {% else %}
-                            <button class="btn btn-outline-secondary" disabled title="Telegram ID отсутствует">
-                                <i class="fas fa-comment"></i>
-                            </button>
-                            {% endif %}
+
+                    <!-- Progress Bar -->
+                    <div class="project-progress">
+                        <div class="progress-header">
+                            <span class="progress-label">Прогресс</span>
+                            <span class="progress-value">{{ calculate_progress(project.status) }}%</span>
                         </div>
+                        <div class="progress-bar-container">
+                            <div class="progress-bar-fill" style="width: {{ calculate_progress(project.status) }}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Deadline Info -->
+                    {% if project.deadline %}
+                    <div class="deadline-info">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Дедлайн: {{ project.deadline[:10] if project.deadline else 'Не указан' }}</span>
+                    </div>
+                    {% endif %}
+
+                    <!-- Action Buttons -->
+                    <div class="card-actions">
+                        <button class="action-btn action-btn-view" onclick="viewProject({{ project.id }})" title="Просмотр">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="action-btn action-btn-edit" onclick="openEditModal({{ project.id }})" title="Редактировать">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        {% if project.user and project.user.telegram_id %}
+                        <button class="action-btn action-btn-chat" onclick="contactClient({{ project.user.telegram_id }})" title="Связаться">
+                            <i class="fas fa-comment"></i>
+                        </button>
+                        {% endif %}
+                        <button class="action-btn action-btn-delete" onclick="confirmDeleteProject({{ project.id }}, '{{ project.title | replace("'", "\\'") | replace('"', '\\"') }}')" title="Удалить">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+
+                    <!-- Created Date -->
+                    <div class="card-footer-info">
+                        <i class="fas fa-clock"></i>
+                        <span>{{ project.created_at[:10] if project.created_at else 'Н/Д' }}</span>
                     </div>
                 </div>
             </div>
@@ -1729,7 +2358,7 @@ tr .project-color-indicator {
                     <button class="btn btn-outline-warning" onclick="archiveProject(${project.id}, '${project.title}')" title="${project.is_archived ? 'Восстановить из архива' : 'Добавить в архив'}">
                         <i class="fas fa-${project.is_archived ? 'box-open' : 'archive'}"></i>
                     </button>
-                    <button class="btn btn-outline-danger" onclick="deleteProject(${project.id})" title="Удалить">
+                    <button class="btn btn-outline-danger" onclick="confirmDeleteProject(${project.id}, '${project.title}')" title="Удалить">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -4857,22 +5486,22 @@ tr .project-color-indicator {
         console.log('DOM загружен!');
         const createBtn = document.getElementById('createProjectBtn');
         console.log('Кнопка найдена:', createBtn);
-        
+
         // Дополнительная защита - тройной обработчик
         if (createBtn) {
             // Диагностика событий мыши
             createBtn.addEventListener('mousedown', function(e) {
                 console.log('MOUSEDOWN на кнопке!');
             });
-            
+
             createBtn.addEventListener('mouseup', function(e) {
                 console.log('MOUSEUP на кнопке!');
             });
-            
+
             createBtn.addEventListener('mouseover', function(e) {
                 console.log('MOUSEOVER на кнопке!');
             });
-            
+
             // 1. addEventListener как резерв
             createBtn.addEventListener('click', function(e) {
                 console.log('КЛИК через addEventListener!');
@@ -4880,7 +5509,7 @@ tr .project-color-indicator {
                 e.stopPropagation();
                 createProject();
             });
-            
+
             // 2. Прямое назначение onclick как резерв
             createBtn.onclick = function(e) {
                 console.log('КЛИК через onclick!');
@@ -4888,9 +5517,122 @@ tr .project-color-indicator {
                 e.stopPropagation();
                 createProject();
             };
-            
+
             console.log('Обработчики добавлены');
         }
+    });
+
+    // ============================================
+    // НОВЫЕ ФУНКЦИИ ДЛЯ КАРТОЧНОГО ВИДА
+    // ============================================
+
+    // Глобальные переменные для фильтров
+    let currentFilter = 'all';
+    let currentSort = 'date-desc';
+
+    // Функция фильтрации проектов
+    function filterProjects(filter) {
+        currentFilter = filter;
+
+        // Обновляем активный фильтр
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.classList.remove('active');
+            if (chip.dataset.filter === filter) {
+                chip.classList.add('active');
+            }
+        });
+
+        // Получаем все карточки
+        const cards = document.querySelectorAll('.project-card-wrapper');
+
+        cards.forEach(card => {
+            const status = card.dataset.status;
+            let show = false;
+
+            switch(filter) {
+                case 'all':
+                    show = true;
+                    break;
+                case 'my':
+                    // Здесь нужно добавить логику "моих проектов"
+                    // Пока показываем все
+                    show = true;
+                    break;
+                case 'in_progress':
+                    show = status === 'in_progress';
+                    break;
+                case 'overdue':
+                    // Здесь нужно проверять дедлайн
+                    // Пока скрываем
+                    show = false;
+                    break;
+                case 'completed':
+                    show = status === 'completed';
+                    break;
+                default:
+                    show = true;
+            }
+
+            if (show) {
+                card.style.display = 'block';
+                // Плавное появление
+                setTimeout(() => {
+                    card.style.opacity = '1';
+                    card.style.transform = 'scale(1)';
+                }, 10);
+            } else {
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.9)';
+                setTimeout(() => {
+                    card.style.display = 'none';
+                }, 300);
+            }
+        });
+
+        // Применяем текущую сортировку
+        sortProjects(currentSort);
+    }
+
+    // Функция сортировки проектов
+    function sortProjects(sortType) {
+        currentSort = sortType;
+
+        const container = document.getElementById('projectsCards');
+        const cards = Array.from(container.querySelectorAll('.project-card-wrapper'));
+
+        cards.sort((a, b) => {
+            switch(sortType) {
+                case 'date-desc':
+                    return new Date(b.dataset.created) - new Date(a.dataset.created);
+                case 'date-asc':
+                    return new Date(a.dataset.created) - new Date(b.dataset.created);
+                case 'price-desc':
+                    return parseFloat(b.dataset.price) - parseFloat(a.dataset.price);
+                case 'price-asc':
+                    return parseFloat(a.dataset.price) - parseFloat(b.dataset.price);
+                case 'status':
+                    return a.dataset.status.localeCompare(b.dataset.status);
+                case 'client':
+                    return a.dataset.client.localeCompare(b.dataset.client);
+                default:
+                    return 0;
+            }
+        });
+
+        // Перемещаем карточки в отсортированном порядке
+        cards.forEach(card => {
+            container.appendChild(card);
+        });
+    }
+
+    // Инициализация фильтров при загрузке
+    document.addEventListener('DOMContentLoaded', function() {
+        // Устанавливаем начальные стили для карточек
+        document.querySelectorAll('.project-card-wrapper').forEach(card => {
+            card.style.opacity = '1';
+            card.style.transform = 'scale(1)';
+            card.style.transition = 'all 0.3s ease';
+        });
     });
 
 </script>
