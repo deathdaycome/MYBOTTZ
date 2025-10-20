@@ -1745,7 +1745,7 @@ tr .project-color-indicator {
                 <button class="btn btn-outline-secondary" onclick="changeView('table')" id="tableView">
                     <i class="fas fa-table"></i>
                 </button>
-                <button class="btn btn-outline-secondary" onclick="changeView('cards')" id="cardsView">
+                <button class="btn btn-outline-secondary active" onclick="changeView('cards')" id="cardsView">
                     <i class="fas fa-th-large"></i>
                 </button>
             </div>
@@ -1753,7 +1753,7 @@ tr .project-color-indicator {
     </div>
     <div class="card-body p-0">
         <!-- Table View -->
-        <div id="tableViewContainer">
+        <div id="tableViewContainer" style="display: none;">
             <div class="table-responsive">
                 <table class="table table-hover mb-0" id="projectsTable">
                     <thead class="table-dark">
@@ -1883,7 +1883,7 @@ tr .project-color-indicator {
     </div>
 
     <!-- Cards View - NEW STYLISH DESIGN -->
-    <div id="cardsViewContainer">
+    <div id="cardsViewContainer" style="display: block;">
         <!-- Filters and Sorting Bar -->
         <div class="projects-toolbar px-3 pt-3 pb-2">
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
