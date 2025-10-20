@@ -1753,7 +1753,7 @@ tr .project-color-indicator {
     </div>
     <div class="card-body p-0">
         <!-- Table View -->
-        <div id="tableViewContainer" class="d-none">
+        <div id="tableViewContainer">
             <div class="table-responsive">
                 <table class="table table-hover mb-0" id="projectsTable">
                     <thead class="table-dark">
@@ -2215,7 +2215,7 @@ tr .project-color-indicator {
     window.username = 'admin';
     window.password = 'qwerty123';
 
-    let currentView = 'table';
+    let currentView = 'cards';
     let allProjects = {{ projects|tojson|safe }};
     let filteredProjects = [...allProjects];
     let projectStatuses = []; // Массив для хранения статусов проектов
@@ -2489,17 +2489,34 @@ tr .project-color-indicator {
     // View Management
     function changeView(view) {
         currentView = view;
-        
+
+        const tableContainer = document.getElementById('tableViewContainer');
+        const cardsContainer = document.getElementById('cardsViewContainer');
+        const tableViewBtn = document.getElementById('tableView');
+        const cardsViewBtn = document.getElementById('cardsView');
+
         if (view === 'table') {
-            document.getElementById('tableViewContainer').style.display = 'block';
-            document.getElementById('cardsViewContainer').style.display = 'none';
-            document.getElementById('tableView').classList.add('active');
-            document.getElementById('cardsView').classList.remove('active');
+            if (tableContainer) {
+                tableContainer.classList.remove('d-none');
+                tableContainer.style.display = 'block';
+            }
+            if (cardsContainer) {
+                cardsContainer.classList.add('d-none');
+                cardsContainer.style.display = 'none';
+            }
+            if (tableViewBtn) tableViewBtn.classList.add('active');
+            if (cardsViewBtn) cardsViewBtn.classList.remove('active');
         } else {
-            document.getElementById('tableViewContainer').style.display = 'none';
-            document.getElementById('cardsViewContainer').style.display = 'block';
-            document.getElementById('tableView').classList.remove('active');
-            document.getElementById('cardsView').classList.add('active');
+            if (tableContainer) {
+                tableContainer.classList.add('d-none');
+                tableContainer.style.display = 'none';
+            }
+            if (cardsContainer) {
+                cardsContainer.classList.remove('d-none');
+                cardsContainer.style.display = 'block';
+            }
+            if (tableViewBtn) tableViewBtn.classList.remove('active');
+            if (cardsViewBtn) cardsViewBtn.classList.add('active');
         }
     }
 
