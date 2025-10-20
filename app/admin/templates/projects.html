@@ -2258,10 +2258,10 @@ tr .project-color-indicator {
                 filteredProjects = [...allProjects];
                 console.log('Всего проектов:', allProjects.length);
                 console.log('После фильтрации:', filteredProjects.length);
-                
+
                 // Обновляем отображение
-                updateProjectsDisplay();
-                
+                // updateProjectsDisplay(); // Закомментировано - используем серверный рендеринг
+
                 // Обновляем счетчик
                 const counter = document.getElementById('projectsCount');
                 if (counter) {
