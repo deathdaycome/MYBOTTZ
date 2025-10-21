@@ -26,6 +26,7 @@ def get_navigation_items(role_or_path=None, db=None, user_role=None) -> list:
         {"name": "Планировщик задач", "url": "/admin/tasks", "icon": "fas fa-tasks", "roles": ["owner", "admin", "executor"]},
         {"name": "Канбан доска", "url": "/admin/tasks/kanban", "icon": "fas fa-columns", "roles": ["owner"]},
         {"name": "Мои задачи", "url": "/admin/tasks/user/my-tasks", "icon": "fas fa-clipboard-list", "roles": ["owner", "admin", "sales", "salesperson", "executor"]},
+        {"name": "Архив задач", "url": "/admin/tasks/archive", "icon": "fas fa-archive", "roles": ["owner", "admin"]},
         {"name": "Документы", "url": "/admin/documents", "icon": "fas fa-file-alt", "roles": ["owner", "admin"]},
         {"name": "Финансы", "url": "/admin/finance", "icon": "fas fa-chart-bar", "roles": ["owner", "admin", "executor"]},
         {"name": "Пользователи", "url": "/admin/users", "icon": "fas fa-users", "roles": ["owner", "admin"]},

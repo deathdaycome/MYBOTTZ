@@ -1,0 +1,420 @@
+{% extends "base.html" %}
+
+{% block title %}Архив задач - Админ-панель{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="/admin/static/css/tasks.css">
+<style>
+.archive-page {
+    background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.archive-header {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.archive-filters {
+    display: flex;
+    gap: 16px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #374151;
+    margin-bottom: 6px;
+}
+
+.filter-select, .filter-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.filter-select:focus, .filter-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.filter-btn {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    align-self: flex-end;
+}
+
+.filter-btn:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.date-group {
+    background: white;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.date-header {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #111827;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.date-header i {
+    color: #8b5cf6;
+}
+
+.employee-section {
+    margin-bottom: 24px;
+}
+
+.employee-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    border-radius: 12px;
+}
+
+.employee-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.employee-name {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+}
+
+.employee-stats {
+    margin-left: auto;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
+.task-counter {
+    background: #8b5cf6;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.archived-tasks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.archived-task-card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    transition: all 0.3s;
+    border-left: 4px solid #10b981;
+}
+
+.archived-task-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.archived-task-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: #111827;
+    margin-bottom: 8px;
+}
+
+.archived-task-description {
+    font-size: 0.875rem;
+    color: #6b7280;
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+
+.archived-task-meta {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+    color: #9ca3af;
+}
+
+.archived-task-meta i {
+    margin-right: 4px;
+}
+
+.archived-task-time {
+    background: #f3f4f6;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-weight: 500;
+    color: #374151;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #9ca3af;
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: 16px;
+    opacity: 0.3;
+}
+
+.empty-state h3 {
+    font-size: 1.25rem;
+    margin-bottom: 8px;
+    color: #6b7280;
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 60px;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f4f6;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="archive-page">
+    <div class="archive-header">
+        <h1>
+            <i class="fas fa-archive text-primary"></i>
+            Архив задач
+        </h1>
+        <p class="text-muted">Просмотр выполненных задач с фильтрацией по датам и сотрудникам</p>
+
+        <div class="archive-filters">
+            <div class="filter-group">
+                <label>Сотрудник:</label>
+                <select class="filter-select" id="employeeFilter">
+                    <option value="">Все сотрудники</option>
+                    {% for employee in employees %}
+                    <option value="{{ employee.id }}">{{ employee.first_name }} {{ employee.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Дата от:</label>
+                <input type="date" class="filter-input" id="dateFrom">
+            </div>
+            <div class="filter-group">
+                <label>Дата до:</label>
+                <input type="date" class="filter-input" id="dateTo">
+            </div>
+            <button class="filter-btn" onclick="loadArchive()">
+                <i class="fas fa-search"></i> Применить
+            </button>
+        </div>
+    </div>
+
+    <div id="archiveContent">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Загрузка архива при инициализации
+document.addEventListener('DOMContentLoaded', function() {
+    loadArchive();
+});
+
+async function loadArchive() {
+    const employeeId = document.getElementById('employeeFilter').value;
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+
+    // Строим URL с параметрами
+    let url = '/admin/api/tasks/archive/list?';
+    const params = [];
+    if (employeeId) params.push(`employee_id=${employeeId}`);
+    if (dateFrom) params.push(`date_from=${dateFrom}`);
+    if (dateTo) params.push(`date_to=${dateTo}`);
+    url += params.join('&');
+
+    try {
+        const response = await fetch(url, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            renderArchive(data.tasks_by_date, data.total_tasks);
+        } else {
+            showError(data.error || 'Ошибка загрузки архива');
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки архива:', error);
+        showError('Ошибка загрузки архива');
+    }
+}
+
+function renderArchive(tasksByDate, totalTasks) {
+    const container = document.getElementById('archiveContent');
+
+    if (totalTasks === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <h3>Архив пуст</h3>
+                <p>Здесь будут отображаться завершенные задачи</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+
+    // Сортируем даты в обратном порядке (новые сначала)
+    const sortedDates = Object.keys(tasksByDate).sort().reverse();
+
+    sortedDates.forEach(date => {
+        const dateObj = new Date(date);
+        const formattedDate = dateObj.toLocaleDateString('ru-RU', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        html += `
+            <div class="date-group">
+                <div class="date-header">
+                    <i class="fas fa-calendar-day"></i>
+                    ${formattedDate}
+                </div>
+        `;
+
+        // Перебираем сотрудников в этой дате
+        Object.keys(tasksByDate[date]).forEach(employeeId => {
+            const employeeData = tasksByDate[date][employeeId];
+            const employee = employeeData.employee;
+            const tasks = employeeData.tasks;
+
+            const initials = (employee.first_name ? employee.first_name[0] : '') +
+                           (employee.last_name ? employee.last_name[0] : '');
+
+            html += `
+                <div class="employee-section">
+                    <div class="employee-header">
+                        <div class="employee-avatar">${initials}</div>
+                        <div class="employee-name">${employee.first_name} ${employee.last_name}</div>
+                        <div class="employee-stats">
+                            <span class="task-counter">${tasks.length} ${tasks.length === 1 ? 'задача' : tasks.length < 5 ? 'задачи' : 'задач'}</span>
+                        </div>
+                    </div>
+                    <div class="archived-tasks-grid">
+            `;
+
+            tasks.forEach(task => {
+                const timeSpent = task.time_spent_seconds || 0;
+                const hours = Math.floor(timeSpent / 3600);
+                const minutes = Math.floor((timeSpent % 3600) / 60);
+                const timeFormatted = `${hours}ч ${minutes}м`;
+
+                html += `
+                    <div class="archived-task-card" onclick="window.location.href='/admin/tasks/${task.id}'">
+                        <div class="archived-task-title">${escapeHtml(task.title)}</div>
+                        ${task.description ? `<div class="archived-task-description">${escapeHtml(task.description)}</div>` : ''}
+                        <div class="archived-task-meta">
+                            <span><i class="fas fa-check-circle"></i> Завершено</span>
+                            <span class="archived-task-time"><i class="fas fa-clock"></i> ${timeFormatted}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showError(message) {
+    const container = document.getElementById('archiveContent');
+    container.innerHTML = `
+        <div class="empty-state">
+            <i class="fas fa-exclamation-triangle"></i>
+            <h3>Ошибка</h3>
+            <p>${message}</p>
+        </div>
+    `;
+}
+</script>
+{% endblock %}

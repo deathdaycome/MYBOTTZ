@@ -57,6 +57,35 @@ def get_current_user_from_request(request: Request):
         logger.error(f"Ошибка получения пользователя: {e}")
         raise HTTPException(status_code=401, detail="Не авторизован")
 
+@router.get("/archive", response_class=HTMLResponse)
+async def tasks_archive_page(request: Request, current_user: dict = Depends(get_current_admin_user)):
+    """Страница архива задач"""
+    try:
+        with get_db_context() as db:
+            # Получаем элементы навигации
+            from app.admin.app import get_navigation_items
+            navigation_items = get_navigation_items(current_user['role'])
+
+            # Получаем список сотрудников для фильтра
+            employees = db.query(AdminUser).filter(
+                AdminUser.is_active == True,
+                AdminUser.role.in_(['executor', 'manager'])
+            ).all()
+
+            return templates.TemplateResponse("tasks_archive.html", {
+                "request": request,
+                "current_user": current_user,
+                "current_user_id": current_user['id'],
+                "username": current_user['username'],
+                "user_role": current_user['role'],
+                "navigation_items": navigation_items,
+                "employees": employees
+            })
+
+    except Exception as e:
+        logger.error(f"Ошибка при загрузке архива задач: {e}")
+        raise HTTPException(status_code=500, detail="Ошибка при загрузке архива задач")
+
 @router.get("/kanban", response_class=HTMLResponse)
 async def kanban_board_page(request: Request, current_user: dict = Depends(get_current_admin_user)):
     """Страница канбан-доски с исполнителями (только для владельца)"""
@@ -64,12 +93,12 @@ async def kanban_board_page(request: Request, current_user: dict = Depends(get_c
         # Проверяем, что пользователь - владелец
         if current_user["role"] != "owner":
             raise HTTPException(status_code=403, detail="Доступ запрещен")
-        
+
         with get_db_context() as db:
             # Получаем элементы навигации
             from app.admin.app import get_navigation_items
             navigation_items = get_navigation_items(current_user['role'])
-            
+
             return templates.TemplateResponse("tasks_kanban.html", {
                 "request": request,
                 "current_user": current_user,
@@ -78,7 +107,7 @@ async def kanban_board_page(request: Request, current_user: dict = Depends(get_c
                 "user_role": current_user['role'],
                 "navigation_items": navigation_items
             })
-            
+
     except HTTPException:
         raise
     except Exception as e:
