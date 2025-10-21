@@ -1173,3 +1173,105 @@ h4 {
     transform: scale(1.08);
     box-shadow: 0 3px 6px rgba(239, 68, 68, 0.35);
 }
+
+/* === СТИЛИ ДЛЯ ГРАДИЕНТНОЙ АНИМАЦИИ ВЫПОЛНЕННЫХ ЗАДАЧ === */
+.task-completed-gradient {
+    background: linear-gradient(
+        135deg,
+        #fecaca 0%,
+        #fca5a5 25%,
+        #f87171 50%,
+        #fca5a5 75%,
+        #fecaca 100%
+    ) !important;
+    background-size: 200% 200% !important;
+    animation: gradient-shift 3s ease infinite !important;
+    border: 2px solid #ef4444 !important;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3) !important;
+}
+
+@keyframes gradient-shift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* === КНОПКА ВЫПОЛНЕНА === */
+.task-complete-btn {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #10b981, #34d399);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+}
+
+.task-complete-btn:hover {
+    background: linear-gradient(135deg, #059669, #10b981);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+}
+
+.task-complete-btn i {
+    font-size: 1rem;
+}
+
+/* === ИНФОРМАЦИЯ О ВЫПОЛНЕНИИ === */
+.task-completed-info {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #059669;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.completed-by {
+    margin-top: 5px;
+    font-size: 0.75rem;
+    color: #6b7280;
+    font-weight: 400;
+}
+
+/* === КНОПКА АРХИВАЦИИ === */
+.task-archive-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 2px 6px rgba(139, 92, 246, 0.25);
+}
+
+.task-archive-btn:hover {
+    background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(139, 92, 246, 0.35);
+}
+
+.task-archive-btn i {
+    font-size: 1rem;
+}

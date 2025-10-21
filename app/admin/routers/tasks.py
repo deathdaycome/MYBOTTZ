@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
 from typing import Optional, List
 import json
+from sqlalchemy import desc
 
 from ...config.logging import get_logger
 from ...database.database import get_db_context
@@ -1536,6 +1537,173 @@ async def update_task_progress(
 
     except Exception as e:
         logger.error(f"Ошибка обновления прогресса задачи {task_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+@router.post("/api/tasks/{task_id}/mark-completed")
+async def mark_task_completed(
+    task_id: int,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Отметить задачу как выполненную (для сотрудника)"""
+    try:
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                return {"success": False, "error": "Задача не найдена"}
+
+            # Проверка прав: только исполнитель может отметить как выполненную
+            if task.assigned_to_id != current_user['id']:
+                return {"success": False, "error": "Только исполнитель может отметить задачу как выполненную"}
+
+            # Сохраняем в метаданные информацию о том, что сотрудник отметил задачу
+            if not task.task_metadata:
+                task.task_metadata = {}
+
+            task.task_metadata['marked_completed_by_employee'] = {
+                'employee_id': current_user['id'],
+                'employee_name': current_user['username'],
+                'marked_at': datetime.utcnow().isoformat()
+            }
+
+            # Меняем статус на "completed"
+            task.status = "completed"
+            task.progress = 100
+
+            # Останавливаем таймер если он запущен
+            if task.timer_started_at:
+                elapsed = int((datetime.utcnow() - task.timer_started_at).total_seconds())
+                task.time_spent_seconds = (task.time_spent_seconds or 0) + elapsed
+                task.timer_started_at = None
+
+            db.commit()
+            db.refresh(task)
+
+            logger.info(f"Задача {task_id} отмечена как выполненная сотрудником {current_user['username']}")
+
+            return {
+                "success": True,
+                "message": "Задача отмечена как выполненная и ожидает подтверждения администратора",
+                "task": task.to_dict()
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка отметки задачи {task_id} как выполненной: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+@router.post("/api/tasks/{task_id}/archive")
+async def archive_task(
+    task_id: int,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Архивировать задачу (только для владельца)"""
+    try:
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                return {"success": False, "error": "Задача не найдена"}
+
+            # Проверка прав: только создатель (владелец) может архивировать
+            if task.created_by_id != current_user['id']:
+                admin_user = db.query(AdminUser).filter(AdminUser.id == current_user['id']).first()
+                if not admin_user or admin_user.role != 'owner':
+                    return {"success": False, "error": "Только владелец может архивировать задачи"}
+
+            # Проверяем что задача завершена
+            if task.status != "completed":
+                return {"success": False, "error": "Можно архивировать только выполненные задачи"}
+
+            # Сохраняем в метаданные информацию об архивации
+            if not task.task_metadata:
+                task.task_metadata = {}
+
+            task.task_metadata['archived'] = True
+            task.task_metadata['archived_by'] = {
+                'admin_id': current_user['id'],
+                'admin_name': current_user['username'],
+                'archived_at': datetime.utcnow().isoformat()
+            }
+
+            # Устанавливаем время завершения если не установлено
+            if not task.completed_at:
+                task.completed_at = datetime.utcnow()
+
+            db.commit()
+            db.refresh(task)
+
+            logger.info(f"Задача {task_id} ({task.title}) архивирована администратором {current_user['username']}")
+
+            return {
+                "success": True,
+                "message": "Задача успешно архивирована",
+                "task": task.to_dict()
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка архивации задачи {task_id}: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "error": str(e)}
+
+@router.get("/api/tasks/archive/list")
+async def get_archived_tasks(
+    current_user: dict = Depends(get_current_admin_user),
+    employee_id: int = None,
+    date_from: str = None,
+    date_to: str = None
+):
+    """Получить список архивных задач с фильтрацией по сотруднику и датам"""
+    try:
+        with get_db_context() as db:
+            # Базовый запрос - только архивные задачи
+            query = db.query(Task).filter(
+                Task.task_metadata['archived'].astext == 'true'
+            )
+
+            # Фильтр по сотруднику
+            if employee_id:
+                query = query.filter(Task.assigned_to_id == employee_id)
+
+            # Фильтр по датам
+            if date_from:
+                date_from_dt = datetime.fromisoformat(date_from)
+                query = query.filter(Task.completed_at >= date_from_dt)
+
+            if date_to:
+                date_to_dt = datetime.fromisoformat(date_to)
+                query = query.filter(Task.completed_at <= date_to_dt)
+
+            # Сортировка по дате завершения
+            tasks = query.order_by(desc(Task.completed_at)).all()
+
+            # Группируем задачи по дням и сотрудникам
+            tasks_by_date = {}
+            for task in tasks:
+                if task.completed_at:
+                    date_key = task.completed_at.strftime('%Y-%m-%d')
+                    if date_key not in tasks_by_date:
+                        tasks_by_date[date_key] = {}
+
+                    employee_key = str(task.assigned_to_id)
+                    if employee_key not in tasks_by_date[date_key]:
+                        tasks_by_date[date_key][employee_key] = {
+                            'employee': task.assigned_to.to_dict() if task.assigned_to else None,
+                            'tasks': []
+                        }
+
+                    tasks_by_date[date_key][employee_key]['tasks'].append(task.to_dict())
+
+            return {
+                "success": True,
+                "tasks_by_date": tasks_by_date,
+                "total_tasks": len(tasks)
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка получения архивных задач: {e}")
         import traceback
         logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}

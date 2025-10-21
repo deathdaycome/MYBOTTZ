@@ -289,7 +289,32 @@ document.addEventListener('DOMContentLoaded', function() {
     loadTasksToBoard();
     updateEmployeeStats();
     initializeDragDropZones();
+
+    // Запускаем обновление таймеров каждую секунду
+    setInterval(updateRunningTimers, 1000);
 });
+
+// Функция обновления запущенных таймеров
+function updateRunningTimers() {
+    document.querySelectorAll('.timer-display.running').forEach(timerEl => {
+        const taskId = timerEl.dataset.taskId;
+        const startedAt = timerEl.dataset.startedAt;
+        const timeSpent = parseInt(timerEl.dataset.timeSpent) || 0;
+
+        if (startedAt) {
+            const startTime = new Date(startedAt);
+            const now = new Date();
+            const elapsedSeconds = Math.floor((now - startTime) / 1000);
+            const totalSeconds = timeSpent + elapsedSeconds;
+
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            timerEl.textContent = `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+    });
+}
 
 // Загрузка задач на доску
 function loadTasksToBoard() {
@@ -394,6 +419,11 @@ function createTaskCard(task) {
 
     console.log('🎯 Создание карточки:', task.title, 'status:', task.status, 'progress:', progress, 'timeSpent:', timeSpent);
 
+    // Добавляем класс для градиентной анимации выполненных задач
+    if (task.status === 'completed') {
+        card.classList.add('task-completed-gradient');
+    }
+
     card.innerHTML = `
         <div class="task-title">${escapeHtml(task.title)}</div>
         ${task.description ? `<div class="task-description">${escapeHtml(task.description)}</div>` : ''}
@@ -412,13 +442,29 @@ function createTaskCard(task) {
         </div>
 
         <div class="task-timer">
-            <div class="timer-display ${timerRunning ? 'running' : ''}" id="timer-${task.id}">${timeFormatted}</div>
+            <div class="timer-display ${timerRunning ? 'running' : ''}" id="timer-${task.id}" data-task-id="${task.id}" data-time-spent="${timeSpent}" data-started-at="${task.timer_started_at || ''}">${timeFormatted}</div>
             ${!timerRunning ?
                 `<button class="timer-btn timer-btn-start" onclick="startTimer(${task.id}); event.stopPropagation();">▶ Старт</button>` :
                 `<button class="timer-btn timer-btn-stop" onclick="stopTimer(${task.id}); event.stopPropagation();">■ Стоп</button>`
             }
         </div>
+
+        <button class="task-complete-btn" onclick="markTaskCompleted(${task.id}); event.stopPropagation();">
+            <i class="fas fa-check-circle"></i> Выполнена
+        </button>
+        ` : `
+        <div class="task-completed-info">
+            <i class="fas fa-check-circle"></i> Задача выполнена
+            ${task.task_metadata && task.task_metadata.marked_completed_by_employee ? `
+                <div class="completed-by">Отмечена: ${task.task_metadata.marked_completed_by_employee.employee_name}</div>
+            ` : ''}
+        </div>
+        ${window.userRole === 'owner' && (!task.task_metadata || !task.task_metadata.archived) ? `
+            <button class="task-archive-btn" onclick="archiveTask(${task.id}); event.stopPropagation();">
+                <i class="fas fa-archive"></i> В архив
+            </button>
         ` : ''}
+        `}
 
         <div class="task-meta">
             ${task.deadline ? `<span class="task-deadline ${deadlineClass}"><i class="fas fa-calendar"></i> ${deadlineText}</span>` : ''}
@@ -1025,6 +1071,56 @@ async function stopTimer(taskId) {
     } catch (error) {
         console.error('Ошибка остановки таймера:', error);
         showNotification('Ошибка остановки таймера', 'error');
+    }
+}
+
+// Функция отметки задачи как выполненной
+async function markTaskCompleted(taskId) {
+    if (!confirm('Отметить задачу как выполненную? Она будет отправлена на проверку администратору.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/admin/api/tasks/${taskId}/mark-completed`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadTasksToBoard();
+        } else {
+            showNotification(data.error || 'Ошибка отметки задачи', 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка отметки задачи как выполненной:', error);
+        showNotification('Ошибка отметки задачи как выполненной', 'error');
+    }
+}
+
+// Функция архивации задачи (только для владельца)
+async function archiveTask(taskId) {
+    if (!confirm('Переместить задачу в архив? Это подтвердит ее выполнение.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/admin/api/tasks/${taskId}/archive`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadTasksToBoard();
+        } else {
+            showNotification(data.error || 'Ошибка архивации задачи', 'error');
+        }
+    } catch (error) {
+        console.error('Ошибка архивации задачи:', error);
+        showNotification('Ошибка архивации задачи', 'error');
     }
 }
 
