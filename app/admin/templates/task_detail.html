@@ -215,10 +215,23 @@
                 
                 <!-- Форма добавления комментария -->
                 {% if current_user.role == "owner" or task.assigned_to_id == current_user.id %}
-                <form id="addCommentForm" class="mb-4">
+                <form id="addCommentForm" class="mb-4" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <textarea class="form-control" id="commentText" placeholder="Добавить комментарий..." rows="3" required></textarea>
+                        <textarea class="form-control" id="commentText" name="comment" placeholder="Добавить комментарий..." rows="3" required></textarea>
                     </div>
+
+                    <!-- Блок для загрузки файлов -->
+                    <div class="mb-3">
+                        <label for="commentFiles" class="form-label">
+                            <i class="fas fa-paperclip me-2"></i>Прикрепить файлы (фото, документы)
+                        </label>
+                        <input type="file" class="form-control" id="commentFiles" name="files" multiple accept="image/*,.pdf,.doc,.docx">
+                        <small class="text-muted">Можно выбрать несколько файлов</small>
+
+                        <!-- Превью выбранных файлов -->
+                        <div id="filesPreview" class="mt-2 d-flex flex-wrap gap-2"></div>
+                    </div>
+
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-paper-plane me-2"></i>Отправить
                     </button>
@@ -235,9 +248,31 @@
                             <div class="comment-date">{{ comment.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
                         </div>
                         <div class="comment-text">{{ comment.comment }}</div>
+
+                        <!-- Прикрепленные файлы -->
+                        {% if comment.attachments and comment.attachments|length > 0 %}
+                        <div class="comment-attachments mt-2">
+                            <small class="text-muted"><i class="fas fa-paperclip me-1"></i>Прикреплено файлов: {{ comment.attachments|length }}</small>
+                            <div class="d-flex flex-wrap gap-2 mt-2">
+                                {% for attachment in comment.attachments %}
+                                <div class="attachment-item">
+                                    {% if attachment.type == 'image' %}
+                                    <a href="/{{ attachment.path }}" target="_blank" class="d-block">
+                                        <img src="/{{ attachment.path }}" alt="{{ attachment.original_filename }}" class="img-thumbnail" style="max-width: 150px; max-height: 150px; object-fit: cover;">
+                                    </a>
+                                    {% else %}
+                                    <a href="/{{ attachment.path }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-file me-1"></i>{{ attachment.original_filename }}
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
-                    
+
                     {% if not task.comments %}
                     <div class="text-center text-muted py-4">
                         <i class="fas fa-comment-slash fa-2x mb-3 opacity-50"></i>
@@ -434,26 +469,93 @@ async function toggleStatus() {
     }
 }
 
-// Добавление комментария
+// Превью выбранных файлов
+document.getElementById('commentFiles')?.addEventListener('change', function(e) {
+    const filesPreview = document.getElementById('filesPreview');
+    filesPreview.innerHTML = '';
+
+    const files = Array.from(e.target.files);
+    files.forEach((file, index) => {
+        const previewItem = document.createElement('div');
+        previewItem.className = 'file-preview-item position-relative';
+        previewItem.style.cssText = 'width: 100px; height: 100px; border: 2px solid #ddd; border-radius: 8px; overflow: hidden;';
+
+        if (file.type.startsWith('image/')) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                previewItem.innerHTML = `
+                    <img src="${event.target.result}" style="width: 100%; height: 100%; object-fit: cover;">
+                    <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" onclick="removeFile(${index})" style="padding: 2px 6px;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+            };
+            reader.readAsDataURL(file);
+        } else {
+            previewItem.innerHTML = `
+                <div class="d-flex flex-column align-items-center justify-content-center h-100 p-2 text-center">
+                    <i class="fas fa-file fa-2x mb-2"></i>
+                    <small class="text-truncate w-100">${file.name}</small>
+                    <button type="button" class="btn btn-sm btn-danger mt-2" onclick="removeFile(${index})" style="padding: 2px 6px;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        }
+
+        filesPreview.appendChild(previewItem);
+    });
+});
+
+// Удаление файла из списка
+function removeFile(index) {
+    const fileInput = document.getElementById('commentFiles');
+    const dt = new DataTransfer();
+    const files = Array.from(fileInput.files);
+
+    files.forEach((file, i) => {
+        if (i !== index) {
+            dt.items.add(file);
+        }
+    });
+
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+}
+
+// Добавление комментария с файлами
 document.getElementById('addCommentForm')?.addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
     const commentText = document.getElementById('commentText').value.trim();
-    if (!commentText) return;
-    
+    if (!commentText) {
+        alert('Введите текст комментария');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('comment', commentText);
+    formData.append('is_internal', false);
+
+    // Добавляем файлы
+    const fileInput = document.getElementById('commentFiles');
+    if (fileInput.files.length > 0) {
+        Array.from(fileInput.files).forEach(file => {
+            formData.append('files', file);
+        });
+    }
+
     try {
         const response = await fetch('/admin/api/tasks/{{ task.id }}/comments', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ comment: commentText })
+            body: formData
         });
-        
+
         if (response.ok) {
             location.reload();
         } else {
-            alert('Ошибка при добавлении комментария');
+            const error = await response.json();
+            alert('Ошибка при добавлении комментария: ' + (error.error || 'Неизвестная ошибка'));
         }
     } catch (error) {
         console.error('Error:', error);

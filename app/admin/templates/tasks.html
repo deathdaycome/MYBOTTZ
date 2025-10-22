@@ -415,7 +415,8 @@ function createTaskCard(task) {
 
     const hours = Math.floor(timeSpent / 3600);
     const minutes = Math.floor((timeSpent % 3600) / 60);
-    const timeFormatted = `${hours}:${minutes.toString().padStart(2, '0')}`;
+    const seconds = timeSpent % 60;
+    const timeFormatted = `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
     console.log('🎯 Создание карточки:', task.title, 'status:', task.status, 'progress:', progress, 'timeSpent:', timeSpent);
 
@@ -1036,7 +1037,7 @@ async function handleDrop(e) {
 // Функции для таймера
 async function startTimer(taskId) {
     try {
-        const response = await fetch(`/admin/api/tasks/${taskId}/timer/start`, {
+        const response = await fetch(`/admin/tasks/${taskId}/timer/start`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -1056,7 +1057,7 @@ async function startTimer(taskId) {
 
 async function stopTimer(taskId) {
     try {
-        const response = await fetch(`/admin/api/tasks/${taskId}/timer/stop`, {
+        const response = await fetch(`/admin/tasks/${taskId}/timer/stop`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -1081,7 +1082,7 @@ async function markTaskCompleted(taskId) {
     }
 
     try {
-        const response = await fetch(`/admin/api/tasks/${taskId}/mark-completed`, {
+        const response = await fetch(`/admin/tasks/api/tasks/${taskId}/mark-completed`, {
             method: 'POST',
             credentials: 'include'
         });
@@ -1106,7 +1107,7 @@ async function archiveTask(taskId) {
     }
 
     try {
-        const response = await fetch(`/admin/api/tasks/${taskId}/archive`, {
+        const response = await fetch(`/admin/tasks/api/tasks/${taskId}/archive`, {
             method: 'POST',
             credentials: 'include'
         });
