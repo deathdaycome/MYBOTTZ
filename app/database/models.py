@@ -1315,14 +1315,16 @@ class Task(Base):
 class TaskComment(Base):
     """Модель комментариев к задачам"""
     __tablename__ = "task_comments"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
     author_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)  # Автор комментария
     comment = Column(Text, nullable=False)  # Текст комментария
     comment_type = Column(String(50), default="general")  # general, status_change, deadline_change
     is_internal = Column(Boolean, default=False)  # Внутренний комментарий (только для команды)
-    attachments = Column(JSON, default=lambda: [])  # Прикрепленные файлы/скриншоты [{"filename": "...", "path": "..."}]
+    attachments = Column(JSON, default=lambda: [])  # Прикрепленные файлы/скриншоты [{"filename": "...", "path": "...", "type": "image"}]
+    is_read = Column(Boolean, default=False)  # Прочитан ли комментарий
+    read_by = Column(JSON, default=lambda: [])  # Список ID пользователей, прочитавших комментарий
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Связи
@@ -1338,6 +1340,8 @@ class TaskComment(Base):
             "comment_type": self.comment_type,
             "is_internal": self.is_internal,
             "attachments": self.attachments or [],
+            "is_read": self.is_read,
+            "read_by": self.read_by or [],
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "author": self.author.to_dict() if self.author else None
         }

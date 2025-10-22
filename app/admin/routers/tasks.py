@@ -2,13 +2,16 @@
 Router для управления задачами
 """
 
-from fastapi import APIRouter, HTTPException, Depends, Request, Form
+from fastapi import APIRouter, HTTPException, Depends, Request, Form, File, UploadFile
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
 from typing import Optional, List
 import json
 from sqlalchemy import desc
+import os
+import uuid
+from pathlib import Path
 
 from ...config.logging import get_logger
 from ...database.database import get_db_context
@@ -789,53 +792,200 @@ async def add_task_comment(
     task_id: int,
     comment: str = Form(...),
     is_internal: bool = Form(False),
+    files: List[UploadFile] = File(None),
     current_user: dict = Depends(get_current_admin_user)
 ):
-    """Добавить комментарий к задаче"""
+    """Добавить комментарий к задаче с возможностью прикрепления фотографий"""
     try:
         with get_db_context() as db:
             task = db.query(Task).filter(Task.id == task_id).first()
-            
+
             if not task:
                 return {"success": False, "error": "Задача не найдена"}
-            
+
             # Проверяем права доступа
             can_comment = (
                 current_user["role"] == "owner" or
                 task.assigned_to_id == current_user["id"]
             )
-            
+
             if not can_comment:
                 return {"success": False, "error": "Недостаточно прав"}
-            
+
+            # Обработка загруженных файлов
+            attachments = []
+            if files:
+                upload_dir = Path("uploads/task_comments")
+                upload_dir.mkdir(parents=True, exist_ok=True)
+
+                for file in files:
+                    if file and file.filename:
+                        # Генерируем уникальное имя файла
+                        file_ext = os.path.splitext(file.filename)[1]
+                        unique_filename = f"{uuid.uuid4()}{file_ext}"
+                        file_path = upload_dir / unique_filename
+
+                        # Сохраняем файл
+                        with open(file_path, "wb") as f:
+                            content = await file.read()
+                            f.write(content)
+
+                        # Определяем тип файла
+                        file_type = "image" if file.content_type and file.content_type.startswith("image/") else "file"
+
+                        attachments.append({
+                            "filename": unique_filename,
+                            "original_filename": file.filename,
+                            "path": str(file_path),
+                            "type": file_type,
+                            "size": len(content)
+                        })
+
+                        logger.info(f"Файл {file.filename} сохранен как {unique_filename}")
+
             # Создаем комментарий
             new_comment = TaskComment(
                 task_id=task_id,
                 author_id=current_user["id"],
                 comment=comment,
-                is_internal=is_internal and current_user["role"] == "owner"  # Только владелец может создавать внутренние комментарии
+                is_internal=is_internal and current_user["role"] == "owner",  # Только владелец может создавать внутренние комментарии
+                attachments=attachments,
+                is_read=False,
+                read_by=[]
             )
-            
+
             db.add(new_comment)
             db.commit()
             db.refresh(new_comment)
-            
+
             # Отправляем уведомление о новом комментарии
             try:
-                await task_notification_service.notify_new_task_comment(db, task, new_comment)
+                await task_notification_service.notify_new_task_comment(db, task, new_comment, current_user)
             except Exception as e:
                 logger.error(f"Ошибка отправки уведомления о комментарии к задаче {task.id}: {e}")
-            
-            logger.info(f"Добавлен комментарий к задаче {task_id}")
-            
+
+            logger.info(f"Добавлен комментарий к задаче {task_id} с {len(attachments)} вложениями")
+
             return {
                 "success": True,
                 "message": "Комментарий добавлен",
                 "comment": new_comment.to_dict()
             }
-        
+
     except Exception as e:
         logger.error(f"Ошибка добавления комментария к задаче {task_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.post("/api/tasks/{task_id}/comments/{comment_id}/mark_read")
+async def mark_comment_as_read(
+    task_id: int,
+    comment_id: int,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Отметить комментарий как прочитанный"""
+    try:
+        with get_db_context() as db:
+            comment = db.query(TaskComment).filter(
+                TaskComment.id == comment_id,
+                TaskComment.task_id == task_id
+            ).first()
+
+            if not comment:
+                return {"success": False, "error": "Комментарий не найден"}
+
+            # Добавляем пользователя в список прочитавших
+            read_by = comment.read_by or []
+            if current_user["id"] not in read_by:
+                read_by.append(current_user["id"])
+                comment.read_by = read_by
+                comment.is_read = True  # Помечаем как прочитанный
+                db.commit()
+
+            return {"success": True, "message": "Комментарий отмечен как прочитанный"}
+
+    except Exception as e:
+        logger.error(f"Ошибка отметки комментария {comment_id} как прочитанного: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.get("/api/tasks/{task_id}/unread_comments_count")
+async def get_unread_comments_count(
+    task_id: int,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Получить количество непрочитанных комментариев для задачи"""
+    try:
+        with get_db_context() as db:
+            # Получаем все комментарии задачи, которые не прочитаны текущим пользователем
+            comments = db.query(TaskComment).filter(
+                TaskComment.task_id == task_id,
+                TaskComment.author_id != current_user["id"]  # Исключаем свои комментарии
+            ).all()
+
+            unread_count = 0
+            for comment in comments:
+                read_by = comment.read_by or []
+                if current_user["id"] not in read_by:
+                    unread_count += 1
+
+            return {
+                "success": True,
+                "task_id": task_id,
+                "unread_count": unread_count
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка получения количества непрочитанных комментариев для задачи {task_id}: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.get("/api/tasks/{task_id}/comments")
+async def get_task_comments(
+    task_id: int,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Получить все комментарии задачи"""
+    try:
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+
+            if not task:
+                return {"success": False, "error": "Задача не найдена"}
+
+            # Проверяем права доступа
+            can_view = (
+                current_user["role"] == "owner" or
+                task.assigned_to_id == current_user["id"]
+            )
+
+            if not can_view:
+                return {"success": False, "error": "Недостаточно прав"}
+
+            comments = db.query(TaskComment).filter(
+                TaskComment.task_id == task_id
+            ).order_by(TaskComment.created_at.asc()).all()
+
+            # Подсчитываем непрочитанные комментарии
+            unread_count = 0
+            comments_data = []
+            for comment in comments:
+                comment_dict = comment.to_dict()
+                # Проверяем, прочитан ли комментарий текущим пользователем
+                read_by = comment.read_by or []
+                comment_dict["is_read_by_me"] = current_user["id"] in read_by or comment.author_id == current_user["id"]
+
+                if not comment_dict["is_read_by_me"]:
+                    unread_count += 1
+
+                comments_data.append(comment_dict)
+
+            return {
+                "success": True,
+                "comments": comments_data,
+                "total_count": len(comments_data),
+                "unread_count": unread_count
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка получения комментариев задачи {task_id}: {e}")
         return {"success": False, "error": str(e)}
 
 @router.get("/api/tasks/stats/dashboard")

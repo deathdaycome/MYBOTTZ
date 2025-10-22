@@ -135,31 +135,47 @@ class TaskNotificationService:
             logger.error(f"Ошибка при уведомлении об изменении статуса задачи {task.id}: {e}")
             return False
 
-    async def notify_new_task_comment(self, db: Session, task: Task, comment: TaskComment) -> bool:
-        """Уведомить о новом комментарии к задаче"""
+    async def notify_new_task_comment(self, db: Session, task: Task, comment: TaskComment, current_user: dict = None) -> bool:
+        """Уведомить о новом комментарии к задаче
+
+        Логика уведомлений:
+        - Если комментарий от сотрудника (исполнителя) -> уведомляем админа (owner)
+        - Если комментарий от админа -> уведомляем исполнителя задачи
+        """
         try:
             # Определяем, кого уведомлять
             notify_users = []
-            
-            # Уведомляем исполнителя, если комментарий не от него
-            if (task.assigned_to and 
-                task.assigned_to.telegram_id and 
-                task.assigned_to.id != comment.author_id):
-                notify_users.append(task.assigned_to)
-            
-            # Уведомляем создателя задачи, если комментарий не от него
-            if (task.created_by and 
-                task.created_by.telegram_id and 
-                task.created_by.id != comment.author_id and
-                task.created_by.id not in [user.id for user in notify_users]):
-                notify_users.append(task.created_by)
-            
+
+            # Проверяем роль автора комментария
+            is_admin_comment = current_user and current_user.get("role") == "owner"
+
+            if is_admin_comment:
+                # Комментарий от админа -> уведомляем исполнителя
+                if (task.assigned_to and
+                    task.assigned_to.telegram_id and
+                    task.assigned_to.id != comment.author_id):
+                    notify_users.append(task.assigned_to)
+                    logger.info(f"Админ оставил комментарий к задаче {task.id}, уведомляем исполнителя {task.assigned_to.username}")
+            else:
+                # Комментарий от сотрудника -> уведомляем всех админов (владельцев)
+                # Получаем создателя задачи (обычно это админ)
+                if (task.created_by and
+                    task.created_by.telegram_id and
+                    task.created_by.id != comment.author_id and
+                    task.created_by.role == "owner"):
+                    notify_users.append(task.created_by)
+                    logger.info(f"Сотрудник оставил комментарий к задаче {task.id}, уведомляем админа {task.created_by.username}")
+
+                # Дополнительно можно уведомить всех админов из базы
+                # Но для начала уведомим только создателя задачи
+
             if not notify_users:
+                logger.warning(f"Нет пользователей для уведомления о комментарии к задаче {task.id}")
                 return True
-            
+
             # Формируем сообщение
             message = self._format_task_comment_message(task, comment)
-            
+
             # Отправляем уведомления
             success_count = 0
             for user in notify_users:
@@ -169,10 +185,10 @@ class TaskNotificationService:
                 )
                 if success:
                     success_count += 1
-            
+
             logger.info(f"Уведомления о комментарии к задаче {task.id} отправлены {success_count}/{len(notify_users)} пользователям")
             return success_count > 0
-            
+
         except Exception as e:
             logger.error(f"Ошибка при уведомлении о комментарии к задаче {task.id}: {e}")
             return False
@@ -304,11 +320,18 @@ class TaskNotificationService:
 
 📝 <b>Комментарий:</b>
 {comment.comment}
-
-🔗 <b>ID задачи:</b> #{task.id}
-
-📱 Посмотреть все комментарии можно в админ-панели
 """
+
+        # Добавляем информацию о прикрепленных файлах
+        if comment.attachments and len(comment.attachments) > 0:
+            message += f"\n\n📎 <b>Прикреплено файлов:</b> {len(comment.attachments)}"
+            for idx, attachment in enumerate(comment.attachments, 1):
+                file_type_emoji = "🖼" if attachment.get("type") == "image" else "📄"
+                message += f"\n   {file_type_emoji} {attachment.get('original_filename', 'Файл ' + str(idx))}"
+
+        message += f"\n\n🔗 <b>ID задачи:</b> #{task.id}"
+        message += "\n\n📱 Посмотреть все комментарии и файлы можно в админ-панели"
+
         return message.strip()
 
     async def check_and_send_deadline_reminders(self, db: Session) -> int:
