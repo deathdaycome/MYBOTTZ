@@ -3,18 +3,10 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Zap,
   FolderKanban,
-  FileEdit,
-  Briefcase,
-  PlusCircle,
+  MessageCircle,
   TrendingUp,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  FileText,
-  Wallet,
-  Bell
+  Clock
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { useTelegram } from '../hooks/useTelegram';
@@ -29,11 +21,17 @@ export const Dashboard: React.FC = () => {
   const { data: projectsStats } = useQuery({
     queryKey: ['projects-stats'],
     queryFn: () => projectsApi.getProjectsStats(),
+    staleTime: 0, // Данные всегда считаются устаревшими
+    refetchOnMount: true, // Перезагружать при монтировании
+    refetchOnWindowFocus: true, // Перезагружать при фокусе окна
   });
 
   const { data: revisionsStats } = useQuery({
     queryKey: ['revisions-stats'],
     queryFn: () => revisionsApi.getAllRevisionsStats(),
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const stats = {
@@ -63,16 +61,6 @@ export const Dashboard: React.FC = () => {
 
   const quickActions = [
     {
-      title: 'Быстрый проект',
-      description: 'Создать за 2 минуты',
-      icon: <Zap className="w-6 h-6" />,
-      gradient: 'from-purple-500 to-pink-500',
-      action: () => {
-        hapticFeedback('medium');
-        navigate('/projects/quick-create');
-      },
-    },
-    {
       title: 'Мои проекты',
       description: stats.totalProjects === 1 ? '1 проект' : `${stats.totalProjects} проектов`,
       icon: <FolderKanban className="w-6 h-6" />,
@@ -83,43 +71,13 @@ export const Dashboard: React.FC = () => {
       },
     },
     {
-      title: 'Правки',
-      description: stats.totalRevisions === 0 ? 'нет открытых' : stats.totalRevisions === 1 ? '1 открытая' : `${stats.totalRevisions} открытых`,
-      icon: <FileEdit className="w-6 h-6" />,
-      gradient: 'from-orange-500 to-red-500',
-      action: () => {
-        hapticFeedback('medium');
-        navigate('/revisions');
-      },
-    },
-    {
-      title: 'Документы',
-      description: 'Договоры и акты',
-      icon: <FileText className="w-6 h-6" />,
-      gradient: 'from-indigo-500 to-purple-500',
-      action: () => {
-        hapticFeedback('medium');
-        navigate('/documents');
-      },
-    },
-    {
-      title: 'Финансы',
-      description: 'Платежи и счета',
-      icon: <Wallet className="w-6 h-6" />,
+      title: 'Чаты',
+      description: 'Общение с исполнителем',
+      icon: <MessageCircle className="w-6 h-6" />,
       gradient: 'from-emerald-500 to-teal-500',
       action: () => {
         hapticFeedback('medium');
-        navigate('/finance');
-      },
-    },
-    {
-      title: 'Уведомления',
-      description: 'История событий',
-      icon: <Bell className="w-6 h-6" />,
-      gradient: 'from-pink-500 to-rose-500',
-      action: () => {
-        hapticFeedback('medium');
-        navigate('/notifications');
+        navigate('/chats');
       },
     },
   ];
@@ -139,7 +97,7 @@ export const Dashboard: React.FC = () => {
                 Привет, {user?.first_name || 'Пользователь'}! 👋
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
-                Добро пожаловать в BotDev Studio
+                Добро пожаловать в ИИ логист
               </p>
             </div>
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-bold text-xl">
@@ -191,48 +149,12 @@ export const Dashboard: React.FC = () => {
             </div>
           </Card>
         </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-green-100 dark:bg-green-900/20 rounded-full -mr-10 -mt-10" />
-            <div className="relative">
-              <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="text-sm font-medium">Завершено</span>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                {stats.completed}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                проекта
-              </div>
-            </div>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className="relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-orange-100 dark:bg-orange-900/20 rounded-full -mr-10 -mt-10" />
-            <div className="relative">
-              <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 mb-2">
-                <AlertCircle className="w-5 h-5" />
-                <span className="text-sm font-medium">Правки</span>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                {stats.totalRevisions}
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                открытых
-              </div>
-            </div>
-          </Card>
-        </motion.div>
       </motion.div>
 
-      {/* Quick Actions */}
+      {/* Main Sections */}
       <div className="px-6 py-2">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Быстрые действия
+          Разделы
         </h2>
         <motion.div
           variants={containerVariants}
@@ -264,38 +186,6 @@ export const Dashboard: React.FC = () => {
           ))}
         </motion.div>
       </div>
-
-      {/* CTA Section */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="px-6 py-6"
-      >
-        <Card className="bg-gradient-to-br from-primary-600 to-accent-600 text-white">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold mb-2">
-                Готовы начать новый проект?
-              </h3>
-              <p className="text-white/80 text-sm mb-4">
-                Создайте проект за 2 минуты и получите предложение
-              </p>
-              <button
-                onClick={() => {
-                  hapticFeedback('medium');
-                  navigate('/create-project');
-                }}
-                className="bg-white text-primary-600 px-6 py-2 rounded-lg font-medium inline-flex items-center gap-2 hover:bg-gray-100 transition-colors"
-              >
-                <PlusCircle className="w-5 h-5" />
-                Создать проект
-              </button>
-            </div>
-            <Briefcase className="w-24 h-24 opacity-20" />
-          </div>
-        </Card>
-      </motion.div>
     </div>
   );
 };

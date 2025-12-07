@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { projectsApi } from '../api/projects';
 import { Button } from '../components/common/Button';
 import { useTelegram } from '../hooks/useTelegram';
-import { Search, FileEdit, Clock, DollarSign, ChevronRight, Plus } from 'lucide-react';
+import { Search, FileEdit, Clock, DollarSign, ChevronRight, Plus, MessageCircle } from 'lucide-react';
 
 export const Projects = () => {
   const navigate = useNavigate();
@@ -33,6 +33,9 @@ export const Projects = () => {
       console.log('📦 Данные:', result);
       return result;
     },
+    staleTime: 0, // Данные всегда считаются устаревшими
+    refetchOnMount: true, // Перезагружать при монтировании
+    refetchOnWindowFocus: true, // Перезагружать при фокусе окна
   });
 
   console.log('🎯 Projects компонент - проекты:', projects);
@@ -257,18 +260,33 @@ export const Projects = () => {
                       )}
                     </div>
 
-                    {/* Кнопка правок */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/projects/${project.id}/revisions`);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-50 to-primary-100 text-primary-700 rounded-xl font-medium hover:from-primary-100 hover:to-primary-200 transition-all group/btn"
-                    >
-                      <FileEdit className="w-4 h-4" />
-                      <span>Правки проекта</span>
-                      <ChevronRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
-                    </button>
+                    {/* Кнопки действий */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Кнопка чата */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // TODO: Добавить навигацию к чату когда будет готова страница чата
+                          console.log('Открыть чат проекта', project.id);
+                        }}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gradient-to-r from-blue-50 to-blue-100 text-blue-700 rounded-xl font-medium hover:from-blue-100 hover:to-blue-200 transition-all group/btn"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        <span className="text-sm">Чат</span>
+                      </button>
+
+                      {/* Кнопка правок */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/projects/${project.id}/revisions`);
+                        }}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-gradient-to-r from-primary-50 to-primary-100 text-primary-700 rounded-xl font-medium hover:from-primary-100 hover:to-primary-200 transition-all group/btn"
+                      >
+                        <FileEdit className="w-4 h-4" />
+                        <span className="text-sm">Правки</span>
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               );

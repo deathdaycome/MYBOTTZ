@@ -14,21 +14,24 @@ def get_navigation_items(role_or_path=None, db=None, user_role=None) -> list:
     
     # Полный список всех элементов навигации
     all_navigation = [
-        {"name": "Дашборд", "url": "/admin/", "icon": "fas fa-chart-line", "roles": ["owner", "admin", "sales", "salesperson", "executor"]},
+        {"name": "Дашборд", "url": "/admin/", "icon": "fas fa-chart-line", "roles": ["owner", "admin", "sales", "salesperson", "executor", "timlead"]},
         {"name": "Клиенты", "url": "/admin/clients", "icon": "fas fa-address-book", "roles": ["owner", "admin", "sales", "salesperson"]},
         {"name": "Лиды", "url": "/admin/leads", "icon": "fas fa-user-check", "roles": ["owner", "admin", "sales", "salesperson"]},
         {"name": "Сделки", "url": "/admin/deals", "icon": "fas fa-handshake", "roles": ["owner", "admin", "sales", "salesperson"]},
         {"name": "Авито", "url": "/admin/avito", "icon": "fas fa-comments", "roles": ["owner", "admin", "sales", "salesperson"]},
-        {"name": "Проекты", "url": "/admin/projects", "icon": "fas fa-project-diagram", "roles": ["owner", "admin", "sales", "salesperson", "executor"]},
+        {"name": "Проекты", "url": "/admin/projects", "icon": "fas fa-project-diagram", "roles": ["owner", "admin", "sales", "salesperson", "executor", "timlead"]},
         {"name": "База проектов", "url": "/admin/project-files", "icon": "fas fa-database", "roles": ["owner", "admin"]},
         # {"name": "Портфолио", "url": "/admin/portfolio", "icon": "fas fa-briefcase", "roles": ["owner", "admin", "executor"]},  # DISABLED
-        {"name": "Правки", "url": "/admin/revisions", "icon": "fas fa-edit", "roles": ["owner", "admin", "executor"]},
-        {"name": "Планировщик задач", "url": "/admin/tasks", "icon": "fas fa-tasks", "roles": ["owner", "admin", "executor"]},
+        {"name": "Правки", "url": "/admin/revisions", "icon": "fas fa-edit", "roles": ["owner", "admin", "executor", "timlead"]},
+        {"name": "Чаты", "url": "/admin/chats", "icon": "fas fa-comments", "roles": ["owner", "admin", "executor", "timlead"]},
+        {"name": "Планировщик задач", "url": "/admin/tasks", "icon": "fas fa-tasks", "roles": ["owner", "admin", "executor", "timlead"]},
         {"name": "Канбан доска", "url": "/admin/tasks/kanban", "icon": "fas fa-columns", "roles": ["owner"]},
-        {"name": "Мои задачи", "url": "/admin/tasks/user/my-tasks", "icon": "fas fa-clipboard-list", "roles": ["owner", "admin", "sales", "salesperson", "executor"]},
-        {"name": "Архив задач", "url": "/admin/tasks/archive", "icon": "fas fa-archive", "roles": ["owner", "admin"]},
+        {"name": "Мои задачи", "url": "/admin/tasks/user/my-tasks", "icon": "fas fa-clipboard-list", "roles": ["owner", "admin", "sales", "salesperson", "executor", "timlead"]},
+        {"name": "Архив задач", "url": "/admin/tasks/archive", "icon": "fas fa-archive", "roles": ["owner", "admin", "timlead"]},
+        {"name": "ТИМЛИД — РЕГЛАМЕНТЫ", "url": "/admin/timlead-regulations", "icon": "fas fa-clipboard-check", "roles": ["owner", "timlead"]},
         {"name": "Документы", "url": "/admin/documents", "icon": "fas fa-file-alt", "roles": ["owner", "admin"]},
-        {"name": "Финансы", "url": "/admin/finance", "icon": "fas fa-chart-bar", "roles": ["owner", "admin", "executor"]},
+        {"name": "Финансы", "url": "/admin/finance", "icon": "fas fa-chart-bar", "roles": ["owner", "admin", "executor", "timlead"]},
+        {"name": "Timeweb Хостинг", "url": "/admin/hosting", "icon": "fas fa-server", "roles": ["owner", "admin"]},
         {"name": "Пользователи", "url": "/admin/users", "icon": "fas fa-users", "roles": ["owner", "admin"]},
         {"name": "Управление правами", "url": "/admin/permissions", "icon": "fas fa-shield-alt", "roles": ["owner"]},
         {"name": "Исполнители", "url": "/admin/contractors", "icon": "fas fa-user-tie", "roles": ["owner", "admin"]},
@@ -36,7 +39,7 @@ def get_navigation_items(role_or_path=None, db=None, user_role=None) -> list:
         {"name": "Аналитика", "url": "/admin/analytics", "icon": "fas fa-chart-area", "roles": ["owner", "admin"]},
         {"name": "Отчеты", "url": "/admin/reports", "icon": "fas fa-file-invoice", "roles": ["owner", "admin", "sales"]},
         {"name": "Автоматизация", "url": "/admin/automation", "icon": "fas fa-robot", "roles": ["owner", "admin"]},
-        {"name": "Уведомления", "url": "/admin/notifications", "icon": "fas fa-bell", "roles": ["owner", "admin", "sales", "executor"]},
+        {"name": "Уведомления", "url": "/admin/notifications", "icon": "fas fa-bell", "roles": ["owner", "admin", "sales", "executor", "timlead"]},
         {"name": "Настройки", "url": "/admin/settings", "icon": "fas fa-cog", "roles": ["owner", "admin"]},
     ]
     
@@ -44,7 +47,7 @@ def get_navigation_items(role_or_path=None, db=None, user_role=None) -> list:
     filter_role = user_role
     
     # Обратная совместимость: если передана роль как первый параметр
-    if role_or_path and isinstance(role_or_path, str) and role_or_path in ["owner", "admin", "sales", "executor"]:
+    if role_or_path and isinstance(role_or_path, str) and role_or_path in ["owner", "admin", "sales", "executor", "timlead"]:
         filter_role = role_or_path
     
     # Фильтруем навигацию по роли

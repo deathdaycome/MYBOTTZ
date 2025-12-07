@@ -1,0 +1,347 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
+  color: #111827;
+  min-height: 100vh;
+  overflow-x: hidden !important;
+}
+
+/* Hide scrollbar globally */
+body,
+html {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+body::-webkit-scrollbar,
+html::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+/* Smooth transitions */
+* {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hide scrollbar in modal containers */
+.modal-scrollable-container,
+.modal-scrollable-backdrop,
+.modal-edit-scrollable,
+.modal-content-scrollable {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.modal-scrollable-container::-webkit-scrollbar,
+.modal-scrollable-backdrop::-webkit-scrollbar,
+.modal-edit-scrollable::-webkit-scrollbar,
+.modal-content-scrollable::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Additional aggressive scrollbar hiding */
+div[class*="modal-content-scrollable"] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+div[class*="modal-content-scrollable"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Custom scrollbar for task columns */
+.custom-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: #667eea #f1f1f1 !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  border-radius: 10px;
+  border: 2px solid #f1f5f9;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+}
+
+/* Стили для прогресс-бара (range slider) */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Ползунок для Webkit (Chrome, Safari, Edge) */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  border: 3px solid white;
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(0.95);
+}
+
+/* Ползунок для Firefox */
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+  border: 3px solid white;
+  transition: all 0.2s ease;
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.6);
+}
+
+input[type="range"]::-moz-range-thumb:active {
+  transform: scale(0.95);
+}
+
+/* Трек для Firefox */
+input[type="range"]::-moz-range-track {
+  background: transparent;
+  border: none;
+}
+
+/* Disabled состояние */
+input[type="range"]:disabled::-webkit-slider-thumb {
+  background: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+input[type="range"]:disabled::-moz-range-thumb {
+  background: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ========== ТЕМЫ ОФОРМЛЕНИЯ ========== */
+
+/* Разноцветная тема (по умолчанию) */
+.theme-colorful {
+  /* Основные цвета уже заданы в компонентах */
+}
+
+/* Черно-белая тема */
+.theme-monochrome {
+  --color-primary: #374151;
+  --color-secondary: #6b7280;
+  --color-accent: #9ca3af;
+}
+
+.theme-monochrome body {
+  background: linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%);
+}
+
+.theme-monochrome .bg-gradient-to-r,
+.theme-monochrome .bg-gradient-to-br,
+.theme-monochrome .bg-gradient-to-bl,
+.theme-monochrome [class*="from-blue"],
+.theme-monochrome [class*="from-purple"],
+.theme-monochrome [class*="from-indigo"],
+.theme-monochrome [class*="from-pink"],
+.theme-monochrome [class*="from-orange"] {
+  background: linear-gradient(135deg, #374151 0%, #6b7280 100%) !important;
+}
+
+.theme-monochrome .text-blue-600,
+.theme-monochrome .text-purple-600,
+.theme-monochrome .text-indigo-600 {
+  color: #374151 !important;
+}
+
+.theme-monochrome .border-blue-600,
+.theme-monochrome .border-purple-600 {
+  border-color: #374151 !important;
+}
+
+/* Темная тема */
+.theme-dark {
+  --color-primary: #1f2937;
+  --color-secondary: #374151;
+  --color-accent: #4b5563;
+}
+
+.theme-dark body {
+  background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+  color: #f9fafb;
+}
+
+.theme-dark .bg-white {
+  background-color: #1f2937 !important;
+}
+
+.theme-dark .text-gray-900 {
+  color: #f9fafb !important;
+}
+
+.theme-dark .text-gray-600 {
+  color: #d1d5db !important;
+}
+
+.theme-dark .text-gray-700 {
+  color: #e5e7eb !important;
+}
+
+.theme-dark .border-gray-100,
+.theme-dark .border-gray-200 {
+  border-color: #374151 !important;
+}
+
+.theme-dark .bg-gray-50 {
+  background-color: #111827 !important;
+}
+
+.theme-dark .bg-gray-100 {
+  background-color: #1f2937 !important;
+}
+
+.theme-dark .bg-gray-200 {
+  background-color: #374151 !important;
+}
+
+/* Синяя тема */
+.theme-blue {
+  --color-primary: #0ea5e9;
+  --color-secondary: #0284c7;
+  --color-accent: #0369a1;
+}
+
+.theme-blue body {
+  background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+}
+
+.theme-blue .bg-gradient-to-r,
+.theme-blue .bg-gradient-to-br,
+.theme-blue .bg-gradient-to-bl,
+.theme-blue [class*="from-purple"],
+.theme-blue [class*="from-indigo"],
+.theme-blue [class*="from-pink"],
+.theme-blue [class*="from-orange"] {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%) !important;
+}
+
+.theme-blue .text-purple-600,
+.theme-blue .text-indigo-600,
+.theme-blue .text-pink-600 {
+  color: #0ea5e9 !important;
+}
+
+.theme-blue .border-purple-600,
+.theme-blue .border-indigo-600 {
+  border-color: #0ea5e9 !important;
+}
+
+/* Зеленая тема */
+.theme-green {
+  --color-primary: #10b981;
+  --color-secondary: #059669;
+  --color-accent: #047857;
+}
+
+.theme-green body {
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+}
+
+.theme-green .bg-gradient-to-r,
+.theme-green .bg-gradient-to-br,
+.theme-green .bg-gradient-to-bl,
+.theme-green [class*="from-blue"],
+.theme-green [class*="from-purple"],
+.theme-green [class*="from-indigo"],
+.theme-green [class*="from-pink"],
+.theme-green [class*="from-orange"] {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+}
+
+.theme-green .text-blue-600,
+.theme-green .text-purple-600,
+.theme-green .text-indigo-600 {
+  color: #10b981 !important;
+}
+
+.theme-green .border-blue-600,
+.theme-green .border-purple-600 {
+  border-color: #10b981 !important;
+}
+
+/* Hide scrollbar for sidebar menu */
+.scrollbar-hide {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}

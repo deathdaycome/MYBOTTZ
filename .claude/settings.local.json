@@ -1,9 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pkill:*)",
-      "Bash(true)",
-      "Bash(python3:*)"
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(sed:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(ssh root@147.45.215.199 \"cat /var/www/bot_business_card/app/admin/templates/projects.html | grep -n ''telegramUsername: getElementValue'' | head -1\")"
     ],
     "deny": []
   }

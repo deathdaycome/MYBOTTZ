@@ -38,6 +38,20 @@ class EmployeeNotificationSettings(Base):
     lead_status_changed = Column(Boolean, default=True)  # Изменение статуса лида
     deal_assigned = Column(Boolean, default=True)  # Назначение сделки
     deal_status_changed = Column(Boolean, default=True)  # Изменение статуса сделки
+
+    # Настройки для задач (Tasks)
+    task_assigned = Column(Boolean, default=True)  # Назначение задачи
+    task_status_changed = Column(Boolean, default=True)  # Изменение статуса задачи
+    task_deadline_reminder = Column(Boolean, default=True)  # Напоминание о дедлайне задачи
+    task_comment_added = Column(Boolean, default=True)  # Новый комментарий к задаче
+
+    # Настройки для правок (Revisions)
+    revision_new = Column(Boolean, default=True)  # Новая правка
+    revision_status_changed = Column(Boolean, default=True)  # Изменение статуса правки
+    revision_message_new = Column(Boolean, default=True)  # Новое сообщение в правке
+
+    # Настройки для чатов (Project Chats)
+    project_chat_new_message = Column(Boolean, default=True)  # Новое сообщение в чате проекта
     
     # Настройки времени уведомлений
     work_hours_start = Column(String(5), default='09:00')  # Начало рабочего дня
@@ -63,14 +77,14 @@ class EmployeeNotificationSettings(Base):
             "telegram_user_id": self.telegram_user_id,
             "notifications_enabled": self.notifications_enabled,
             "notification_language": self.notification_language,
-            
+
             # Проекты
             "project_assigned": self.project_assigned,
             "project_status_changed": self.project_status_changed,
             "project_deadline_reminder": self.project_deadline_reminder,
             "project_overdue": self.project_overdue,
             "project_new_task": self.project_new_task,
-            
+
             # Avito и CRM
             "avito_new_message": self.avito_new_message,
             "avito_unread_reminder": self.avito_unread_reminder,
@@ -79,17 +93,31 @@ class EmployeeNotificationSettings(Base):
             "lead_status_changed": self.lead_status_changed,
             "deal_assigned": self.deal_assigned,
             "deal_status_changed": self.deal_status_changed,
-            
+
+            # Задачи
+            "task_assigned": self.task_assigned,
+            "task_status_changed": self.task_status_changed,
+            "task_deadline_reminder": self.task_deadline_reminder,
+            "task_comment_added": self.task_comment_added,
+
+            # Правки
+            "revision_new": self.revision_new,
+            "revision_status_changed": self.revision_status_changed,
+            "revision_message_new": self.revision_message_new,
+
+            # Чаты
+            "project_chat_new_message": self.project_chat_new_message,
+
             # Рабочее время
             "work_hours_start": self.work_hours_start,
             "work_hours_end": self.work_hours_end,
             "weekend_notifications": self.weekend_notifications,
             "urgent_notifications_always": self.urgent_notifications_always,
-            
+
             # Интервалы
             "avito_reminder_interval": self.avito_reminder_interval,
             "project_reminder_interval": self.project_reminder_interval,
-            
+
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }

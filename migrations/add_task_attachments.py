@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def run_migration():
     """Запуск миграции"""
-    db_path = os.environ.get("DATABASE_PATH", "admin_panel.db")
+    db_path = os.environ.get("DATABASE_PATH", "data/bot.db")
 
     print(f"🔄 Запуск миграции для {db_path}")
 

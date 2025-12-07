@@ -9,7 +9,7 @@ from datetime import datetime
 
 def run_migration():
     """Выполнение миграции"""
-    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'admin_panel.db')
+    db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'bot.db')
 
     print(f"Подключение к БД: {db_path}")
     conn = sqlite3.connect(db_path)

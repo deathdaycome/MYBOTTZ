@@ -88,37 +88,46 @@ async def permissions_page(
     db: Session = Depends(get_db)
 ):
     """Главная страница управления правами доступа"""
-    # Проверяем права доступа
-    rbac = RBACService(db)
-    if not rbac.check_permission(current_user, "users.permissions.manage"):
-        raise HTTPException(status_code=403, detail="Недостаточно прав для управления правами доступа")
-    
-    # Получаем навигацию
-    from ..navigation import get_navigation_items
-    navigation_items = get_navigation_items(current_user, db)
-    
-    # Получаем всех пользователей (кроме владельца)
-    users = db.query(AdminUser).filter(AdminUser.role != "owner").all()
-    
-    # Получаем все роли
     try:
-        roles = rbac.get_all_roles()
+        # Упрощенная проверка прав - только для owner
+        user_role = current_user.get("role") if isinstance(current_user, dict) else getattr(current_user, "role", None)
+
+        if user_role != "owner":
+            raise HTTPException(status_code=403, detail="Только владелец может управлять правами доступа")
+
+        # Получаем навигацию
+        from ..navigation import get_navigation_items
+        user_role_for_nav = user_role or "owner"
+        navigation_items = get_navigation_items(user_role=user_role_for_nav)
+
+        # Получаем всех пользователей (кроме владельца)
+        users = db.query(AdminUser).filter(AdminUser.role != "owner").all()
+
+        # Получаем все роли
+        try:
+            rbac = RBACService(db)
+            roles = rbac.get_all_roles()
+        except Exception as e:
+            logger.error(f"Ошибка получения ролей: {str(e)}")
+            roles = []
+
+        return templates.TemplateResponse(
+            "permissions_management.html",
+            {
+                "request": request,
+                "user": current_user,
+                "username": current_user.get("username") if isinstance(current_user, dict) else current_user.username,
+                "navigation_items": navigation_items,
+                "users": users,
+                "roles": roles,
+                "available_modules": AVAILABLE_MODULES
+            }
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Ошибка получения ролей: {str(e)}")
-        roles = []
-    
-    return templates.TemplateResponse(
-        "permissions_management.html",
-        {
-            "request": request,
-            "user": current_user,
-            "username": current_user.get("username") if isinstance(current_user, dict) else current_user.username,
-            "navigation_items": navigation_items,
-            "users": users,
-            "roles": roles,
-            "available_modules": AVAILABLE_MODULES
-        }
-    )
+        logger.error(f"Ошибка на странице управления правами: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка загрузки страницы: {str(e)}")
 
 @router.get("/user/{user_id}", response_class=JSONResponse)
 async def get_user_permissions(
@@ -127,80 +136,93 @@ async def get_user_permissions(
     db: Session = Depends(get_db)
 ):
     """Получить детальные права пользователя"""
-    # Проверяем права доступа
-    rbac = RBACService(db)
-    if not rbac.check_permission(current_user, "users.permissions.manage"):
-        raise HTTPException(status_code=403, detail="Недостаточно прав")
-    
-    user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-    
-    # Получаем роли пользователя
     try:
-        user_roles = rbac.get_user_roles(user_id)
-    except Exception as e:
-        logger.warning(f"Не удалось получить роли пользователя {user_id}: {str(e)}")
+        # Упрощенная проверка прав - только для owner
+        user_role = current_user.get("role") if isinstance(current_user, dict) else getattr(current_user, "role", None)
+        if user_role != "owner":
+            raise HTTPException(status_code=403, detail="Недостаточно прав")
+
+        user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Пользователь не найден")
+
+        # Получаем роли пользователя
         user_roles = []
-    
-    # Получаем разрешения пользователя (временно возвращаем пустой список)
-    try:
-        user_permissions = rbac.get_user_permissions(user_id)
-    except Exception as e:
-        logger.warning(f"Не удалось получить разрешения пользователя {user_id}: {str(e)}")
         user_permissions = []
-    
-    # Получаем правила доступа к данным
-    data_access_rules = db.query(DataAccessRule).filter(
-        DataAccessRule.user_id == user_id,
-        DataAccessRule.is_active == True
-    ).all()
-    
-    # Формируем детальные права по модулям
-    module_permissions = {}
-    for module, config in AVAILABLE_MODULES.items():
-        module_permissions[module] = {
-            "enabled": False,
-            "permissions": {},
-            "data_access": {
-                "type": "none",  # none, own, team, all
-                "can_view": False,
-                "can_edit": False, 
-                "can_delete": False,
-                "can_export": False
-            }
-        }
-        
-        # Проверяем каждое разрешение модуля
-        for perm in config["permissions"]:
-            perm_name = f"{module}.{perm}"
-            module_permissions[module]["permissions"][perm] = perm_name in user_permissions
-            if perm_name in user_permissions:
-                module_permissions[module]["enabled"] = True
-        
-        # Проверяем правила доступа к данным
-        for rule in data_access_rules:
-            if rule.entity_type == module:
-                module_permissions[module]["data_access"] = {
-                    "type": rule.access_type,
-                    "can_view": rule.can_view,
-                    "can_edit": rule.can_edit,
-                    "can_delete": rule.can_delete,
-                    "can_export": rule.can_export
+
+        try:
+            rbac = RBACService(db)
+            user_roles = rbac.get_user_roles(user_id)
+        except Exception as e:
+            logger.warning(f"Не удалось получить роли пользователя {user_id}: {str(e)}")
+
+        # Получаем разрешения пользователя
+        try:
+            rbac = RBACService(db)
+            user_permissions = rbac.get_user_permissions(user_id)
+        except Exception as e:
+            logger.warning(f"Не удалось получить разрешения пользователя {user_id}: {str(e)}")
+
+        # Получаем правила доступа к данным
+        data_access_rules = []
+        try:
+            data_access_rules = db.query(DataAccessRule).filter(
+                DataAccessRule.user_id == user_id,
+                DataAccessRule.is_active == True
+            ).all()
+        except Exception as e:
+            logger.warning(f"Не удалось получить правила доступа к данным: {str(e)}")
+
+        # Формируем детальные права по модулям
+        module_permissions = {}
+        for module, config in AVAILABLE_MODULES.items():
+            module_permissions[module] = {
+                "enabled": False,
+                "permissions": {},
+                "data_access": {
+                    "type": "none",  # none, own, team, all
+                    "can_view": False,
+                    "can_edit": False,
+                    "can_delete": False,
+                    "can_export": False
                 }
-    
-    return {
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "role": user.role,
-            "is_active": user.is_active
-        },
-        "roles": [role.to_dict() for role in user_roles],
-        "module_permissions": module_permissions,
-        "available_modules": AVAILABLE_MODULES
-    }
+            }
+
+            # Проверяем каждое разрешение модуля
+            for perm in config["permissions"]:
+                perm_name = f"{module}.{perm}"
+                module_permissions[module]["permissions"][perm] = perm_name in user_permissions
+                if perm_name in user_permissions:
+                    module_permissions[module]["enabled"] = True
+
+            # Проверяем правила доступа к данным
+            for rule in data_access_rules:
+                if rule.entity_type == module:
+                    module_permissions[module]["data_access"] = {
+                        "type": rule.access_type,
+                        "can_view": rule.can_view,
+                        "can_edit": rule.can_edit,
+                        "can_delete": rule.can_delete,
+                        "can_export": rule.can_export
+                    }
+
+        return {
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+                "is_active": user.is_active
+            },
+            "roles": [role.to_dict() for role in user_roles],
+            "module_permissions": module_permissions,
+            "available_modules": AVAILABLE_MODULES
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка получения прав пользователя {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Ошибка получения прав: {str(e)}")
 
 @router.post("/user/{user_id}/update", response_class=JSONResponse)
 async def update_user_permissions(
@@ -495,6 +517,41 @@ async def reset_user_permissions(
     except Exception as e:
         logger.error(f"Ошибка сброса прав пользователя {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Ошибка сброса прав: {str(e)}")
+
+
+@router.get("/api/admins", response_class=JSONResponse)
+async def get_all_admins(
+    current_user: AdminUser = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Получить список всех администраторов для React приложения"""
+    try:
+        # Получаем всех админов
+        admins = db.query(AdminUser).all()
+
+        # Форматируем данные для фронтенда
+        admins_data = []
+        for admin in admins:
+            admins_data.append({
+                "id": admin.id,
+                "username": admin.username,
+                "first_name": admin.first_name,
+                "last_name": admin.last_name,
+                "email": admin.email,
+                "role": admin.role,
+                "is_active": admin.is_active,
+                "created_at": admin.created_at.isoformat() if admin.created_at else None
+            })
+
+        return {
+            "success": True,
+            "admins": admins_data,
+            "total": len(admins_data)
+        }
+
+    except Exception as e:
+        logger.error(f"Ошибка получения списка администраторов: {str(e)}")
+        raise HTTPException(status_code=500, detail="Ошибка получения списка администраторов")
 
 
 async def _update_user_module_permissions(user_id: int, module_permissions: Dict[str, Any], 

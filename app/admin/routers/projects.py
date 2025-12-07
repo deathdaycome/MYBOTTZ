@@ -14,9 +14,9 @@ from pydantic import BaseModel
 
 from ...database.database import get_db, get_db_context
 from ...database.models import (
-    Project, User, AdminUser, ProjectFile, ProjectStatus, ProjectRevision, 
-    RevisionMessage, RevisionFile, ProjectStatusLog, ConsultantSession, 
-    FinanceTransaction, ContractorPayment, ServiceExpense
+    Project, User, AdminUser, ProjectFile, ProjectStatus, ProjectRevision,
+    RevisionMessage, RevisionFile, ProjectStatusLog, ConsultantSession,
+    FinanceTransaction, ContractorPayment, ServiceExpense, FinanceCategory
 )
 from ...config.logging import get_logger
 from ...config.settings import settings
@@ -76,6 +76,7 @@ class ProjectUpdateModel(BaseModel):
     timeweb_password: Optional[str] = None  # Пароль Timeweb
     color: Optional[str] = None  # Цветовая метка проекта (default, green, yellow, red)
     telegram_id: Optional[str] = None  # Telegram ID пользователя
+    client_telegram_id: Optional[str] = None  # Telegram ID клиента для доступа к мини-приложению
 
     class Config:
         from_attributes = True
@@ -106,6 +107,18 @@ class ProjectCreateModel(BaseModel):
     
     class Config:
         from_attributes = True
+
+# Модель для добавления оплаты
+class PaymentCreate(BaseModel):
+    payment_type: str
+    amount: float
+    payment_date: str
+    comment: Optional[str] = None
+
+# Модель для назначения исполнителя
+class ExecutorAssign(BaseModel):
+    executor_id: int
+    executor_cost: Optional[float] = 0
 
 def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> dict:
     """Получение текущего пользователя с проверкой аутентификации"""
@@ -255,32 +268,44 @@ async def get_projects(
             user = db.query(User).filter(User.id == project.user_id).first()
             if user:
                 user_dict = user.to_dict()
-                
+
                 # Добавляем Telegram ID из preferences или metadata проекта
                 telegram_id = ""
                 if user.preferences and user.preferences.get('telegram_id'):
                     telegram_id = user.preferences.get('telegram_id', '')
                 elif project.project_metadata and project.project_metadata.get('user_telegram_id'):
                     telegram_id = project.project_metadata.get('user_telegram_id', '')
-                    
+
                 user_dict["telegram_id"] = telegram_id
+
+                # Для исполнителей скрываем username и контактные данные клиента
+                if current_user["role"] == "executor":
+                    user_dict.pop("username", None)
+                    user_dict.pop("phone", None)
+                    user_dict.pop("email", None)
+                    user_dict.pop("telegram_id", None)
+
                 project_dict["user"] = user_dict
             
             # Добавляем информацию об исполнителе
             if project.assigned_executor_id:
                 executor = db.query(AdminUser).filter(AdminUser.id == project.assigned_executor_id).first()
                 if executor:
-                    project_dict["assigned_executor"] = {
+                    executor_data = {
                         "id": executor.id,
                         "username": executor.username,
                         "first_name": executor.first_name,
                         "last_name": executor.last_name,
                         "role": executor.role
                     }
+                    project_dict["assigned_executor"] = executor_data
+                    project_dict["assigned_to"] = executor_data  # Алиас для совместимости с шаблоном
                 else:
                     project_dict["assigned_executor"] = None
+                    project_dict["assigned_to"] = None
             else:
                 project_dict["assigned_executor"] = None
+                project_dict["assigned_to"] = None
             
             # Добавляем читаемые названия статуса и приоритета
             project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)
@@ -342,15 +367,7 @@ async def get_projects(
             "user_role": current_user["role"]
         }
 
-        # Возвращаем ответ с заголовками против кеширования
-        return JSONResponse(
-            content=response_data,
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
-            }
-        )
+        return response_data
         
     except Exception as e:
         logger.error(f"Ошибка получения проектов: {e}")
@@ -391,22 +408,30 @@ async def get_project(
         user = db.query(User).filter(User.id == project.user_id).first()
         if user:
             user_dict = user.to_dict()
-            
+
             # Добавляем Telegram ID из preferences или metadata проекта
             telegram_id = ""
             if user.preferences and user.preferences.get('telegram_id'):
                 telegram_id = user.preferences.get('telegram_id', '')
             elif project.project_metadata and project.project_metadata.get('user_telegram_id'):
                 telegram_id = project.project_metadata.get('user_telegram_id', '')
-                
+
             user_dict["telegram_id"] = telegram_id
+
+            # Для исполнителей скрываем username и контактные данные клиента
+            if current_user["role"] == "executor":
+                user_dict.pop("username", None)
+                user_dict.pop("phone", None)
+                user_dict.pop("email", None)
+                user_dict.pop("telegram_id", None)
+
             project_dict["user"] = user_dict
         
         # Добавляем информацию об исполнителе
         if project.assigned_executor_id:
             executor = db.query(AdminUser).filter(AdminUser.id == project.assigned_executor_id).first()
             if executor:
-                project_dict["assigned_executor"] = {
+                executor_data = {
                     "id": executor.id,
                     "username": executor.username,
                     "first_name": executor.first_name,
@@ -414,10 +439,14 @@ async def get_project(
                     "role": executor.role,
                     "email": executor.email
                 }
+                project_dict["assigned_executor"] = executor_data
+                project_dict["assigned_to"] = executor_data  # Алиас для совместимости с шаблоном
             else:
                 project_dict["assigned_executor"] = None
+                project_dict["assigned_to"] = None
         else:
             project_dict["assigned_executor"] = None
+            project_dict["assigned_to"] = None
         
         # Добавляем читаемые названия
         project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)
@@ -800,12 +829,12 @@ async def update_project(
             "message": f"Ошибка обновления проекта: {str(e)}"
         }
 
-@router.post("/")
+@router.post("/api-create")
 async def create_project_root(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    """Создать новый проект через корневой POST endpoint - временно без аутентификации"""
+    """Создать новый проект через API endpoint - принимает JSON"""
     try:
         logger.info("Получен запрос на создание проекта")
         
@@ -1056,14 +1085,31 @@ async def create_project_validated(
 
 @router.post("/create")
 async def create_project(
-    project_data: ProjectCreateModel,
+    title: str = Form(...),
+    description: str = Form(...),
+    user_id: Optional[int] = Form(None),
+    client_telegram_id: Optional[str] = Form(None),
+    client_telegram_username: Optional[str] = Form(None),
+    client_name: Optional[str] = Form(None),
+    client_phone: Optional[str] = Form(None),
+    project_type: str = Form("website"),
+    complexity: str = Form("medium"),
+    priority: str = Form("medium"),
+    estimated_cost: Optional[float] = Form(None),
+    executor_cost: Optional[float] = Form(None),
+    prepayment_amount: Optional[float] = Form(0),
+    estimated_hours: Optional[int] = Form(None),
+    deadline: Optional[str] = Form(None),
+    status: str = Form("new"),
+    assigned_executor_id: Optional[int] = Form(None),
+    tz_file: Optional[UploadFile] = File(None),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Создать новый проект вручную через админку (старый метод для совместимости)"""
+    """Создать новый проект вручную через админку с возможностью загрузки файла ТЗ"""
     try:
         logger.info(f"Попытка создания проекта пользователем {current_user.get('username')} с ролью {current_user.get('role')}")
-        
+
         # Проверяем права доступа (только владелец может создавать проекты)
         if current_user["role"] != "owner":
             logger.warning(f"Отказ в создании проекта: недостаточно прав для пользователя {current_user.get('username')}")
@@ -1071,101 +1117,154 @@ async def create_project(
                 "success": False,
                 "message": "У вас нет прав для создания проектов"
             }
-        
+
         # Проверяем, передан ли user_id или нужно создать нового клиента
         user = None
-        
+
         # Проверяем, есть ли user_id в данных (для существующего клиента)
-        if hasattr(project_data, 'user_id') and project_data.user_id:
-            user = db.query(User).filter(User.id == project_data.user_id).first()
+        if user_id:
+            user = db.query(User).filter(User.id == user_id).first()
             if not user:
                 return {
                     "success": False,
-                    "message": f"Клиент с ID {project_data.user_id} не найден"
+                    "message": f"Клиент с ID {user_id} не найден"
                 }
         else:
-            # Создаем нового клиента
-            if project_data.client_telegram_id and str(project_data.client_telegram_id).isdigit():
-                # Ищем существующего пользователя по Telegram ID
-                user = db.query(User).filter(User.telegram_id == int(project_data.client_telegram_id)).first()
-            
+            # Создаем нового клиента или ищем существующего
+            user = None
+
+            # Сначала ищем по telegram_id если указан
+            if client_telegram_id and str(client_telegram_id).isdigit():
+                user = db.query(User).filter(User.telegram_id == int(client_telegram_id)).first()
+
+            # Если не нашли по telegram_id, ищем по telegram_username
+            if not user and client_telegram_username:
+                user = db.query(User).filter(User.username == client_telegram_username.strip().lstrip('@')).first()
+
             if not user:
                 # Генерируем уникальный username на основе имени клиента или используем временную метку
                 import time
-                base_username = (project_data.client_name or "client").replace(' ', '_').lower()
+                base_username = (client_name or "client").replace(' ', '_').lower()
                 username = f"{base_username}_{int(time.time())}"
-                
+
                 # Безопасная конвертация Telegram ID для нового пользователя
                 try:
-                    telegram_id = int(project_data.client_telegram_id) if project_data.client_telegram_id and str(project_data.client_telegram_id).isdigit() else int(time.time())
+                    telegram_id = int(client_telegram_id) if client_telegram_id and str(client_telegram_id).isdigit() else int(time.time())
                 except (ValueError, AttributeError):
                     telegram_id = int(time.time())
-                
+
                 # Создаем нового пользователя
                 user = User(
                     telegram_id=telegram_id,
-                    first_name=project_data.client_name or "Клиент",
+                    first_name=client_name or "Клиент",
                     last_name="",
                     username=username,
-                    phone=project_data.client_phone,
+                    phone=client_phone,
                     is_active=True
                 )
                 db.add(user)
                 db.flush()  # Получаем ID пользователя
+
+                # Создаем запись в CRM (таблица Client)
+                from ...database.crm_models import Client, ClientType, ClientStatus
+
+                crm_client = Client(
+                    name=client_name or "Клиент",
+                    type=ClientType.INDIVIDUAL,
+                    status=ClientStatus.NEW,
+                    phone=client_phone,
+                    telegram=str(client_telegram_id) if client_telegram_id else None,
+                    telegram_user_id=user.id,
+                    source="admin_panel",
+                    description=f"Создан автоматически при создании проекта '{title}'",
+                    created_by_id=current_user.get("id"),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(crm_client)
+                db.flush()  # Получаем ID клиента CRM
+                logger.info(f"Создан клиент CRM с ID: {crm_client.id} для пользователя {user.id}")
         
         # Создаем проект
         from datetime import timedelta
-        
+        from pathlib import Path
+
         # Вычисляем плановую дату завершения
         planned_end_date = datetime.utcnow()
-        if project_data.deadline:
-            planned_end_date = datetime.fromisoformat(project_data.deadline)
-        elif project_data.estimated_hours:
+        if deadline:
+            planned_end_date = datetime.fromisoformat(deadline)
+        elif estimated_hours:
             # Добавляем дни на основе оценочных часов (8 часов = 1 рабочий день)
-            days_needed = (project_data.estimated_hours / 8) + 1
+            days_needed = (estimated_hours / 8) + 1
             planned_end_date = datetime.utcnow() + timedelta(days=days_needed)
         else:
             # По умолчанию 7 дней от текущей даты
             planned_end_date = datetime.utcnow() + timedelta(days=7)
-        
+
+        # Обработка username - убираем @ если есть
+        clean_username = None
+        if client_telegram_username:
+            clean_username = client_telegram_username.strip().lstrip('@')
+
         project = Project(
             user_id=user.id,
-            title=project_data.title,
-            description=project_data.description,
-            project_type=project_data.project_type,
-            complexity=project_data.complexity,
-            priority=project_data.priority,
-            status=project_data.status,
-            estimated_cost=project_data.estimated_cost or 0.0,
-            executor_cost=project_data.executor_cost,
-            prepayment_amount=project_data.prepayment_amount or 0,
-            client_paid_total=project_data.client_paid_total or 0,
-            executor_paid_total=project_data.executor_paid_total or 0,
-            assigned_executor_id=project_data.assigned_executor_id,
-            estimated_hours=project_data.estimated_hours or 0,
+            title=title,
+            description=description,
+            client_telegram_id=client_telegram_id.strip() if client_telegram_id else None,
+            client_telegram_username=clean_username,
+            project_type=project_type,
+            complexity=complexity,
+            priority=priority,
+            status=status,
+            estimated_cost=estimated_cost or 0.0,
+            executor_cost=executor_cost,
+            prepayment_amount=prepayment_amount or 0,
+            assigned_executor_id=assigned_executor_id,
+            estimated_hours=estimated_hours or 0,
             planned_end_date=planned_end_date,
-            deadline=datetime.fromisoformat(project_data.deadline) if project_data.deadline else None,
+            deadline=datetime.fromisoformat(deadline) if deadline else None,
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
-        
+
         db.add(project)
         db.flush()  # Принудительно записываем в БД и получаем ID
         logger.info(f"Проект добавлен в БД с ID: {project.id}")
-        
+
+        # Обрабатываем загрузку файла ТЗ
+        tz_file_path = None
+        if tz_file and tz_file.filename:
+            try:
+                # Создаем директорию для файлов ТЗ
+                tz_dir = Path("uploads/tz")
+                tz_dir.mkdir(parents=True, exist_ok=True)
+
+                # Генерируем уникальное имя файла
+                file_ext = os.path.splitext(tz_file.filename)[1]
+                unique_filename = f"tz_{project.id}_{uuid.uuid4()}{file_ext}"
+                tz_file_path = tz_dir / unique_filename
+
+                # Сохраняем файл
+                with open(tz_file_path, "wb") as f:
+                    content = await tz_file.read()
+                    f.write(content)
+
+                logger.info(f"Файл ТЗ сохранен: {tz_file_path}")
+            except Exception as e:
+                logger.error(f"Ошибка сохранения файла ТЗ: {e}")
+
         db.commit()
         logger.info(f"Транзакция создания проекта {project.id} зафиксирована")
         db.refresh(project)
-        
+
         # Логируем создание в метаданных
         project.project_metadata = {
             "created_manually": True,
             "created_by": current_user["username"],
             "created_at": datetime.utcnow().isoformat(),
             "edit_history": [],
-            "bot_token": project_data.bot_token,
-            "timeweb_login": project_data.timeweb_login,
-            "timeweb_password": project_data.timeweb_password
+            "tz_file_path": str(tz_file_path) if tz_file_path else None,
+            "tz_file_original_name": tz_file.filename if tz_file and tz_file.filename else None
         }
         
         db.commit()
@@ -1205,7 +1304,28 @@ async def create_project(
                 logger.info(f"Уведомление о создании проекта отправлено пользователю {user.telegram_id}")
             except Exception as e:
                 logger.error(f"Ошибка отправки уведомления: {e}")
-        
+
+        # Создаем чат для проекта автоматически
+        try:
+            from ...database.models import ProjectChat
+
+            # Проверяем, существует ли уже чат для этого проекта
+            existing_chat = db.query(ProjectChat).filter(ProjectChat.project_id == project.id).first()
+
+            if not existing_chat:
+                new_chat = ProjectChat(
+                    project_id=project.id,
+                    created_at=datetime.utcnow(),
+                    last_message_at=None,
+                    unread_by_client=0,
+                    unread_by_executor=0
+                )
+                db.add(new_chat)
+                db.commit()
+                logger.info(f"Автоматически создан чат для проекта {project.id}")
+        except Exception as e:
+            logger.error(f"Ошибка создания чата для проекта: {e}")
+
         logger.info(f"Проект '{project.title}' успешно создан с ID {project.id}")
         return {
             "success": True,
@@ -1221,6 +1341,46 @@ async def create_project(
             "success": False,
             "message": f"Ошибка создания проекта: {str(e)}"
         }
+
+@router.get("/{project_id}/tz-file")
+async def download_tz_file(
+    project_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Скачать файл ТЗ проекта"""
+    try:
+        from fastapi.responses import FileResponse
+
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            raise HTTPException(status_code=404, detail="Проект не найден")
+
+        # Проверяем права доступа
+        if current_user["role"] == "executor":
+            if project.assigned_executor_id != current_user["id"]:
+                raise HTTPException(status_code=403, detail="У вас нет доступа к этому проекту")
+
+        # Получаем путь к файлу из метаданных
+        if not project.project_metadata or not project.project_metadata.get('tz_file_path'):
+            raise HTTPException(status_code=404, detail="Файл ТЗ не найден")
+
+        tz_file_path = project.project_metadata.get('tz_file_path')
+        original_filename = project.project_metadata.get('tz_file_original_name', 'tz.pdf')
+
+        if not os.path.exists(tz_file_path):
+            raise HTTPException(status_code=404, detail="Файл ТЗ не существует на диске")
+
+        return FileResponse(
+            path=tz_file_path,
+            filename=original_filename,
+            media_type='application/octet-stream'
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка скачивания файла ТЗ проекта {project_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{project_id}/files")
 async def get_project_files(
@@ -1779,4 +1939,174 @@ async def get_project_integration_chain(
         return {
             "success": False,
             "message": str(e)
-        }
+        }# Добавить в конец файла projects.py
+
+@router.post("/{project_id}/payments")
+async def add_project_payment(
+    project_id: int,
+    payment_data: PaymentCreate,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Добавить оплату к проекту"""
+    try:
+        with get_db_context() as db:
+            # Проверяем существование проекта
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+
+            # Получаем или создаем категорию для оплат проектов
+            category = db.query(FinanceCategory).filter(
+                FinanceCategory.name == "Оплата проекта"
+            ).first()
+
+            if not category:
+                # Создаем категорию, если её нет
+                category = FinanceCategory(
+                    name="Оплата проекта",
+                    type="income",
+                    description="Оплаты от клиентов"
+                )
+                db.add(category)
+                db.flush()  # Получаем ID категории
+
+            # Создаем транзакцию
+            transaction = FinanceTransaction(
+                amount=payment_data.amount,
+                type="income",
+                description=f"{payment_data.payment_type} по проекту #{project_id}: {project.title}",
+                date=datetime.fromisoformat(payment_data.payment_date) if payment_data.payment_date else datetime.utcnow(),
+                project_id=project_id,
+                category_id=category.id,
+                created_by_id=current_user["id"]
+            )
+
+            db.add(transaction)
+
+            # Обновляем оплаченную сумму проекта
+            project.client_paid_total = (project.client_paid_total or 0) + payment_data.amount
+
+            db.commit()
+            db.refresh(transaction)
+
+            logger.info(f"Добавлена оплата {payment_data.amount}₽ к проекту {project_id}")
+
+            return {
+                "success": True,
+                "message": "Оплата успешно добавлена"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка добавления оплаты к проекту {project_id}: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{project_id}/executor-payments")
+async def add_executor_payment(
+    project_id: int,
+    payment_data: PaymentCreate,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Добавить оплату исполнителю"""
+    try:
+        with get_db_context() as db:
+            # Проверяем существование проекта
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+
+            # Проверяем, что у проекта есть исполнитель
+            if not project.assigned_executor_id:
+                raise HTTPException(status_code=400, detail="У проекта не назначен исполнитель")
+
+            # Получаем или создаем категорию для выплат исполнителям
+            category = db.query(FinanceCategory).filter(
+                FinanceCategory.name == "Выплата исполнителю"
+            ).first()
+
+            if not category:
+                # Создаем категорию, если её нет
+                category = FinanceCategory(
+                    name="Выплата исполнителю",
+                    type="expense",
+                    description="Выплаты исполнителям проектов"
+                )
+                db.add(category)
+                db.flush()  # Получаем ID категории
+
+            # Создаем транзакцию расхода
+            transaction = FinanceTransaction(
+                amount=payment_data.amount,
+                type="expense",
+                description=f"{payment_data.payment_type} исполнителю по проекту #{project_id}: {project.title}",
+                date=datetime.fromisoformat(payment_data.payment_date) if payment_data.payment_date else datetime.utcnow(),
+                project_id=project_id,
+                category_id=category.id,
+                created_by_id=current_user["id"]
+            )
+
+            db.add(transaction)
+
+            # Обновляем выплаченную сумму исполнителю
+            project.executor_paid_total = (project.executor_paid_total or 0) + payment_data.amount
+
+            db.commit()
+            db.refresh(transaction)
+
+            logger.info(f"Добавлена выплата {payment_data.amount}₽ исполнителю проекта {project_id}")
+
+            return {
+                "success": True,
+                "message": "Выплата исполнителю успешно добавлена"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка добавления выплаты исполнителю проекта {project_id}: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{project_id}/assign")
+async def assign_executor(
+    project_id: int,
+    executor_data: ExecutorAssign,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Назначить исполнителя на проект"""
+    try:
+        with get_db_context() as db:
+            # Проверяем существование проекта
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+
+            # Проверяем существование исполнителя
+            executor = db.query(AdminUser).filter(AdminUser.id == executor_data.executor_id).first()
+            if not executor:
+                raise HTTPException(status_code=404, detail="Исполнитель не найден")
+
+            # Назначаем исполнителя
+            project.assigned_executor_id = executor_data.executor_id
+            project.executor_cost = executor_data.executor_cost
+
+            db.commit()
+            db.refresh(project)
+
+            logger.info(f"Назначен исполнитель {executor_data.executor_id} на проект {project_id}")
+
+            return {
+                "success": True,
+                "message": "Исполнитель успешно назначен"
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка назначения исполнителя на проект {project_id}: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))

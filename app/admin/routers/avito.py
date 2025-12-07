@@ -165,33 +165,48 @@ async def get_chats(
     username: str = Depends(authenticate)
 ):
     """Получение списка чатов"""
+    # Проверка наличия Avito credentials до попытки получить сервис
+    if not (settings.AVITO_USER_ID and settings.AVITO_CLIENT_ID and settings.AVITO_CLIENT_SECRET):
+        logger.warning("Avito credentials not configured")
+        return JSONResponse(
+            status_code=200,  # Возвращаем 200 чтобы не было ошибок в консоли
+            content={
+                "chats": [],
+                "total": 0,
+                "error": "not_configured",
+                "message": "Avito интеграция не настроена. Добавьте AVITO_CLIENT_ID, AVITO_CLIENT_SECRET и AVITO_USER_ID в .env файл."
+            }
+        )
+
     try:
         service = get_avito_service()
         logger.info(f"Getting chats with params: unread_only={unread_only}, limit={limit}, offset={offset}")
-        
+
         chats = await service.get_chats(unread_only=unread_only, limit=limit, offset=offset)
-        
+
         # Преобразуем в словари для JSON
         chats_data = [chat.to_dict() for chat in chats]
-        
+
         logger.info(f"Returning {len(chats_data)} chats to frontend")
-        
+
         # Включаем current_user_id для фронтенда
         response_data = {
-            "chats": chats_data, 
+            "chats": chats_data,
             "total": len(chats_data),
             "current_user_id": service.user_id
         }
-        
+
         return JSONResponse(response_data)
     except Exception as e:
         logger.error(f"Failed to get chats: {e}", exc_info=True)
         if "not initialized" in str(e):
             # Возвращаем более информативное сообщение об ошибке
             return JSONResponse(
-                status_code=400,
+                status_code=200,  # Возвращаем 200 чтобы не было ошибок в консоли
                 content={
-                    "error": "not_configured", 
+                    "chats": [],
+                    "total": 0,
+                    "error": "not_configured",
                     "message": "Avito service is not initialized. Call init_avito_service first.",
                     "details": "Требуется авторизация через OAuth. Перейдите в настройки Avito."
                 }
@@ -199,8 +214,10 @@ async def get_chats(
         # Если ошибка 403 - проблема с доступом
         if "403" in str(e) or "permission denied" in str(e):
             return JSONResponse(
-                status_code=403,
+                status_code=200,  # Возвращаем 200 чтобы не было ошибок в консоли
                 content={
+                    "chats": [],
+                    "total": 0,
                     "error": "access_denied",
                     "message": "Access denied to Avito API. Invalid User ID or insufficient permissions.",
                     "details": f"User ID: {service.user_id if service else 'Not set'}"

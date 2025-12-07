@@ -456,7 +456,46 @@ async def update_lead_status(
         # Если статус LOST, сохраняем причину
         if status_enum == LeadStatus.LOST and data.get("lost_reason"):
             lead.lost_reason = data["lost_reason"]
-        
+
+        # Автоматически создаём сделку при переводе лида в статус WON
+        if status_enum == LeadStatus.WON and old_status != LeadStatus.WON:
+            # Проверяем, нет ли уже созданной сделки для этого лида
+            existing_deal = db.query(Deal).filter(Deal.lead_id == lead.id).first()
+
+            if not existing_deal:
+                # Создаём новую сделку
+                new_deal = Deal(
+                    title=lead.title,
+                    description=f"Автоматически создано из лида: {lead.title}",
+                    client_id=lead.client_id,
+                    lead_id=lead.id,
+                    amount=lead.estimated_value,
+                    status=DealStatus.NEW,
+                    created_by_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(new_deal)
+                db.flush()  # Получаем ID без коммита
+
+                # Обновляем лид - добавляем ссылку на сделку
+                lead.converted_at = datetime.utcnow()
+
+                # Логируем создание сделки
+                audit_log_deal = AuditLog(
+                    action_type=AuditActionType.CREATE,
+                    entity_type=AuditEntityType.DEAL,
+                    entity_id=new_deal.id,
+                    old_values={},
+                    new_values={"title": new_deal.title, "status": DealStatus.NEW.value},
+                    description=f"Автоматически создана сделка из лида '{lead.title}'",
+                    user_id=current_user.id if hasattr(current_user, 'id') else current_user.get('id'),
+                    user_email=current_user.username if hasattr(current_user, 'username') else current_user.get('username')
+                )
+                db.add(audit_log_deal)
+
+                logger.info(f"Автоматически создана сделка ID={new_deal.id} из лида ID={lead.id}")
+
         db.commit()
         
         # Логируем действие

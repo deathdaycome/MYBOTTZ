@@ -3,6 +3,7 @@
 """
 import logging
 import asyncio
+import nest_asyncio
 import sys
 from pathlib import Path
 
@@ -112,6 +113,12 @@ def setup_handlers(app: Application):
     app.add_handler(CallbackQueryHandler(
         portfolio_handler.show_portfolio_categories,
         pattern="^portfolio$"
+    ))
+
+    # Обработчик для "Мой Telegram ID"
+    app.add_handler(CallbackQueryHandler(
+        start_handler.show_telegram_id,
+        pattern="^my_telegram_id$"
     ))
 
     app.add_handler(CallbackQueryHandler(
@@ -312,4 +319,6 @@ async def main():
 
 
 if __name__ == "__main__":
+    # Применяем nest_asyncio для работы в фоновом режиме
+    nest_asyncio.apply()
     asyncio.run(main())

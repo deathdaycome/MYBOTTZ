@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..database.database import get_db_context
 from ..config.logging import get_logger
 from .task_notification_service import task_notification_service
+from .payment_notification_service import payment_notification_service
 
 logger = get_logger(__name__)
 
@@ -49,10 +50,14 @@ class TaskScheduler:
         """Основной цикл планировщика"""
         while self.is_running:
             try:
-                # Проверяем дедлайны каждые 30 минут
+                # Проверяем дедлайны задач каждые 3 часа
                 await self._check_task_deadlines()
-                await asyncio.sleep(30 * 60)  # 30 минут
-                
+
+                # Проверяем просроченные платежи каждые 3 часа
+                await self._check_payment_deadlines()
+
+                await asyncio.sleep(180 * 60)  # 3 часа = 180 минут
+
             except asyncio.CancelledError:
                 logger.info("Планировщик задач прерван")
                 break
@@ -68,9 +73,23 @@ class TaskScheduler:
                 sent_count = await task_notification_service.check_and_send_deadline_reminders(db)
                 if sent_count > 0:
                     logger.info(f"Отправлено {sent_count} напоминаний о дедлайнах")
-                    
+
         except Exception as e:
             logger.error(f"Ошибка при проверке дедлайнов: {e}")
+
+    async def _check_payment_deadlines(self):
+        """Проверить просроченные платежи и отправить уведомления"""
+        try:
+            stats = payment_notification_service.send_payment_notifications()
+            if stats.get('error'):
+                logger.error(f"Ошибка при проверке платежей: {stats['error']}")
+            else:
+                total_sent = stats.get('overdue_sent', 0) + stats.get('upcoming_sent', 0)
+                if total_sent > 0:
+                    logger.info(f"Отправлено {total_sent} уведомлений о платежах")
+
+        except Exception as e:
+            logger.error(f"Ошибка при проверке платежей: {e}")
 
 # Глобальный экземпляр планировщика
 task_scheduler = TaskScheduler()

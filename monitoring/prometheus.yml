@@ -1,0 +1,92 @@
+# ============================================
+# PROMETHEUS CONFIGURATION
+# ============================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'crm-production'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
+
+# Load rules once and periodically evaluate them
+# rule_files:
+#   - "alerts/*.yml"
+
+# Scrape configurations
+scrape_configs:
+  # ========== APPLICATION METRICS ==========
+
+  - job_name: 'crm-app'
+    static_configs:
+      - targets: ['app:9090']
+        labels:
+          service: 'crm-api'
+          component: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # ========== PROMETHEUS SELF-MONITORING ==========
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
+
+  # ========== POSTGRESQL EXPORTER ==========
+
+  # Uncomment and configure if using postgres_exporter
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  #       labels:
+  #         service: 'postgresql'
+  #         component: 'database'
+
+  # ========== REDIS EXPORTER ==========
+
+  # Uncomment and configure if using redis_exporter
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  #       labels:
+  #         service: 'redis'
+  #         component: 'cache'
+
+  # ========== NODE EXPORTER ==========
+
+  # Uncomment if using node_exporter for host metrics
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+  #       labels:
+  #         service: 'node'
+  #         component: 'system'
+
+  # ========== CELERY METRICS ==========
+
+  # Uncomment if exposing Celery metrics
+  # - job_name: 'celery'
+  #   static_configs:
+  #     - targets: ['celery-worker:9090']
+  #       labels:
+  #         service: 'celery'
+  #         component: 'worker'
+
+# ========== STORAGE CONFIGURATION ==========
+
+storage:
+  tsdb:
+    path: /prometheus
+    retention.time: 30d
+    retention.size: 10GB

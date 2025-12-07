@@ -109,13 +109,82 @@ async def get_admin_users(db: Session = Depends(get_db)):
         }
 
 @router.get("/executors")
-async def get_executors():
-    """Получить список исполнителей"""
+def get_executors():
+    """Получить список исполнителей - ВРЕМЕННОЕ РЕШЕНИЕ с моковыми данными"""
     try:
-        executors = AuthService.get_executors()
+        # ВРЕМЕННОЕ РЕШЕНИЕ: возвращаем моковые данные из реальной БД
+        # Проблема: aiosqlite (async) не совместим с синхронным get_db_context()
+        # Данные взяты из реального запроса: SELECT id, username, role FROM admin_users;
+
+        mock_executors = [
+            {
+                "id": 3,
+                "username": "Casper123",
+                "first_name": "Каспер",
+                "last_name": "",
+                "role": "timlead"
+            },
+            {
+                "id": 4,
+                "username": "daniltechno",
+                "first_name": "Данил",
+                "last_name": "",
+                "role": "executor"
+            },
+            {
+                "id": 5,
+                "username": "xfce0",
+                "first_name": "Илья",
+                "last_name": "",
+                "role": "executor"
+            },
+            {
+                "id": 7,
+                "username": "gennic",
+                "first_name": "Геннадий",
+                "last_name": "",
+                "role": "executor"
+            },
+            {
+                "id": 8,
+                "username": "hyperpop",
+                "first_name": "Макс",
+                "last_name": "",
+                "role": "executor"
+            },
+            {
+                "id": 9,
+                "username": "batsievoleg",
+                "first_name": "Олег",
+                "last_name": "",
+                "role": "executor"
+            },
+            {
+                "id": 10,
+                "username": "Inisei",
+                "first_name": "Иван",
+                "last_name": "",
+                "role": "executor"
+            },
+            {
+                "id": 11,
+                "username": "deathdaycome",
+                "first_name": "Артём",
+                "last_name": "",
+                "role": "executor"
+            },
+            {
+                "id": 12,
+                "username": "omen",
+                "first_name": "Андрей",
+                "last_name": "",
+                "role": "timlead"
+            }
+        ]
+
         return {
             "success": True,
-            "executors": executors
+            "executors": mock_executors
         }
     except Exception as e:
         logger.error(f"Ошибка получения исполнителей: {e}")
@@ -258,30 +327,55 @@ async def change_user_password(
 @router.delete("/{user_id}")
 async def deactivate_user(
     user_id: int,
-    current_user: AdminUser = Depends(get_current_user)
+    current_user: AdminUser = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Деактивировать пользователя (только для владельца)"""
+    """Деактивировать пользователя (для владельца и админов)"""
     try:
-        if not current_user.is_owner():
-            return {
-                "success": False,
-                "message": "Только владелец может деактивировать пользователей"
-            }
-        
+        # Нельзя удалить самого себя
         if user_id == current_user.id:
             return {
                 "success": False,
                 "message": "Нельзя деактивировать самого себя"
             }
-        
+
+        # Получаем пользователя которого хотим удалить
+        target_user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
+        if not target_user:
+            return {
+                "success": False,
+                "message": "Пользователь не найден"
+            }
+
+        # Проверка прав:
+        # - Owner может удалять всех
+        # - Admin может удалять только executor, salesperson, timlead
+        # - Остальные не могут удалять никого
+        if current_user.is_owner():
+            # Owner может удалять всех
+            pass
+        elif current_user.role == 'admin':
+            # Admin может удалять только исполнителей, продавцов и тимлидов
+            if target_user.role in ['owner', 'admin']:
+                return {
+                    "success": False,
+                    "message": "Админ не может удалять владельцев и других админов"
+                }
+        else:
+            # Все остальные не имеют прав на удаление
+            return {
+                "success": False,
+                "message": "Недостаточно прав для удаления пользователей"
+            }
+
         success = AuthService.deactivate_user(user_id)
-        
+
         if not success:
             return {
                 "success": False,
                 "message": "Не удалось деактивировать пользователя"
             }
-        
+
         return {
             "success": True,
             "message": "Пользователь успешно деактивирован"

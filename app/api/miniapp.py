@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, HTTPException, Form, File, UploadFile
+from fastapi import APIRouter, Depends, Header, HTTPException, Form, File, UploadFile, Request
 from sqlalchemy.orm import Session
 from typing import Optional, List
 import hmac
@@ -10,7 +10,7 @@ import uuid
 import shutil
 
 from ..database.database import get_db, get_or_create_user, create_project
-from ..database.models import User, Project, ProjectRevision, RevisionMessage, RevisionMessageFile, RevisionFile
+from ..database.models import User, Project, ProjectRevision, RevisionMessage, RevisionMessageFile, RevisionFile, ProjectChat, ProjectChatMessage, AdminUser
 from ..config.settings import get_settings
 
 router = APIRouter(prefix="/api", tags=["miniapp"])
@@ -100,14 +100,23 @@ async def get_user_projects(
     """Получить все проекты пользователя"""
     print(f"🔍 Mini App: Запрос проектов от пользователя: id={current_user.id}, telegram_id={current_user.telegram_id}, username={current_user.username}")
 
+    # Фильтруем проекты по user_id ИЛИ по client_telegram_id
+    from sqlalchemy import or_, and_
     projects = db.query(Project).filter(
-        Project.user_id == current_user.id
+        or_(
+            Project.user_id == current_user.id,
+            and_(
+                Project.client_telegram_id.isnot(None),
+                Project.client_telegram_id == str(current_user.telegram_id)
+            )
+        ),
+        Project.is_archived == False  # Не показываем архивные проекты
     ).order_by(Project.created_at.desc()).all()
 
     print(f"📊 Найдено проектов: {len(projects)}")
     if projects:
         for p in projects[:3]:
-            print(f"  - ID: {p.id}, Название: {p.title}")
+            print(f"  - ID: {p.id}, Название: {p.title}, user_id: {p.user_id}, client_telegram_id: {p.client_telegram_id}")
 
     return [project.to_dict() for project in projects]
 
@@ -119,9 +128,13 @@ async def get_project(
     db: Session = Depends(get_db)
 ):
     """Получить детали проекта"""
+    from sqlalchemy import or_
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.user_id == current_user.id
+        or_(
+            Project.user_id == current_user.id,
+            Project.client_telegram_id == str(current_user.telegram_id)
+        )
     ).first()
 
     if not project:
@@ -136,8 +149,20 @@ async def get_projects_stats(
     db: Session = Depends(get_db)
 ):
     """Получить статистику по проектам"""
+    from sqlalchemy import or_, and_
+
+    # Получаем проекты где:
+    # 1. user_id совпадает (владелец проекта)
+    # 2. ИЛИ client_telegram_id совпадает с telegram_id пользователя (клиент проекта)
     projects = db.query(Project).filter(
-        Project.user_id == current_user.id
+        or_(
+            Project.user_id == current_user.id,
+            and_(
+                Project.client_telegram_id.isnot(None),
+                Project.client_telegram_id == str(current_user.telegram_id)
+            )
+        ),
+        Project.is_archived == False  # Не показываем архивные проекты
     ).all()
 
     stats = {
@@ -156,9 +181,13 @@ async def get_all_revisions_stats(
     db: Session = Depends(get_db)
 ):
     """Получить общую статистику по всем правкам пользователя"""
-    # Получаем все проекты пользователя
+    # Получаем все проекты пользователя (по user_id ИЛИ по client_telegram_id)
+    from sqlalchemy import or_
     user_projects = db.query(Project).filter(
-        Project.user_id == current_user.id
+        or_(
+            Project.user_id == current_user.id,
+            Project.client_telegram_id == str(current_user.telegram_id)
+        )
     ).all()
 
     project_ids = [p.id for p in user_projects]
@@ -254,9 +283,13 @@ async def get_project_revisions(
 ):
     """Получить все правки проекта"""
     # Проверяем, что проект принадлежит пользователю
+    from sqlalchemy import or_
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.user_id == current_user.id
+        or_(
+            Project.user_id == current_user.id,
+            Project.client_telegram_id == str(current_user.telegram_id)
+        )
     ).first()
 
     if not project:
@@ -301,15 +334,24 @@ async def get_revision(
 ):
     """Получить детали правки"""
     revision = db.query(ProjectRevision).filter(
-        ProjectRevision.id == revision_id,
-        ProjectRevision.created_by_id == current_user.id
+        ProjectRevision.id == revision_id
     ).first()
 
     if not revision:
         raise HTTPException(status_code=404, detail="Revision not found")
 
-    # Получаем проект для названия
-    project = db.query(Project).filter(Project.id == revision.project_id).first()
+    # Получаем проект и проверяем доступ
+    from sqlalchemy import or_
+    project = db.query(Project).filter(
+        Project.id == revision.project_id,
+        or_(
+            Project.user_id == current_user.id,
+            Project.client_telegram_id == str(current_user.telegram_id)
+        )
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     return {
         'revision': {
@@ -347,9 +389,13 @@ async def create_revision(
 ):
     """Создать новую правку с файлами"""
     # Проверяем, что проект принадлежит пользователю
+    from sqlalchemy import or_
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.user_id == current_user.id
+        or_(
+            Project.user_id == current_user.id,
+            Project.client_telegram_id == str(current_user.telegram_id)
+        )
     ).first()
 
     if not project:
@@ -445,9 +491,13 @@ async def get_revision_stats(
 ):
     """Получить статистику по правкам проекта"""
     # Проверяем, что проект принадлежит пользователю
+    from sqlalchemy import or_
     project = db.query(Project).filter(
         Project.id == project_id,
-        Project.user_id == current_user.id
+        or_(
+            Project.user_id == current_user.id,
+            Project.client_telegram_id == str(current_user.telegram_id)
+        )
     ).first()
 
     if not project:
@@ -475,14 +525,26 @@ async def get_revision_messages(
     db: Session = Depends(get_db)
 ):
     """Получить сообщения правки (чат)"""
-    # Проверяем доступ к правке
+    # Проверяем доступ к правке через проект
     revision = db.query(ProjectRevision).filter(
-        ProjectRevision.id == revision_id,
-        ProjectRevision.created_by_id == current_user.id
+        ProjectRevision.id == revision_id
     ).first()
 
     if not revision:
         raise HTTPException(status_code=404, detail="Revision not found")
+
+    # Проверяем доступ к проекту
+    from sqlalchemy import or_
+    project = db.query(Project).filter(
+        Project.id == revision.project_id,
+        or_(
+            Project.user_id == current_user.id,
+            Project.client_telegram_id == str(current_user.telegram_id)
+        )
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     messages = db.query(RevisionMessage).filter(
         RevisionMessage.revision_id == revision_id
@@ -525,14 +587,26 @@ async def send_revision_message(
     db: Session = Depends(get_db)
 ):
     """Отправить сообщение в чат правки с файлами"""
-    # Проверяем доступ к правке
+    # Проверяем доступ к правке через проект
     revision = db.query(ProjectRevision).filter(
-        ProjectRevision.id == revision_id,
-        ProjectRevision.created_by_id == current_user.id
+        ProjectRevision.id == revision_id
     ).first()
 
     if not revision:
         raise HTTPException(status_code=404, detail="Revision not found")
+
+    # Проверяем доступ к проекту
+    from sqlalchemy import or_
+    project = db.query(Project).filter(
+        Project.id == revision.project_id,
+        or_(
+            Project.user_id == current_user.id,
+            Project.client_telegram_id == str(current_user.telegram_id)
+        )
+    ).first()
+
+    if not project:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # Создаем сообщение
     new_message = RevisionMessage(
@@ -581,6 +655,90 @@ async def send_revision_message(
 
     db.commit()
     db.refresh(new_message)
+
+    # Отправляем уведомления
+    try:
+        from ..config.settings import get_settings
+        from telegram import Bot
+
+        settings = get_settings()
+        bot = Bot(settings.BOT_TOKEN)
+
+        # Определяем, кого уведомлять
+        # Если сообщение от клиента - уведомляем исполнителя и админов
+        # Если сообщение от сотрудника/админа - уведомляем клиента
+
+        notify_users = []
+
+        # Получаем telegram_id клиента (владельца проекта)
+        client_telegram_id = None
+        if project.client_telegram_id:
+            client_telegram_id = int(project.client_telegram_id)
+        elif project.user and project.user.telegram_id:
+            client_telegram_id = project.user.telegram_id
+
+        # Проверяем, кто отправил сообщение
+        is_from_client = current_user.telegram_id == client_telegram_id
+
+        if is_from_client:
+            # Сообщение от клиента - уведомляем исполнителя и админов
+            # Уведомляем исполнителя правки
+            if revision.assigned_to and revision.assigned_to.telegram_id:
+                notify_users.append({
+                    'telegram_id': revision.assigned_to.telegram_id,
+                    'name': revision.assigned_to.username
+                })
+
+            # Уведомляем админов
+            from ..database.models import AdminUser
+            admins = db.query(AdminUser).filter(
+                AdminUser.role == "owner",
+                AdminUser.telegram_id.isnot(None)
+            ).all()
+
+            for admin in admins:
+                if admin.telegram_id not in [u['telegram_id'] for u in notify_users]:
+                    notify_users.append({
+                        'telegram_id': admin.telegram_id,
+                        'name': admin.username
+                    })
+        else:
+            # Сообщение от сотрудника/админа - уведомляем клиента
+            if client_telegram_id:
+                notify_users.append({
+                    'telegram_id': client_telegram_id,
+                    'name': project.user.first_name if project.user else 'Клиент'
+                })
+
+        # Формируем сообщение
+        sender_name = current_user.first_name if hasattr(current_user, 'first_name') else current_user.username
+        notification_text = f"""
+💬 <b>Новый комментарий в правке</b>
+
+📋 <b>Проект:</b> {project.title}
+✏️ <b>Правка:</b> {revision.title}
+
+👤 <b>От:</b> {sender_name}
+💭 <b>Сообщение:</b>
+{message[:200]}{'...' if len(message) > 200 else ''}
+
+📱 Откройте мини-приложение для просмотра
+"""
+
+        # Отправляем уведомления
+        for user in notify_users:
+            try:
+                await bot.send_message(
+                    chat_id=user['telegram_id'],
+                    text=notification_text,
+                    parse_mode='HTML'
+                )
+                print(f"✅ Уведомление отправлено {user['name']} (TG: {user['telegram_id']})")
+            except Exception as e:
+                print(f"❌ Ошибка отправки уведомления {user['name']}: {e}")
+
+    except Exception as e:
+        print(f"❌ Ошибка при отправке уведомлений о комментарии в правке: {e}")
 
     return {
         'message': {
@@ -991,3 +1149,374 @@ async def get_unread_notifications_count(
     return {
         'unread_count': count
     }
+
+
+# ===== ЧАТЫ ПРОЕКТОВ =====
+
+@router.get("/chats")
+async def get_chats(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить все чаты проектов клиента"""
+    try:
+        print(f"🔍 Запрос чатов от пользователя: id={current_user.id}, telegram_id={current_user.telegram_id}")
+
+        # Находим все проекты клиента (используем тот же фильтр что и для /api/projects)
+        from sqlalchemy import or_, and_
+        projects = db.query(Project).filter(
+            or_(
+                Project.user_id == current_user.id,
+                and_(
+                    Project.client_telegram_id.isnot(None),
+                    Project.client_telegram_id == str(current_user.telegram_id)
+                )
+            )
+        ).all()
+
+        print(f"📊 Найдено проектов: {len(projects)}")
+
+        chats = []
+        for project in projects:
+            # Находим или создаем чат для проекта
+            chat = db.query(ProjectChat).filter(ProjectChat.project_id == project.id).first()
+
+            if not chat:
+                # Автоматически создаем чат
+                chat = ProjectChat(
+                    project_id=project.id,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow()
+                )
+                db.add(chat)
+                db.flush()
+                print(f"✅ Создан новый чат для проекта {project.id}")
+
+            # Получаем последнее сообщение
+            last_message = db.query(ProjectChatMessage).filter(
+                ProjectChatMessage.chat_id == chat.id
+            ).order_by(ProjectChatMessage.created_at.desc()).first()
+
+            # Получаем исполнителя проекта
+            executor = None
+            if project.assigned_executor_id:
+                executor = db.query(AdminUser).filter(AdminUser.id == project.assigned_executor_id).first()
+
+            chats.append({
+                'id': chat.id,
+                'project': {
+                    'id': project.id,
+                    'title': project.title,
+                    'status': project.status,
+                    'executor': {
+                        'id': executor.id,
+                        'name': executor.username or executor.first_name
+                    } if executor else None
+                },
+                'last_message': {
+                    'sender_type': last_message.sender_type,
+                    'message_text': last_message.message_text,
+                    'created_at': last_message.created_at.isoformat()
+                } if last_message else None,
+                'last_message_at': chat.last_message_at.isoformat() if chat.last_message_at else None,
+                'unread_by_client': chat.unread_by_client,
+                'created_at': chat.created_at.isoformat()
+            })
+
+        db.commit()
+        print(f"✅ Возвращено чатов: {len(chats)}")
+        return chats
+
+    except Exception as e:
+        print(f"❌ Ошибка в get_chats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/chats/{chat_id}/messages")
+async def get_chat_messages(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить сообщения чата"""
+    try:
+        print(f"📨 get_chat_messages: chat_id={chat_id}, user_id={current_user.id}, telegram_id={current_user.telegram_id}")
+
+        # Проверяем доступ к чату
+        chat = db.query(ProjectChat).filter(ProjectChat.id == chat_id).first()
+        if not chat:
+            print(f"❌ Чат {chat_id} не найден")
+            raise HTTPException(status_code=404, detail="Chat not found")
+
+        print(f"✅ Чат найден: project_id={chat.project_id}")
+
+        project = db.query(Project).filter(Project.id == chat.project_id).first()
+        print(f"✅ Проект: {project.title}, user_id={project.user_id}, client_telegram_id={project.client_telegram_id}")
+
+        from sqlalchemy import or_
+        # Проверяем что пользователь имеет доступ к проекту (владелец или клиент)
+        if not (project.user_id == current_user.id or project.client_telegram_id == str(current_user.telegram_id)):
+            print(f"❌ Доступ запрещен: project.user_id={project.user_id}, current_user.id={current_user.id}, project.client_telegram_id={project.client_telegram_id}, current_user.telegram_id={current_user.telegram_id}")
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Получаем сообщения
+        messages = db.query(ProjectChatMessage).filter(
+            ProjectChatMessage.chat_id == chat_id
+        ).order_by(ProjectChatMessage.created_at.asc()).all()
+
+        print(f"📝 Найдено сообщений: {len(messages)}")
+
+        # Получаем имя клиента
+        client_name = 'Клиент'
+        if project.user:
+            if project.user.first_name:
+                client_name = project.user.first_name
+                if project.user.last_name:
+                    client_name += f' {project.user.last_name}'
+            elif project.user.username:
+                client_name = f'@{project.user.username}'
+
+        # Помечаем сообщения как прочитанные клиентом
+        for msg in messages:
+            if not msg.is_read_by_client and msg.sender_type != 'client':
+                msg.is_read_by_client = True
+                msg.read_at = datetime.utcnow()
+
+        chat.unread_by_client = 0
+        db.commit()
+
+        return {
+            'project_title': project.title,
+            'client_name': client_name,
+            'messages': [
+                {
+                    'id': msg.id,
+                    'sender_type': msg.sender_type,
+                    'sender_name': client_name if msg.sender_type == 'client' else 'Исполнитель',
+                    'message_text': msg.message_text,
+                    'attachments': msg.attachments or [],
+                    'created_at': msg.created_at.isoformat(),
+                    'is_read': msg.is_read_by_client if msg.sender_type == 'executor' else msg.is_read_by_executor
+                }
+                for msg in messages
+            ]
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка в get_chat_messages: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/chats/{chat_id}/messages")
+async def send_chat_message(
+    chat_id: int,
+    request: Request,
+    message_text: Optional[str] = Form(None),
+    attachments: Optional[List[UploadFile]] = File(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Отправить сообщение в чат"""
+    try:
+        # Детальное логирование в файл
+        with open("/tmp/chat_debug.log", "a") as f:
+            import json
+            f.write(f"\n{'='*80}\n")
+            f.write(f"[{datetime.now()}] send_chat_message вызван\n")
+            f.write(f"chat_id: {chat_id}\n")
+            f.write(f"\nHeaders:\n")
+            for key, value in request.headers.items():
+                f.write(f"  {key}: {value}\n")
+            f.write(f"\nmessage_text: {repr(message_text)}\n")
+            f.write(f"message_text type: {type(message_text)}\n")
+            f.write(f"attachments: {attachments}\n")
+            f.write(f"attachments type: {type(attachments)}\n")
+            if attachments:
+                f.write(f"attachments length: {len(attachments)}\n")
+                for i, att in enumerate(attachments):
+                    f.write(f"  attachment[{i}]: filename={att.filename}, content_type={att.content_type}\n")
+            f.write(f"user: {current_user.id}, telegram_id={current_user.telegram_id}\n")
+
+        print(f"📨 send_chat_message: chat_id={chat_id}, message_text={message_text}, attachments={attachments}")
+
+        # Проверяем доступ к чату
+        chat = db.query(ProjectChat).filter(ProjectChat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+
+        project = db.query(Project).filter(Project.id == chat.project_id).first()
+
+        from sqlalchemy import or_
+        # Проверяем что пользователь имеет доступ к проекту
+        if not (project.user_id == current_user.id or project.client_telegram_id == str(current_user.telegram_id)):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Обрабатываем вложения
+        attachment_files = []
+        print(f"🔍 Проверка attachments: {attachments}, type: {type(attachments)}")
+        if attachments:
+            upload_dir = os.path.join(settings.UPLOAD_DIR, "chat_attachments", str(chat_id))
+            os.makedirs(upload_dir, exist_ok=True)
+
+            for file in attachments:
+                if file.filename:
+                    file_ext = os.path.splitext(file.filename)[1]
+                    unique_filename = f"{uuid.uuid4()}{file_ext}"
+                    file_path = os.path.join(upload_dir, unique_filename)
+
+                    with open(file_path, "wb") as buffer:
+                        shutil.copyfileobj(file.file, buffer)
+
+                    attachment_files.append({
+                        'filename': file.filename,
+                        'url': f'/{file_path}',
+                        'size': os.path.getsize(file_path)
+                    })
+
+        # Создаем сообщение
+        message = ProjectChatMessage(
+            chat_id=chat_id,
+            sender_type='client',
+            sender_id=current_user.id,
+            message_text=message_text,
+            attachments=attachment_files,
+            created_at=datetime.utcnow(),
+            is_read_by_client=True,
+            is_read_by_executor=False
+        )
+
+        db.add(message)
+
+        # Обновляем чат
+        chat.last_message_at = datetime.utcnow()
+        chat.updated_at = datetime.utcnow()
+        chat.unread_by_executor += 1
+
+        db.commit()
+
+        # Отправляем уведомление исполнителю в Telegram
+        print(f"🔔 [NOTIFICATION DEBUG] Начинаем процесс уведомления для chat_id={chat_id}")
+        project = db.query(Project).filter(Project.id == chat.project_id).first()
+        print(f"🔔 [NOTIFICATION DEBUG] project найден: {project is not None}, project_id={chat.project_id}")
+
+        if project:
+            print(f"🔔 [NOTIFICATION DEBUG] project.assigned_executor_id = {project.assigned_executor_id}")
+
+        if project and project.assigned_executor_id:
+            from ..database.models import AdminUser
+            from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+            from ..config.settings import settings
+            from datetime import datetime
+            import asyncio
+
+            # Получаем данные исполнителя
+            executor = db.query(AdminUser).filter(AdminUser.id == project.assigned_executor_id).first()
+            print(f"🔔 [NOTIFICATION DEBUG] executor найден: {executor is not None}")
+
+            if executor:
+                print(f"🔔 [NOTIFICATION DEBUG] executor.telegram_id = {executor.telegram_id}")
+
+            if executor and executor.telegram_id:
+                # Получаем имя клиента
+                client_name = current_user.first_name or 'Клиент'
+                if current_user.last_name:
+                    client_name += f" {current_user.last_name}"
+
+                print(f"🔔 [NOTIFICATION DEBUG] Отправляем уведомление исполнителю {executor.telegram_id}, от клиента {client_name}")
+
+                # Отправляем уведомление асинхронно используя временный бот
+                async def send_notification():
+                    try:
+                        bot = Bot(settings.BOT_TOKEN)
+                        preview_text = message_text[:150] + "..." if message_text and len(message_text) > 150 else (message_text or "📎 Вложение")
+
+                        notification_message = f"""
+💬 <b>Новое сообщение в проекте</b>
+
+📋 <b>Проект:</b> {project.title}
+👤 <b>От:</b> {client_name} (Клиент)
+
+💬 <b>Сообщение:</b>
+{preview_text}
+
+🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}
+                        """
+
+                        admin_url = f"http://147.45.215.199:8001/admin/chats/{chat_id}"
+                        keyboard = InlineKeyboardMarkup([[InlineKeyboardButton("💬 Ответить", url=admin_url)]])
+
+                        await bot.send_message(
+                            chat_id=executor.telegram_id,
+                            text=notification_message,
+                            parse_mode='HTML',
+                            reply_markup=keyboard,
+                            disable_web_page_preview=True
+                        )
+                        print(f"✅ [NOTIFICATION DEBUG] Уведомление успешно отправлено!")
+                    except Exception as e:
+                        print(f"❌ [NOTIFICATION DEBUG] Ошибка отправки: {e}")
+
+                asyncio.create_task(send_notification())
+            else:
+                print(f"🔔 [NOTIFICATION DEBUG] Уведомление НЕ отправлено: executor={executor is not None if executor else None}, telegram_id={executor.telegram_id if executor else None}")
+        else:
+            print(f"🔔 [NOTIFICATION DEBUG] Уведомление НЕ отправлено: project={project is not None}, assigned_executor_id={project.assigned_executor_id if project else None}")
+
+        return {
+            'id': message.id,
+            'sender_type': message.sender_type,
+            'message_text': message.message_text,
+            'attachments': message.attachments or [],
+            'created_at': message.created_at.isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка в send_chat_message: {e}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/chats/{chat_id}/read")
+async def mark_chat_as_read(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Пометить все сообщения чата как прочитанные"""
+    try:
+        # Проверяем доступ к чату
+        chat = db.query(ProjectChat).filter(ProjectChat.id == chat_id).first()
+        if not chat:
+            raise HTTPException(status_code=404, detail="Chat not found")
+
+        project = db.query(Project).filter(Project.id == chat.project_id).first()
+
+        from sqlalchemy import or_
+        if not (project.user_id == current_user.id or project.client_telegram_id == str(current_user.telegram_id)):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # Помечаем все непрочитанные сообщения как прочитанные
+        messages = db.query(ProjectChatMessage).filter(
+            ProjectChatMessage.chat_id == chat_id,
+            ProjectChatMessage.is_read_by_client == False,
+            ProjectChatMessage.sender_type == 'executor'
+        ).all()
+
+        for msg in messages:
+            msg.is_read_by_client = True
+            msg.read_at = datetime.utcnow()
+
+        chat.unread_by_client = 0
+        db.commit()
+
+        return {'success': True}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Ошибка в mark_chat_as_read: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

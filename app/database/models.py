@@ -68,6 +68,8 @@ class Project(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)  # Клиент (обязательное)
+    client_telegram_id = Column(String(100), nullable=True)  # Telegram ID клиента для доступа к мини-приложению
+    client_telegram_username = Column(String(100), nullable=True)  # Telegram username клиента (@username) для автопривязки
     title = Column(String(500), nullable=False)  # Название проекта (обязательное)
     description = Column(Text, nullable=True)
     original_request = Column(Text, nullable=True)  # Оригинальный запрос пользователя
@@ -110,7 +112,10 @@ class Project(Base):
     # Связь с CRM
     source_deal_id = Column(Integer, nullable=True)  # ID сделки, из которой создан проект
     paid_amount = Column(Float, default=0.0)  # Сумма поступлений по проекту
-    
+
+    # Документы проекта
+    contract_document_id = Column(Integer, nullable=True)  # ID документа договора (только owner видит)
+
     # Связи
     user = relationship("User", back_populates="projects")
     messages = relationship("Message", back_populates="project")
@@ -125,6 +130,7 @@ class Project(Base):
         return {
             "id": self.id,
             "user_id": self.user_id,
+            "client_telegram_id": self.client_telegram_id,
             "title": self.title,
             "description": self.description,
             "original_request": self.original_request,
@@ -571,6 +577,48 @@ class AdminUser(Base):
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "last_login": self.last_login.isoformat() if self.last_login else None
+        }
+
+class UIElementPermission(Base):
+    """Модель детальных прав доступа к элементам интерфейса"""
+    __tablename__ = "ui_element_permissions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_user_id = Column(Integer, ForeignKey("admin_users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Модуль системы (раздел)
+    module = Column(String(100), nullable=False, index=True)  # 'projects', 'tasks', 'analytics', etc.
+
+    # Тип элемента
+    element_type = Column(String(50), nullable=False, index=True)  # 'field', 'button', 'section', 'tab', 'column', 'action'
+
+    # Уникальный идентификатор элемента
+    element_id = Column(String(255), nullable=False, index=True)  # 'projects.title', 'projects.edit_button', etc.
+
+    # Разрешен ли доступ к элементу
+    is_enabled = Column(Boolean, default=True, nullable=False)
+
+    # Метаданные
+    description = Column(Text, nullable=True)  # Описание элемента
+
+    # Даты
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    # Связи
+    admin_user = relationship("AdminUser", backref="ui_permissions")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "admin_user_id": self.admin_user_id,
+            "module": self.module,
+            "element_type": self.element_type,
+            "element_id": self.element_id,
+            "is_enabled": self.is_enabled,
+            "description": self.description,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
 
 class ProjectFile(Base):
@@ -1239,7 +1287,8 @@ class Task(Base):
     status = Column(String(50), default="pending")  # pending, in_progress, completed, cancelled
     priority = Column(String(20), default="normal")  # low, normal, high, urgent
     color = Column(String(20), default="normal")  # normal, red, yellow, green - цвет карточки
-    
+    tags = Column(JSON, default=lambda: [])  # Теги задачи (массив строк)
+
     # Назначение и создание
     assigned_to_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)  # Исполнитель
     created_by_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)  # Кто создал
@@ -1253,12 +1302,15 @@ class Task(Base):
     progress = Column(Integer, default=0)  # Процент выполнения (0-100)
     time_spent_seconds = Column(Integer, default=0)  # Время работы в секундах
     timer_started_at = Column(DateTime, nullable=True)  # Когда запущен таймер
-    
+
+    # Ссылка на деплой (для отслеживания прогресса разработки)
+    deploy_url = Column(String(1000), nullable=True)  # Ссылка на задеплоенное приложение
+
     # Системные поля
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)  # Время завершения
-    
+
     # Дополнительные данные
     task_metadata = Column(JSON, default=lambda: {})  # Дополнительная информация
     
@@ -1275,6 +1327,7 @@ class Task(Base):
             "status": self.status,
             "priority": self.priority,
             "color": self.color,
+            "tags": self.tags or [],
             "assigned_to_id": self.assigned_to_id,
             "created_by_id": self.created_by_id,
             "deadline": self.deadline.isoformat() if self.deadline else None,
@@ -1283,6 +1336,7 @@ class Task(Base):
             "progress": self.progress or 0,
             "time_spent_seconds": self.time_spent_seconds or 0,
             "timer_started_at": self.timer_started_at.isoformat() if self.timer_started_at else None,
+            "deploy_url": self.deploy_url,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "completed_at": self.completed_at.isoformat() if self.completed_at else None,
@@ -1510,6 +1564,350 @@ User.created_revisions = relationship("ProjectRevision", back_populates="created
 #             "user_agent": self.user_agent,
 #             "created_at": self.created_at.isoformat() if self.created_at else None
 #         }
+
+class TaskDeadlineNotification(Base):
+    """Модель для отслеживания отправленных уведомлений о дедлайнах задач"""
+    __tablename__ = "task_deadline_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id"), nullable=False)
+    notification_type = Column(String(50), nullable=False)  # "24h_before", "4h_before", "1h_before", "overdue", "daily_overdue"
+    sent_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    deadline_at = Column(DateTime, nullable=False)  # Дедлайн задачи на момент отправки
+
+    # Связи
+    task = relationship("Task")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "task_id": self.task_id,
+            "notification_type": self.notification_type,
+            "sent_at": self.sent_at.isoformat() if self.sent_at else None,
+            "deadline_at": self.deadline_at.isoformat() if self.deadline_at else None
+        }
+
+# === TIMEWEB HOSTING: Управление арендой серверов ===
+
+class HostingServer(Base):
+    """Модель для учета серверов в аренде"""
+    __tablename__ = "hosting_servers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # Связь с проектом
+    client_id = Column(Integer, nullable=True, index=True)  # ID клиента (группировка серверов)
+    client_name = Column(String(255), nullable=False)  # Имя клиента
+    client_company = Column(String(255), nullable=True)  # Компания клиента
+    client_telegram_id = Column(BigInteger, nullable=True)  # Telegram ID для уведомлений
+
+    # Информация о сервере
+    server_name = Column(String(255), nullable=False)  # Название/ID сервера
+    configuration = Column(Text, nullable=True)  # Конфигурация (CPU, RAM, SSD)
+    ip_address = Column(String(50), nullable=True)
+
+    # Финансы
+    cost_price = Column(Float, nullable=False, default=0)  # Себестоимость (₽/мес)
+    client_price = Column(Float, nullable=False)  # Цена для клиента (₽/мес)
+    service_fee = Column(Float, default=0)  # Стоимость обслуживания (₽/мес)
+
+    # Даты и периодичность
+    start_date = Column(DateTime, nullable=False)  # Дата начала аренды
+    next_payment_date = Column(DateTime, nullable=False)  # Следующий платеж
+    payment_period = Column(String(20), default="monthly")  # monthly, quarterly, yearly
+
+    # Статус
+    status = Column(String(20), default="active")  # active, overdue, suspended, closed
+
+    # Интеграция с Timeweb Cloud
+    timeweb_id = Column(BigInteger, nullable=True, unique=True, index=True)  # ID сервера в Timeweb
+    timeweb_status = Column(String(50), nullable=True)  # Статус в Timeweb (on, off, etc.)
+    timeweb_preset_id = Column(Integer, nullable=True)  # ID тарифа в Timeweb
+    timeweb_data = Column(Text, nullable=True)  # JSON с полными данными из Timeweb API
+    auto_sync = Column(Boolean, default=False)  # Автоматическая синхронизация с Timeweb
+    last_sync_at = Column(DateTime, nullable=True)  # Дата последней синхронизации
+
+    # Дополнительно
+    notes = Column(Text, nullable=True)  # Заметки
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Связи
+    project = relationship("Project", foreign_keys=[project_id], backref="hosting_servers")
+    # client = relationship("Client", foreign_keys=[client_id], backref="hosting_servers")  # TODO: Create Client model
+    payments = relationship("HostingPayment", back_populates="server", cascade="all, delete-orphan")
+
+    def calculate_profit(self):
+        """Рассчитать прибыль"""
+        total_price = self.client_price + (self.service_fee or 0)
+        profit_amount = total_price - self.cost_price
+        profit_percent = (profit_amount / self.cost_price * 100) if self.cost_price > 0 else 0
+        return {
+            "amount": round(profit_amount, 2),
+            "percent": round(profit_percent, 2)
+        }
+
+    def to_dict(self):
+        profit = self.calculate_profit()
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "client_id": self.client_id,
+            "client_name": self.client_name,
+            "client_company": self.client_company,
+            "client_telegram_id": self.client_telegram_id,
+            "server_name": self.server_name,
+            "configuration": self.configuration,
+            "ip_address": self.ip_address,
+            "cost_price": self.cost_price,
+            "client_price": self.client_price,
+            "service_fee": self.service_fee,
+            "total_price": self.client_price + (self.service_fee or 0),
+            "profit_amount": profit["amount"],
+            "profit_percent": profit["percent"],
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "next_payment_date": self.next_payment_date.isoformat() if self.next_payment_date else None,
+            "payment_period": self.payment_period,
+            "status": self.status,
+            "timeweb_id": self.timeweb_id,
+            "timeweb_status": self.timeweb_status,
+            "timeweb_preset_id": self.timeweb_preset_id,
+            "auto_sync": self.auto_sync,
+            "last_sync_at": self.last_sync_at.isoformat() if self.last_sync_at else None,
+            "notes": self.notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class HostingPayment(Base):
+    """Модель для учета платежей за серверы"""
+    __tablename__ = "hosting_payments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    server_id = Column(Integer, ForeignKey("hosting_servers.id", ondelete="CASCADE"), nullable=False)
+
+    # Информация о платеже
+    amount = Column(Float, nullable=False)  # Сумма платежа
+    payment_date = Column(DateTime, nullable=True)  # Дата получения платежа (null = ожидается)
+    expected_date = Column(DateTime, nullable=False)  # Ожидаемая дата платежа
+
+    # Период оплаты
+    period_start = Column(DateTime, nullable=False)  # Начало периода
+    period_end = Column(DateTime, nullable=False)  # Конец периода
+
+    # Статус и метод
+    status = Column(String(20), default="pending")  # paid, pending, overdue
+    payment_method = Column(String(50), nullable=True)  # Способ оплаты
+
+    # Документы
+    receipt_url = Column(String(500), nullable=True)  # Ссылка на чек/документ
+
+    # Дополнительно
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Связи
+    server = relationship("HostingServer", back_populates="payments")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "server_id": self.server_id,
+            "amount": self.amount,
+            "payment_date": self.payment_date.isoformat() if self.payment_date else None,
+            "expected_date": self.expected_date.isoformat() if self.expected_date else None,
+            "period_start": self.period_start.isoformat() if self.period_start else None,
+            "period_end": self.period_end.isoformat() if self.period_end else None,
+            "status": self.status,
+            "payment_method": self.payment_method,
+            "receipt_url": self.receipt_url,
+            "notes": self.notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class ProjectChat(Base):
+    """Модель чата проекта между клиентом и исполнителем"""
+    __tablename__ = "project_chats"
+
+    id = Column(Integer, primary_key=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    # Метаданные
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_message_at = Column(DateTime, nullable=True)  # Время последнего сообщения
+    unread_by_executor = Column(Integer, default=0)  # Количество непрочитанных сообщений исполнителем
+    unread_by_client = Column(Integer, default=0)  # Количество непрочитанных сообщений клиентом
+    is_pinned_by_owner = Column(Boolean, default=False)  # Закреплен ли чат руководителем
+    is_hidden_by_owner = Column(Boolean, default=False)  # Скрыт ли чат руководителем
+
+    # Связи
+    project = relationship("Project", backref="chat")
+    messages = relationship("ProjectChatMessage", back_populates="chat", cascade="all, delete-orphan", order_by="ProjectChatMessage.created_at")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "last_message_at": self.last_message_at.isoformat() if self.last_message_at else None,
+            "unread_by_executor": self.unread_by_executor,
+            "unread_by_client": self.unread_by_client,
+            "is_pinned_by_owner": self.is_pinned_by_owner,
+            "is_hidden_by_owner": self.is_hidden_by_owner
+        }
+
+
+class ProjectChatMessage(Base):
+    """Модель сообщения в чате проекта"""
+    __tablename__ = "project_chat_messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    chat_id = Column(Integer, ForeignKey("project_chats.id", ondelete="CASCADE"), nullable=False)
+
+    # Автор сообщения
+    sender_type = Column(String(20), nullable=False)  # 'client' или 'executor'
+    sender_id = Column(Integer, nullable=True)  # ID пользователя (User.id для клиента, AdminUser.id для исполнителя)
+
+    # Содержимое
+    message_text = Column(Text, nullable=True)  # Текст сообщения
+    attachments = Column(JSON, default=list)  # Прикрепленные файлы [{filename, path, type, size}]
+
+    # Метаданные
+    created_at = Column(DateTime, default=datetime.utcnow)
+    is_read_by_executor = Column(Boolean, default=False)  # Прочитано исполнителем
+    is_read_by_client = Column(Boolean, default=False)  # Прочитано клиентом
+    read_at = Column(DateTime, nullable=True)  # Время прочтения
+
+    # Флаг нарушения (попытка поделиться контактами)
+    has_contact_violation = Column(Boolean, default=False)
+    violation_details = Column(Text, nullable=True)  # Детали нарушения
+
+    # Связь с правкой (если сообщение - создание правки)
+    related_revision_id = Column(Integer, ForeignKey("project_revisions.id"), nullable=True)
+
+    # Связи
+    chat = relationship("ProjectChat", back_populates="messages")
+    related_revision = relationship("ProjectRevision", foreign_keys=[related_revision_id])
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "chat_id": self.chat_id,
+            "sender_type": self.sender_type,
+            "sender_id": self.sender_id,
+            "message_text": self.message_text,
+            "attachments": self.attachments,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "is_read_by_executor": self.is_read_by_executor,
+            "is_read_by_client": self.is_read_by_client,
+            "read_at": self.read_at.isoformat() if self.read_at else None,
+            "has_contact_violation": self.has_contact_violation,
+            "violation_details": self.violation_details,
+            "related_revision_id": self.related_revision_id
+        }
+
+
+class ClientBalance(Base):
+    """Модель для учета балансов клиентов"""
+    __tablename__ = "client_balances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, nullable=False, unique=True, index=True)
+    client_name = Column(String(255), nullable=False)
+    client_telegram_id = Column(BigInteger, nullable=True)
+
+    # Баланс и расчеты
+    balance = Column(Float, default=0.0, nullable=False)  # Текущий баланс
+    total_monthly_cost = Column(Float, default=0.0, nullable=False)  # Общая стоимость всех серверов клиента в месяц
+    days_remaining = Column(Integer, default=0)  # Остаток дней на балансе
+
+    # Даты списаний
+    last_charge_date = Column(DateTime, nullable=True)  # Дата последнего списания
+    next_charge_date = Column(DateTime, nullable=True)  # Дата следующего списания
+
+    # Уведомления
+    low_balance_notified = Column(Boolean, default=False)  # Было ли отправлено уведомление о низком балансе
+
+    # Метаданные
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def calculate_days_remaining(self):
+        """Рассчитать количество дней на балансе"""
+        if self.total_monthly_cost <= 0:
+            return 999  # Бесконечно, если нет серверов
+
+        # Месячная стоимость → дневная стоимость
+        daily_cost = self.total_monthly_cost / 30
+
+        if daily_cost <= 0:
+            return 999
+
+        days = int(self.balance / daily_cost)
+        return max(0, days)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "client_id": self.client_id,
+            "client_name": self.client_name,
+            "client_telegram_id": self.client_telegram_id,
+            "balance": self.balance,
+            "total_monthly_cost": self.total_monthly_cost,
+            "days_remaining": self.days_remaining,
+            "last_charge_date": self.last_charge_date.isoformat() if self.last_charge_date else None,
+            "next_charge_date": self.next_charge_date.isoformat() if self.next_charge_date else None,
+            "low_balance_notified": self.low_balance_notified,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class BalanceTransaction(Base):
+    """Модель для истории транзакций баланса"""
+    __tablename__ = "balance_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(Integer, nullable=False, index=True)
+    client_name = Column(String(255), nullable=False)
+
+    # Тип транзакции
+    type = Column(String(50), nullable=False, index=True)  # replenish (пополнение), charge (списание), refund (возврат)
+
+    # Суммы
+    amount = Column(Float, nullable=False)  # Сумма транзакции
+    balance_before = Column(Float, nullable=False)  # Баланс до транзакции
+    balance_after = Column(Float, nullable=False)  # Баланс после транзакции
+
+    # Дополнительная информация
+    description = Column(Text, nullable=True)  # Описание транзакции
+    server_id = Column(Integer, nullable=True)  # ID сервера (для списаний)
+    server_name = Column(String(255), nullable=True)  # Название сервера
+
+    # Метаданные
+    created_by = Column(String(100), nullable=True)  # Кто создал транзакцию
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "client_id": self.client_id,
+            "client_name": self.client_name,
+            "type": self.type,
+            "amount": self.amount,
+            "balance_before": self.balance_before,
+            "balance_after": self.balance_after,
+            "description": self.description,
+            "server_id": self.server_id,
+            "server_name": self.server_name,
+            "created_by": self.created_by,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
 # === CRM AUTO-SYNC: Автоматическое создание клиента при создании пользователя ===
 from sqlalchemy import event
 

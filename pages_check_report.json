@@ -1,0 +1,76 @@
+[
+  {
+    "name": "Dashboard",
+    "url": "https://nikolaevcodev.ru/admin/",
+    "status": "PASSED",
+    "http_status": 200,
+    "errors": [],
+    "warnings": [],
+    "title": "CRM System - Admin Panel"
+  },
+  {
+    "name": "Projects",
+    "url": "https://nikolaevcodev.ru/admin/projects",
+    "status": "PASSED",
+    "http_status": 200,
+    "errors": [],
+    "warnings": [],
+    "title": "CRM System - Admin Panel"
+  },
+  {
+    "name": "Tasks",
+    "url": "https://nikolaevcodev.ru/admin/tasks",
+    "status": "FAILED",
+    "http_status": 200,
+    "errors": [
+      "React root элемент не найден"
+    ],
+    "warnings": [],
+    "title": ""
+  },
+  {
+    "name": "Notifications",
+    "url": "https://nikolaevcodev.ru/admin/notifications",
+    "status": "PASSED",
+    "http_status": 200,
+    "errors": [],
+    "warnings": [],
+    "title": "CRM System - Admin Panel"
+  },
+  {
+    "name": "Analytics",
+    "url": "https://nikolaevcodev.ru/admin/analytics",
+    "status": "PASSED",
+    "http_status": 200,
+    "errors": [],
+    "warnings": [],
+    "title": "CRM System - Admin Panel"
+  },
+  {
+    "name": "Users",
+    "url": "https://nikolaevcodev.ru/admin/users",
+    "status": "PASSED",
+    "http_status": 200,
+    "errors": [],
+    "warnings": [],
+    "title": "CRM System - Admin Panel"
+  },
+  {
+    "name": "Finance",
+    "url": "https://nikolaevcodev.ru/admin/finance",
+    "status": "PASSED",
+    "http_status": 200,
+    "errors": [],
+    "warnings": [],
+    "title": "CRM System - Admin Panel"
+  },
+  {
+    "name": "Settings",
+    "url": "https://nikolaevcodev.ru/admin/settings",
+    "status": "PASSED",
+    "http_status": 200,
+    "errors": [],
+    "warnings": [],
+    "title": "CRM System - Admin Panel"
+  }
+]

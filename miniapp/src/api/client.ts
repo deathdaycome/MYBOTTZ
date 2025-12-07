@@ -4,9 +4,8 @@ import axios from 'axios';
 // Vite proxy перенаправит /api/* на http://localhost:8000/api/*
 const apiClient = axios.create({
   baseURL: '/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // Не устанавливаем Content-Type здесь - пусть Axios сам определяет
+  // для JSON это будет application/json, для FormData - multipart/form-data с boundary
 });
 
 export { apiClient };

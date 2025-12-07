@@ -22,6 +22,9 @@ def get_main_menu_keyboard(user_id: int = None) -> InlineKeyboardMarkup:
             InlineKeyboardButton("⚙️ Настройки", callback_data="settings")
         ],
         [
+            InlineKeyboardButton("🆔 Мой Telegram ID", callback_data="my_telegram_id")
+        ],
+        [
             InlineKeyboardButton("💼 Портфолио", url=f"https://t.me/{settings.PORTFOLIO_CHANNEL_ID}" if settings.PORTFOLIO_CHANNEL_ID else "https://t.me/your_portfolio_channel")
         ]
     ]

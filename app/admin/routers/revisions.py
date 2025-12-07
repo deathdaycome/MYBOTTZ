@@ -74,6 +74,60 @@ async def revisions_page(request: Request, admin_user: dict = Depends(get_curren
         "navigation_items": navigation_items
     })
 
+@router.get("/api/revisions/stats", response_class=JSONResponse)
+async def get_revisions_stats(
+    db: Session = Depends(get_db),
+    user: dict = Depends(get_current_admin_user)
+):
+    """Получить статистику правок"""
+    try:
+        # Базовый запрос с учетом роли пользователя
+        base_query = db.query(ProjectRevision).join(Project)
+        
+        # Если пользователь не владелец, фильтруем по назначенным проектам
+        if user["role"] != "owner":
+            base_query = base_query.filter(Project.assigned_executor_id == user['id'])
+        
+        # Общее количество правок
+        total_revisions = base_query.count()
+        
+        # Правки в ожидании
+        pending_revisions = base_query.filter(
+            ProjectRevision.status == "pending"
+        ).count()
+        
+        # Завершенные правки
+        completed_revisions = base_query.filter(
+            ProjectRevision.status == "completed"
+        ).count()
+        
+        # Мои правки (назначенные на текущего пользователя)
+        if user["role"] == "owner":
+            # Для владельца считаем все правки как "мои"
+            my_revisions = total_revisions
+        else:
+            # Для исполнителя считаем только назначенные на него
+            my_revisions = base_query.filter(
+                ProjectRevision.assigned_to_id == user['id']
+            ).count()
+        
+        return JSONResponse({
+            "success": True,
+            "data": {
+                "total_revisions": total_revisions,
+                "pending_revisions": pending_revisions,
+                "completed_revisions": completed_revisions,
+                "my_revisions": my_revisions
+            }
+        })
+    
+    except Exception as e:
+        logger.error(f"Error fetching revisions stats: {e}")
+        return JSONResponse({
+            "success": False,
+            "error": "Не удалось получить статистику правок"
+        }, status_code=500)
+
 @router.get("/api/revisions", response_class=JSONResponse)
 async def get_revisions(
     db: Session = Depends(get_db),
@@ -192,60 +246,6 @@ async def get_revision(
         return JSONResponse({
             "success": False,
             "error": "Не удалось получить данные правки"
-        }, status_code=500)
-
-@router.get("/api/revisions/stats", response_class=JSONResponse)
-async def get_revisions_stats(
-    db: Session = Depends(get_db),
-    user: dict = Depends(get_current_admin_user)
-):
-    """Получить статистику правок"""
-    try:
-        # Базовый запрос с учетом роли пользователя
-        base_query = db.query(ProjectRevision).join(Project)
-        
-        # Если пользователь не владелец, фильтруем по назначенным проектам
-        if user["role"] != "owner":
-            base_query = base_query.filter(Project.assigned_executor_id == user['id'])
-        
-        # Общее количество правок
-        total_revisions = base_query.count()
-        
-        # Правки в ожидании
-        pending_revisions = base_query.filter(
-            ProjectRevision.status == "pending"
-        ).count()
-        
-        # Завершенные правки
-        completed_revisions = base_query.filter(
-            ProjectRevision.status == "completed"
-        ).count()
-        
-        # Мои правки (назначенные на текущего пользователя)
-        if user["role"] == "owner":
-            # Для владельца считаем все правки как "мои"
-            my_revisions = total_revisions
-        else:
-            # Для исполнителя считаем только назначенные на него
-            my_revisions = base_query.filter(
-                ProjectRevision.assigned_to_id == user['id']
-            ).count()
-        
-        return JSONResponse({
-            "success": True,
-            "data": {
-                "total_revisions": total_revisions,
-                "pending_revisions": pending_revisions,
-                "completed_revisions": completed_revisions,
-                "my_revisions": my_revisions
-            }
-        })
-    
-    except Exception as e:
-        logger.error(f"Error fetching revisions stats: {e}")
-        return JSONResponse({
-            "success": False,
-            "error": "Не удалось получить статистику правок"
         }, status_code=500)
 
 @router.post("/api/revisions", response_class=JSONResponse)

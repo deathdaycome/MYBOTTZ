@@ -1,0 +1,84 @@
+# ============================================
+# TRANSCRIPTION SERVICE REQUIREMENTS
+# ============================================
+#
+# Install these additional dependencies for transcription functionality
+# Run: pip install -r requirements-transcription.txt
+#
+
+# Faster Whisper - High-performance speech recognition
+# Uses CTranslate2 for efficient inference (much faster than OpenAI Whisper)
+faster-whisper>=1.0.0
+
+# FFmpeg Python wrapper - Audio/video processing
+# Note: Requires FFmpeg to be installed on the system
+# Install FFmpeg:
+#   - macOS: brew install ffmpeg
+#   - Ubuntu/Debian: sudo apt-get install ffmpeg
+#   - Windows: Download from https://ffmpeg.org/download.html
+ffmpeg-python>=0.2.0
+
+# Document creation (already in main requirements.txt)
+# python-docx>=1.1.0
+
+# Audio file handling (already in main requirements.txt)
+# pydub>=0.25.1
+
+# OpenRouter API client (already using httpx from main requirements)
+# httpx>=0.26.0
+
+# File handling (already in main requirements.txt)
+# aiofiles>=23.2.1
+
+# ============================================
+# SYSTEM REQUIREMENTS
+# ============================================
+#
+# 1. FFmpeg must be installed:
+#    - macOS: brew install ffmpeg
+#    - Ubuntu: sudo apt-get install ffmpeg
+#    - Windows: Download and add to PATH
+#
+# 2. For faster-whisper GPU acceleration (optional):
+#    pip install faster-whisper[gpu]
+#    Requires CUDA toolkit
+#
+# 3. Storage requirements:
+#    - Models download to ~/.cache/huggingface/hub/
+#    - Small model: ~500MB
+#    - Medium model: ~1.5GB
+#    - Large model: ~3GB
+#
+# 4. Recommended system specs:
+#    - CPU: 4+ cores
+#    - RAM: 8GB+ (4GB for small model, 8GB for medium)
+#    - Disk: 10GB free space
+#
+# ============================================
+# OPTIONAL PERFORMANCE IMPROVEMENTS
+# ============================================
+
+# For GPU acceleration (NVIDIA CUDA)
+# faster-whisper[gpu]>=1.0.0
+# torch>=2.0.0  # For GPU support
+
+# For Apple Silicon (M1/M2) optimization
+# Use default faster-whisper (it works well on Apple Silicon)
+
+# ============================================
+# USAGE NOTES
+# ============================================
+#
+# The transcription service supports:
+# - Audio formats: MP3, WAV, M4A, FLAC, WEBM
+# - Video formats: MP4, AVI, MOV, MKV (audio will be extracted)
+# - Max file size: 2GB
+# - Languages: Russian (primary), English, and 90+ others
+#
+# Models available:
+# - tiny: Fast, lower accuracy
+# - base: Good balance
+# - small: Better accuracy (default)
+# - medium: High accuracy
+# - large-v2/v3: Best accuracy, slower
+#

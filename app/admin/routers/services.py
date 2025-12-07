@@ -23,14 +23,122 @@ async def services_page(request: Request, user: AdminUser = Depends(require_admi
     # Получаем элементы навигации
     from app.admin.app import get_navigation_items
     navigation_items = get_navigation_items(user.get("role", "admin") if isinstance(user, dict) else user.role)
-    
+
     return templates.TemplateResponse("services.html", {
         "request": request,
         "user": user,
         "username": user.get("username") if isinstance(user, dict) else user.username,
         "user_role": user.get("role") if isinstance(user, dict) else user.role,
-        "navigation_items": navigation_items
+        "navigation": navigation_items
     })
+
+@router.get("/api/services/stats", response_class=JSONResponse)
+async def get_services_statistics(
+    db: Session = Depends(get_db),
+    user: AdminUser = Depends(require_admin_auth),
+    period: str = "month"  # week, month, quarter, year
+):
+    """Получить статистику по сервисам"""
+    try:
+        # Определяем период
+        now = datetime.utcnow()
+        if period == "week":
+            start_date = now - timedelta(days=7)
+        elif period == "month":
+            start_date = now - timedelta(days=30)
+        elif period == "quarter":
+            start_date = now - timedelta(days=90)
+        elif period == "year":
+            start_date = now - timedelta(days=365)
+        else:
+            start_date = now - timedelta(days=30)
+        
+        # Общая статистика
+        total_services = db.query(ServiceProvider).count()
+        active_services = db.query(ServiceProvider).filter(ServiceProvider.status == "active").count()
+        
+        # Статистика расходов за период
+        total_cost = db.query(func.sum(ServiceExpense.amount)).filter(
+            ServiceExpense.expense_date >= start_date
+        ).scalar() or 0
+        
+        # Статистика по типам сервисов
+        service_types_stats = db.query(
+            ServiceProvider.provider_type,
+            func.count(ServiceProvider.id).label("count"),
+            func.sum(ServiceExpense.amount).label("total_cost")
+        ).outerjoin(
+            ServiceExpense, ServiceProvider.id == ServiceExpense.service_provider_id
+        ).filter(
+            ServiceExpense.expense_date >= start_date
+        ).group_by(
+            ServiceProvider.provider_type
+        ).all()
+        
+        # Топ сервисы по расходам
+        top_services = db.query(
+            ServiceProvider.name,
+            ServiceProvider.provider_type,
+            func.sum(ServiceExpense.amount).label("total_cost"),
+            func.count(ServiceExpense.id).label("expense_count")
+        ).join(
+            ServiceExpense, ServiceProvider.id == ServiceExpense.service_provider_id
+        ).filter(
+            ServiceExpense.expense_date >= start_date
+        ).group_by(
+            ServiceProvider.id, ServiceProvider.name, ServiceProvider.provider_type
+        ).order_by(
+            func.sum(ServiceExpense.amount).desc()
+        ).limit(10).all()
+        
+        # Прогноз расходов на месяц
+        current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        days_in_month = calendar.monthrange(now.year, now.month)[1]
+        days_passed = (now - current_month_start).days + 1
+        
+        month_cost_so_far = db.query(func.sum(ServiceExpense.amount)).filter(
+            ServiceExpense.expense_date >= current_month_start
+        ).scalar() or 0
+        
+        projected_month_cost = 0
+        if days_passed > 0:
+            daily_average = month_cost_so_far / days_passed
+            projected_month_cost = daily_average * days_in_month
+        
+        return {
+            "success": True,
+            "statistics": {
+                "period": period,
+                "total_services": total_services,
+                "active_services": active_services,
+                "total_cost": total_cost,
+                "projected_month_cost": projected_month_cost,
+                "month_cost_so_far": month_cost_so_far,
+                "service_types": [
+                    {
+                        "type": service_type,
+                        "count": count,
+                        "total_cost": float(total_cost) if total_cost else 0
+                    }
+                    for service_type, count, total_cost in service_types_stats
+                ],
+                "top_services": [
+                    {
+                        "name": name,
+                        "type": service_type,
+                        "total_cost": float(total_cost) if total_cost else 0,
+                        "expense_count": int(expense_count) if expense_count else 0
+                    }
+                    for name, service_type, total_cost, expense_count in top_services
+                ]
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Ошибка при получении статистики: {str(e)}"
+        }
 
 @router.get("/api/services", response_class=JSONResponse)
 async def get_services(
@@ -269,114 +377,6 @@ async def create_service_expense(
         return {
             "success": False,
             "message": f"Ошибка при записи расхода: {str(e)}"
-        }
-
-@router.get("/api/services/stats", response_class=JSONResponse)
-async def get_services_statistics(
-    db: Session = Depends(get_db),
-    user: AdminUser = Depends(require_admin_auth),
-    period: str = "month"  # week, month, quarter, year
-):
-    """Получить статистику по сервисам"""
-    try:
-        # Определяем период
-        now = datetime.utcnow()
-        if period == "week":
-            start_date = now - timedelta(days=7)
-        elif period == "month":
-            start_date = now - timedelta(days=30)
-        elif period == "quarter":
-            start_date = now - timedelta(days=90)
-        elif period == "year":
-            start_date = now - timedelta(days=365)
-        else:
-            start_date = now - timedelta(days=30)
-        
-        # Общая статистика
-        total_services = db.query(ServiceProvider).count()
-        active_services = db.query(ServiceProvider).filter(ServiceProvider.status == "active").count()
-        
-        # Статистика расходов за период
-        total_cost = db.query(func.sum(ServiceExpense.amount)).filter(
-            ServiceExpense.expense_date >= start_date
-        ).scalar() or 0
-        
-        # Статистика по типам сервисов
-        service_types_stats = db.query(
-            ServiceProvider.provider_type,
-            func.count(ServiceProvider.id).label("count"),
-            func.sum(ServiceExpense.amount).label("total_cost")
-        ).outerjoin(
-            ServiceExpense, ServiceProvider.id == ServiceExpense.service_provider_id
-        ).filter(
-            ServiceExpense.expense_date >= start_date
-        ).group_by(
-            ServiceProvider.provider_type
-        ).all()
-        
-        # Топ сервисы по расходам
-        top_services = db.query(
-            ServiceProvider.name,
-            ServiceProvider.provider_type,
-            func.sum(ServiceExpense.amount).label("total_cost"),
-            func.count(ServiceExpense.id).label("expense_count")
-        ).join(
-            ServiceExpense, ServiceProvider.id == ServiceExpense.service_provider_id
-        ).filter(
-            ServiceExpense.expense_date >= start_date
-        ).group_by(
-            ServiceProvider.id, ServiceProvider.name, ServiceProvider.provider_type
-        ).order_by(
-            func.sum(ServiceExpense.amount).desc()
-        ).limit(10).all()
-        
-        # Прогноз расходов на месяц
-        current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        days_in_month = calendar.monthrange(now.year, now.month)[1]
-        days_passed = (now - current_month_start).days + 1
-        
-        month_cost_so_far = db.query(func.sum(ServiceExpense.amount)).filter(
-            ServiceExpense.expense_date >= current_month_start
-        ).scalar() or 0
-        
-        projected_month_cost = 0
-        if days_passed > 0:
-            daily_average = month_cost_so_far / days_passed
-            projected_month_cost = daily_average * days_in_month
-        
-        return {
-            "success": True,
-            "statistics": {
-                "period": period,
-                "total_services": total_services,
-                "active_services": active_services,
-                "total_cost": total_cost,
-                "projected_month_cost": projected_month_cost,
-                "month_cost_so_far": month_cost_so_far,
-                "service_types": [
-                    {
-                        "type": service_type,
-                        "count": count,
-                        "total_cost": float(total_cost) if total_cost else 0
-                    }
-                    for service_type, count, total_cost in service_types_stats
-                ],
-                "top_services": [
-                    {
-                        "name": name,
-                        "type": service_type,
-                        "total_cost": float(total_cost) if total_cost else 0,
-                        "expense_count": int(expense_count) if expense_count else 0
-                    }
-                    for name, service_type, total_cost, expense_count in top_services
-                ]
-            }
-        }
-        
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"Ошибка при получении статистики: {str(e)}"
         }
 
 @router.get("/api/services/billing/upcoming", response_class=JSONResponse)

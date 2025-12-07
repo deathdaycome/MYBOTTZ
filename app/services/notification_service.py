@@ -734,3 +734,79 @@ async def notify_new_project_request(project_id: int, user_id: int, project_type
 Откройте админ-панель для управления запросом.
     """
     return await notification_service.send_admin_notification(message)
+
+async def notify_project_chat_message(recipient_telegram_id: int, sender_name: str, sender_type: str, project_title: str, message_text: str, chat_id: int) -> bool:
+    """Уведомление о новом сообщении в чате проекта"""
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+
+    print(f"📬 [NOTIFICATION SERVICE] Функция notify_project_chat_message вызвана!")
+    print(f"📬 [NOTIFICATION SERVICE] recipient_telegram_id={recipient_telegram_id}, sender_name={sender_name}, sender_type={sender_type}")
+    print(f"📬 [NOTIFICATION SERVICE] project_title={project_title}, chat_id={chat_id}")
+    print(f"📬 [NOTIFICATION SERVICE] message_text={message_text[:50] if message_text else None}...")
+
+    if not notification_service.bot:
+        print(f"📬 [NOTIFICATION SERVICE] ⚠️ Бот не настроен!")
+        logger.warning("Бот не настроен для отправки уведомлений")
+        return False
+
+    print(f"📬 [NOTIFICATION SERVICE] ✓ Бот настроен, продолжаем...")
+
+    # Определяем эмодзи и текст в зависимости от типа отправителя
+    if sender_type == 'client':
+        emoji = '💬'
+        sender_label = 'Клиент'
+    else:
+        emoji = '👨‍💼'
+        sender_label = 'Исполнитель'
+
+    # Обрезаем длинный текст
+    preview_text = message_text[:150] + "..." if message_text and len(message_text) > 150 else (message_text or "📎 Вложение")
+
+    # Формируем сообщение
+    notification_message = f"""
+{emoji} <b>Новое сообщение в проекте</b>
+
+📋 <b>Проект:</b> {project_title}
+👤 <b>От:</b> {sender_name} ({sender_label})
+
+💬 <b>Сообщение:</b>
+{preview_text}
+
+🕐 <b>Время:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}
+    """
+
+    # Создаем кнопки для быстрого ответа
+    miniapp_url = f"{settings.MINIAPP_URL}/projects"
+    admin_url = f"http://147.45.215.199:8001/admin/chats/{chat_id}"
+
+    keyboard_buttons = []
+
+    # Для клиентов - кнопка открыть мини-апп
+    if sender_type == 'executor':
+        keyboard_buttons.append([InlineKeyboardButton("💬 Открыть чат", web_app=WebAppInfo(url=miniapp_url))])
+    # Для исполнителей - кнопка открыть админку
+    else:
+        keyboard_buttons.append([InlineKeyboardButton("💬 Ответить", url=admin_url)])
+
+    keyboard = InlineKeyboardMarkup(keyboard_buttons)
+
+    try:
+        print(f"📬 [NOTIFICATION SERVICE] Отправляем Telegram сообщение...")
+        await notification_service.bot.send_message(
+            chat_id=recipient_telegram_id,
+            text=notification_message,
+            parse_mode='HTML',
+            reply_markup=keyboard,
+            disable_web_page_preview=True
+        )
+
+        print(f"📬 [NOTIFICATION SERVICE] ✅ Уведомление успешно отправлено!")
+        log_api_call("Telegram", "notify_project_chat_message", True)
+        logger.info(f"Уведомление о сообщении в чате {chat_id} отправлено пользователю {recipient_telegram_id}")
+        return True
+
+    except TelegramError as e:
+        print(f"📬 [NOTIFICATION SERVICE] ❌ ОШИБКА при отправке: {e}")
+        log_api_call("Telegram", "notify_project_chat_message", False)
+        logger.error(f"Ошибка отправки уведомления о сообщении в чате: {e}")
+        return False

@@ -1,61 +1,467 @@
+# ============================================
+# ENTERPRISE CRM - PRODUCTION REQUIREMENTS
+# ============================================
+
+# Core Framework
+fastapi[all]>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.6.0
+pydantic-settings>=2.1.0
+
+# Database & ORM
+sqlalchemy[asyncio]>=2.0.25
+alembic>=1.13.0
+psycopg2-binary>=2.9.9
+asyncpg>=0.29.0  # Async PostgreSQL driver
+
+# Redis & Caching
+redis[hiredis]>=5.0.1
+redis-om>=0.2.1  # Redis Object Mapper
+hiredis>=2.3.2  # Fast Redis C parser
+
+# Celery & Background Tasks
+celery[redis]>=5.3.6
+flower>=2.0.1  # Celery monitoring
+celery-types>=0.22.0
 
 # Telegram Bot
-python-telegram-bot>=20.0
-
-# Database
-sqlalchemy>=2.0.0
-alembic>=1.10.0
-psycopg2-binary>=2.9.0
-
-# Web Framework for Admin Panel
-fastapi>=0.100.0
-uvicorn>=0.20.0
-jinja2>=3.1.0
-python-multipart>=0.0.6
-flask>=2.0.0
-
-# AI Services
-openai>=1.0.0
-httpx>=0.25.0
-
-# Speech Recognition
-SpeechRecognition>=3.10.0
-pydub>=0.25.1
-
-# File Processing
-PyPDF2>=3.0.0
-pdfplumber>=0.9.0
-python-docx>=0.8.11
-Pillow>=10.0.0
-pytesseract>=0.3.10
-pdfkit>=1.0.0
+python-telegram-bot>=20.7
+aiogram>=3.3.0  # Alternative async bot framework
+nest-asyncio>=1.6.0  # Allow nested event loops
 
 # Authentication & Security
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.9
+bcrypt>=4.1.2
+cryptography>=42.0.0
+
+# HTTP Clients & Async
+httpx>=0.26.0
+aiohttp>=3.9.1
+aiofiles>=23.2.1
+tenacity>=8.2.3  # Retry logic with exponential backoff
+
+# Monitoring & Observability
+prometheus-client>=0.19.0
+prometheus-fastapi-instrumentator>=6.1.0
+opentelemetry-api>=1.22.0
+opentelemetry-sdk>=1.22.0
+opentelemetry-instrumentation-fastapi>=0.43b0
+opentelemetry-instrumentation-sqlalchemy>=0.43b0
+opentelemetry-exporter-prometheus>=0.43b0
+
+# Structured Logging
+structlog>=24.1.0
+python-json-logger>=2.0.7
+colorama>=0.4.6  # Colored logs for development
+rich>=13.7.0  # Rich CLI output for scripts and monitoring
+
+# Rate Limiting & Throttling
+slowapi>=0.1.9
+limits>=3.8.0
+
+# Data Validation & Serialization
+marshmallow>=3.20.2
+marshmallow-sqlalchemy>=1.0.0
+
+# AI & ML
+openai>=1.12.0
+anthropic>=0.8.1
+langchain>=0.1.5
+langchain-openai>=0.0.5
+
+# File Processing
+PyPDF2>=3.0.1
+pdfplumber>=0.10.3
+python-docx>=1.1.0
+openpyxl>=3.1.2
+xlsxwriter>=3.1.9
+Pillow>=10.2.0
+pytesseract>=0.3.10
+pdfkit>=1.0.0
+
+# Speech Recognition
+SpeechRecognition>=3.10.1
+pydub>=0.25.1
+faster-whisper>=0.10.0  # Fast Whisper transcription
 
 # Utilities
-python-dotenv>=1.0.0
-APScheduler>=3.10.0
-redis>=4.5.0
-celery>=5.3.0
-schedule>=1.2.0
-requests>=2.31.0
+python-dotenv>=1.0.1
+python-dateutil>=2.8.2
+pytz>=2024.1
+arrow>=1.3.0  # Better datetime handling
+pendulum>=3.0.0  # Even better datetime
 
-# Development
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
-black>=23.0.0
-isort>=5.12.0
+# Data Processing
+pandas>=2.2.0
+numpy>=1.26.3
 
-# Additional
-aiofiles>=23.0.0
-aiohttp>=3.9.0
-python-dateutil>=2.8.0
-pytz>=2023.0
-pandas>=2.0.0
-xlsxwriter>=3.1.0
+# Scheduling & Cron
+APScheduler>=3.10.4
+croniter>=2.0.1
+
+# Template Engine
+jinja2>=3.1.3
 
 # Cloud Storage
-boto3>=1.28.0
-botocore>=1.31.0
+boto3>=1.34.34
+botocore>=1.34.34
+
+# HTTP/WSGI
+starlette>=0.36.2
+werkzeug>=3.0.1
+
+# WebSockets
+websockets>=12.0
+
+# Development & Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.4
+pytest-cov>=4.1.0
+pytest-mock>=3.12.0
+faker>=22.6.0  # Generate fake data for testing
+factory-boy>=3.3.0  # Test fixtures
+hypothesis>=6.98.3  # Property-based testing
+
+# Code Quality
+black>=24.1.1
+isort>=5.13.2
+flake8>=7.0.0
+mypy>=1.8.0
+pylint>=3.0.3
+pre-commit>=3.6.0
+
+# Type Stubs
+types-redis>=4.6.0.20240106
+types-requests>=2.31.0.20240125
+types-python-dateutil>=2.8.19.20240106
+sqlalchemy[mypy]>=2.0.25
+
+# Performance Profiling
+py-spy>=0.3.14  # Sampling profiler
+memory-profiler>=0.61.0
+
+# API Documentation
+fastapi-swagger>=0.2.2
+
+# Job Queues (alternative to Celery for some cases)
+arq>=0.25.0  # Async job queue based on Redis
+
+# Distributed Locking
+redis-py-cluster>=2.1.3
+
+# Feature Flags
+flagsmith>=3.7.0
+# ldclient-py>=9.3.0  # LaunchDarkly - requires Python 3.11+
+
+# Notifications
+# python-pushover>=1.1.0  # Временно отключено - версия не существует
+
+# Healthchecks
+py-healthcheck>=1.10.1  # Изменено с 3.0.2 (не существует)
+
+# Idempotency
+# idempotency-header-middleware>=0.1.1  # Пакет не существует в PyPI - закомментировано
+
+# Database Connection Pooling
+sqlalchemy-utils>=0.41.1
+pgbouncer>=0.0.1
+
+# Request ID tracking
+asgi-correlation-id>=4.3.1
+
+# API Versioning
+fastapi-versioning>=0.10.0
+
+# Dependency Injection
+dependency-injector>=4.41.0
+
+# Background Task Management
+dramatiq[redis]>=1.15.0  # Alternative to Celery
+
+# Circuit Breaker Pattern
+pybreaker>=1.0.1
+
+# Database Query Optimization
+sqlalchemy-searchable>=1.5.1
+sqlalchemy-continuum>=1.3.14  # Versioning and audit trails
+
+# Time Series (for analytics)
+influxdb-client>=1.39.0
+
+# Geolocation (if needed for logistics)
+geopy>=2.4.1
+geoip2>=4.7.0
+
+# Excel advanced features
+openpyxl-templates>=0.2.5
+
+# QR Codes
+qrcode[pil]>=7.4.2
+
+# Barcodes
+python-barcode>=0.15.1
+
+# Markdown
+markdown>=3.5.2
+
+# HTML parsing
+beautifulsoup4>=4.12.3
+lxml>=5.1.0
+
+# Phone number validation
+phonenumbers>=8.13.29
+
+# Email validation
+email-validator>=2.1.0.post1
+
+# URL manipulation
+furl>=2.1.3
+
+# Money/Currency handling
+forex-python>=1.8
+py-moneyed>=3.0
+
+# Tax calculations
+python-stdnum>=1.19  # Validate tax IDs, VAT numbers, etc
+
+# Retry with exponential backoff
+backoff>=2.2.1
+
+# Rate limiting (alternative)
+ratelimit>=2.2.1
+
+# Configuration management
+dynaconf>=3.2.4
+
+# Environment variables validation
+environs>=11.0.0
+
+# Secrets management
+keyring>=24.3.0
+
+# CLI tools (for management commands)
+click>=8.1.7
+rich>=13.7.0  # Beautiful terminal output
+typer>=0.9.0
+
+# Migrations tooling
+yoyo-migrations>=8.2.0  # Alternative to Alembic
+
+# GraphQL (if needed)
+strawberry-graphql>=0.217.1
+graphene>=3.3
+
+# gRPC (if needed for microservices later)
+grpcio>=1.60.1
+grpcio-tools>=1.60.1
+
+# Message Queue (alternative to Redis)
+kombu>=5.3.5
+
+# Workflow Engine
+# temporal-sdk>=1.5.1  # Пакет не существует в PyPI - закомментировано
+
+# Audit Trail
+django-auditlog>=2.3.0  # Can be adapted for SQLAlchemy
+
+# Data Encryption
+pynacl>=1.5.0
+
+# CORS
+fastapi-cors>=0.0.6
+
+# Session Management
+itsdangerous>=2.1.2
+
+# JWT Tokens
+pyjwt>=2.8.0
+
+# OAuth2
+authlib>=1.3.0
+
+# SSO Integration
+python-saml>=1.15.0
+
+# Webhooks
+svix>=1.19.0
+
+# Error Tracking
+sentry-sdk[fastapi]>=1.40.2
+
+# APM (Application Performance Monitoring)
+elastic-apm>=6.20.0
+ddtrace>=2.5.0  # Datadog APM
+
+# Distributed Tracing
+opentelemetry-instrumentation>=0.43b0
+jaeger-client>=4.8.0
+# zipkin-py>=0.20.3  # Пакет не существует в PyPI - закомментировано
+
+# Load Testing
+locust>=2.20.1
+
+# API Client Generation
+openapi-python-client>=0.17.2
+
+# Async Database Pooling
+aiopg>=1.4.0
+
+# Database Replication/Sharding helpers
+# sqlalchemy-sharding>=0.1.1  # Пакет не существует в PyPI - закомментировано
+
+# Full-text Search
+whoosh>=2.7.4
+elasticsearch>=8.12.0  # If using Elasticsearch
+
+# Task Scheduler (alternative)
+rocketry>=2.5.1
+
+# Data Validation
+cerberus>=1.3.5
+jsonschema>=4.21.1
+
+# UUID utilities
+shortuuid>=1.0.11
+
+# Slug generation
+python-slugify>=8.0.3
+
+# HTML sanitization
+bleach>=6.1.0
+
+# Markdown to HTML
+mistune>=3.0.2
+
+# CSV processing
+csvkit>=1.5.0
+
+# JSON utilities
+jsonpickle>=3.0.2
+ujson>=5.9.0  # Ultra-fast JSON
+
+# YAML
+pyyaml>=6.0.1
+
+# TOML
+toml>=0.10.2
+
+# Archive files
+py7zr>=0.20.8
+rarfile>=4.1
+
+# Image optimization
+pillow-heif>=0.15.0
+
+# Video processing (if needed)
+moviepy>=1.0.3
+
+# Audio processing
+audioread>=3.0.1
+
+# Character encoding detection
+chardet>=5.2.0
+
+# Timezone handling
+python-tz>=0.2.0
+
+# Natural language processing (if needed)
+nltk>=3.8.1
+spacy>=3.7.2
+
+# Machine Learning (optional)
+scikit-learn>=1.4.0
+
+# Statistics
+scipy>=1.12.0
+
+# Plotting/Charts (for reports)
+matplotlib>=3.8.2
+plotly>=5.18.0
+
+# Dashboard/Admin
+flask-admin>=1.6.1  # If keeping Flask admin
+fastapi-admin>=1.0.4  # FastAPI admin alternative
+
+# WebSocket support enhanced
+python-socketio>=5.11.1
+
+# SSE (Server-Sent Events)
+sse-starlette>=1.8.2
+
+# Background jobs monitoring
+dramatiq-dashboard>=0.6.1
+
+# Database fixtures
+alembic-utils>=0.8.2
+
+# Soft deletes
+sqlalchemy-softdelete>=0.0.1
+
+# Multi-tenancy
+django-tenant-schemas>=1.10.0  # Can adapt concepts
+
+# Content negotiation
+fastapi-negotiate>=0.1.0
+
+# HTTP caching
+cashews>=6.2.0
+aiocache>=0.12.2
+
+# Distributed configuration
+python-consul>=1.1.0
+etcd3>=0.12.0
+
+# Service Discovery
+python-consul2>=0.1.5
+
+# Message Brokers
+pika>=1.3.2  # RabbitMQ
+kafka-python>=2.0.2
+
+# Stream Processing
+faust-streaming>=0.10.15
+
+# Real-time analytics
+statsmodels>=0.14.1
+
+# IP address utilities
+ipaddress>=1.0.23
+ipython>=8.20.0
+
+# User agent parsing
+user-agents>=2.2.0
+
+# Browser automation (for testing)
+playwright>=1.41.2
+selenium>=4.17.2
+
+# HTTP mocking (for tests)
+responses>=0.24.1
+httpretty>=1.1.7
+
+# Database testing
+pytest-postgresql>=5.0.0
+testing.postgresql>=1.3.0
+
+# Freeze time (for tests)
+freezegun>=1.4.0
+
+# VCR (record HTTP interactions for tests)
+vcrpy>=5.1.0
+
+# Coverage reporting
+coverage>=7.4.1
+
+# Documentation
+mkdocs>=1.5.3
+mkdocs-material>=9.5.6
+sphinx>=7.2.6
+
+# API documentation
+drf-yasg>=1.21.7
+apispec>=6.4.0
+
+# OpenAPI tools
+openapi-spec-validator>=0.7.1

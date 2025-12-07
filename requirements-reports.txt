@@ -1,0 +1,6 @@
+# Reports Module Dependencies
+# Install with: python3 -m pip install -r requirements-reports.txt --break-system-packages
+# Or better: create virtual environment first
+
+reportlab>=4.0.0
+openpyxl>=3.1.0

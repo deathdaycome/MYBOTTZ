@@ -150,10 +150,38 @@ except ImportError as e:
     print(f"Ошибка импорта роутера отчетов: {e}")
     reports_router = None
 
+# Импорт роутера хостинга
+try:
+    from .routers.hosting import router as hosting_router
+    print("Роутер хостинга подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера хостинга: {e}")
+    hosting_router = None
+
+# Импорт роутера аутентификации
+try:
+    from .routers.auth import router as auth_router
+    print("Роутер аутентификации подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера аутентификации: {e}")
+    auth_router = None
+
+# Импорт роутера регламентов тимлида
+try:
+    from .routers.timlead_regulations import router as timlead_regulations_router
+    print("Роутер регламентов тимлида подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера регламентов тимлида: {e}")
+    timlead_regulations_router = None
+
 logger = get_logger(__name__)
 
 # Создаем роутер для админки
 admin_router = APIRouter()
+
+# Подключаем роутер аутентификации (должен быть первым, без префикса для /login)
+if auth_router:
+    admin_router.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 
 # Подключаем роутер портфолио
 if portfolio_router:
@@ -162,6 +190,8 @@ if portfolio_router:
 # Подключаем роутер проектов
 if projects_router:
     admin_router.include_router(projects_router, prefix="/api/projects")
+    # Backwards compatibility для React
+    admin_router.include_router(projects_router, prefix="/projects")
 
 # Подключаем роутер пользователей
 if users_router:
@@ -170,10 +200,13 @@ if users_router:
 # Подключаем роутер файлов
 if files_router:
     admin_router.include_router(files_router, prefix="/api/files")
+    # Backwards compatibility для React
+    admin_router.include_router(files_router, prefix="/files")
 
 # Подключаем роутер задач
+# ВАЖНО: Подключаем только для API, HTML отдает React
 if tasks_router:
-    admin_router.include_router(tasks_router, prefix="/tasks")
+    admin_router.include_router(tasks_router, prefix="/api/tasks")
 
 # Подключаем роутер статусов проектов
 if project_statuses_router:
@@ -181,6 +214,9 @@ if project_statuses_router:
 
 # Подключаем роутер финансов
 if finance_router:
+    # Исправлено: был /finance, теперь /api/finance для React
+    admin_router.include_router(finance_router, prefix="/api/finance")
+    # Backwards compatibility для Dashboard component
     admin_router.include_router(finance_router, prefix="/finance")
 
 # Подключаем роутер настроек
@@ -210,6 +246,14 @@ if automation_router:
 if reports_router:
     # Подключаем роутер для страниц отчетов
     admin_router.include_router(reports_router)
+
+if hosting_router:
+    # Подключаем роутер для управления хостингом
+    admin_router.include_router(hosting_router)
+
+if timlead_regulations_router:
+    # Подключаем роутер регламентов тимлида
+    admin_router.include_router(timlead_regulations_router, prefix="/api")
 
 # Импорт роутера аналитики
 try:
@@ -266,10 +310,10 @@ except ImportError as e:
 if deals_router:
     admin_router.include_router(deals_router)
 
-# Импорт роутера документов
+# Импорт роутера документов (используем упрощенную версию без pdfkit)
 try:
-    from .routers.documents import router as documents_router
-    print("Роутер документов подключен")
+    from .routers.documents_new import router as documents_router
+    print("Роутер документов подключен (упрощенная версия)")
 except ImportError as e:
     print(f"Ошибка импорта роутера документов: {e}")
     documents_router = None
@@ -277,6 +321,30 @@ except ImportError as e:
 # Подключаем роутер документов
 if documents_router:
     admin_router.include_router(documents_router)
+
+# Импорт роутера транскрибаций
+try:
+    from .routers.transcriptions import router as transcriptions_router
+    print("Роутер транскрибаций подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера транскрибаций: {e}")
+    transcriptions_router = None
+
+# Подключаем роутер транскрибаций
+if transcriptions_router:
+    admin_router.include_router(transcriptions_router)
+
+# Импорт роутера AI-звонков
+try:
+    from .routers.ai_calls import router as ai_calls_router
+    print("Роутер AI-звонков подключен")
+except ImportError as e:
+    print(f"Ошибка импорта роутера AI-звонков: {e}")
+    ai_calls_router = None
+
+# Подключаем роутер AI-звонков
+if ai_calls_router:
+    admin_router.include_router(ai_calls_router)
 
 # Импорт роутера Авито
 try:
@@ -311,6 +379,16 @@ except ImportError as e:
     print(f"⚠️ Не удалось подключить роутер управления правами: {e}")
     permissions_router = None
 
+# Подключаем роутер детальных UI прав
+# (будет подключен к app напрямую позже, после создания объекта app)
+try:
+    from .routers.ui_permissions import router as ui_permissions_router
+    # Не подключаем к admin_router, так как этот роутер должен быть доступен без префикса /admin
+    print("Роутер детальных UI прав импортирован")
+except ImportError as e:
+    print(f"⚠️ Не удалось подключить роутер детальных UI прав: {e}")
+    ui_permissions_router = None
+
 # Подключаем роутер уведомлений
 try:
     from .routers.notifications import router as notifications_router
@@ -319,6 +397,24 @@ try:
 except ImportError as e:
     print(f"⚠️ Не удалось подключить роутер уведомлений: {e}")
     notifications_router = None
+
+# Подключаем роутер отслеживания (Wialon)
+try:
+    from .routers.tracking import router as tracking_router
+    admin_router.include_router(tracking_router)
+    print("Роутер отслеживания транспорта подключен")
+except ImportError as e:
+    print(f"⚠️ Не удалось подключить роутер отслеживания: {e}")
+    tracking_router = None
+
+# Подключаем роутер чатов
+try:
+    from .routers.chats import router as chats_router
+    admin_router.include_router(chats_router)
+    print("Роутер чатов подключен")
+except ImportError as e:
+    print(f"⚠️ Не удалось подключить роутер чатов: {e}")
+    chats_router = None
 
 # Настройка шаблонов
 templates = Jinja2Templates(directory="app/admin/templates")
@@ -438,8 +534,23 @@ async def login(request: Request, username: str = Form(...), password: str = For
         })
 
 @admin_router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, username: str = Depends(authenticate)):
-    """Главная страница админ-панели"""
+async def react_app(request: Request):
+    """Главная страница React админ-панели"""
+    from fastapi.responses import FileResponse
+    import os
+
+    # Путь к React приложению
+    react_index = os.path.join("app", "admin", "static", "react-admin", "index.html")
+
+    if os.path.exists(react_index):
+        return FileResponse(react_index)
+    else:
+        # Fallback на старую версию если React не найден
+        return RedirectResponse(url="/admin/dashboard", status_code=302)
+
+@admin_router.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_old(request: Request, username: str = Depends(authenticate)):
+    """Старая страница админ-панели (Jinja2)"""
     try:
         user_role = get_user_role(username)
         navigation_items = get_navigation_items(user_role)
@@ -874,6 +985,26 @@ async def projects_page(request: Request, show_archived: bool = False, username:
                 project_dict = p.to_dict()
                 # Добавляем связанный объект пользователя
                 project_dict['user'] = p.user.to_dict() if p.user else None
+
+                # Добавляем информацию об исполнителе
+                if p.assigned_executor_id:
+                    executor = db.query(AdminUser).filter(AdminUser.id == p.assigned_executor_id).first()
+                    if executor:
+                        executor_data = {
+                            "id": executor.id,
+                            "username": executor.username,
+                            "first_name": executor.first_name,
+                            "last_name": executor.last_name,
+                            "role": executor.role
+                        }
+                        project_dict["assigned_executor"] = executor_data
+                        project_dict["assigned_to"] = executor_data  # Алиас для совместимости с шаблоном
+                    else:
+                        project_dict["assigned_executor"] = None
+                        project_dict["assigned_to"] = None
+                else:
+                    project_dict["assigned_executor"] = None
+                    project_dict["assigned_to"] = None
 
                 # Для исполнителя скрываем полную стоимость и показываем только его цену
                 if user_role == "executor":
@@ -4018,21 +4149,56 @@ async def logout_auth(request: Request, switch: str = None):
 
 
 # Основные HTML роуты
-@admin_router.get("/permissions", response_class=HTMLResponse)
-async def permissions_page(request: Request, credentials: HTTPBasicCredentials = Depends(security)):
-    """Страница управления правами"""
-    if not auth_service.verify_credentials(credentials):
-        raise HTTPException(status_code=401, detail="Неверные учетные данные")
-    
-    return templates.TemplateResponse("permissions_management.html", {"request": request})
+# Примечание: /permissions управляется через permissions_management роутер
 
-@admin_router.get("/notifications", response_class=HTMLResponse) 
+@admin_router.get("/notifications", response_class=HTMLResponse)
 async def notifications_page(request: Request, credentials: HTTPBasicCredentials = Depends(security)):
     """Страница уведомлений"""
     if not auth_service.verify_credentials(credentials):
         raise HTTPException(status_code=401, detail="Неверные учетные данные")
-    
+
     return templates.TemplateResponse("notifications.html", {"request": request})
+
+# ===== CATCH-ALL ROUTE ДЛЯ REACT =====
+# ВАЖНО: Этот роут вынесен в отдельный роутер, который регистрируется ПОСЛЕДНИМ в main.py
+# чтобы не перехватывать API и WebSocket запросы
+
+# Создаем отдельный роутер для catch-all
+catch_all_router = APIRouter()
+
+@catch_all_router.get("/{full_path:path}", response_class=HTMLResponse)
+async def catch_all_react(full_path: str):
+    """
+    Catch-all роут для React приложения
+    Отдает index.html для всех несовпавших маршрутов,
+    позволяя React Router обрабатывать клиентскую маршрутизацию
+    """
+    from fastapi.responses import FileResponse
+    import os
+
+    # Игнорируем API запросы - они должны обрабатываться своими роутерами
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API endpoint not found")
+
+    # Игнорируем WebSocket запросы - они должны обрабатываться WebSocket роутерами
+    if full_path.startswith("ws/"):
+        raise HTTPException(status_code=404, detail="WebSocket endpoint not found")
+
+    # Игнорируем статические файлы (assets) - они должны обрабатываться StaticFiles
+    # Проверяем расширение файла
+    if "." in full_path.split("/")[-1]:
+        asset_extensions = ['.js', '.css', '.svg', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.eot', '.map']
+        if any(full_path.endswith(ext) for ext in asset_extensions):
+            raise HTTPException(status_code=404, detail="Static file not found")
+
+    # Путь к React приложению
+    react_index = os.path.join("app", "admin", "static", "react-admin", "index.html")
+
+    if os.path.exists(react_index):
+        return FileResponse(react_index)
+    else:
+        # Если React приложение не найдено, показываем ошибку
+        raise HTTPException(status_code=404, detail="React app not found")
 
 # Создание FastAPI приложения
 app = FastAPI(title="Admin Panel")
@@ -4042,8 +4208,17 @@ app = FastAPI(title="Admin Panel")
 async def root():
     return RedirectResponse(url="/admin/", status_code=302)
 
+# ВАЖНО: Монтируем статические файлы React ПЕРЕД роутерами
+# чтобы они обрабатывались до catch-all роута
+app.mount("/admin/assets", StaticFiles(directory="app/admin/static/assets"), name="react-assets")
+
 # Подключение роутера к приложению с префиксом /admin
 app.include_router(admin_router, prefix="/admin")
+
+# Подключение роутера UI permissions напрямую к app (без префикса /admin)
+if ui_permissions_router:
+    app.include_router(ui_permissions_router)
+    print("✅ Роутер детальных UI прав подключен к app")
 
 # Подключение статических файлов
 app.mount("/static", StaticFiles(directory="app/admin/static"), name="static")

@@ -1,0 +1,7 @@
+export { ProjectOverviewTab } from './ProjectOverviewTab'
+export { ProjectTasksTab } from './ProjectTasksTab'
+export { ProjectRevisionsTab } from './ProjectRevisionsTab'
+export { ProjectChatTab } from './ProjectChatTab'
+export { ProjectDocumentsTab } from './ProjectDocumentsTab'
+export { ProjectFinanceTab } from './ProjectFinanceTab'
+export { ProjectHostingTab } from './ProjectHostingTab'

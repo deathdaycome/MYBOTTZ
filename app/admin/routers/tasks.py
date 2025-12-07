@@ -8,7 +8,8 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
 from typing import Optional, List
 import json
-from sqlalchemy import desc
+from sqlalchemy import desc, or_, cast, String
+from sqlalchemy.orm import joinedload
 import os
 import uuid
 from pathlib import Path
@@ -24,6 +25,15 @@ from ..middleware.roles import RoleMiddleware
 logger = get_logger(__name__)
 router = APIRouter()
 templates = Jinja2Templates(directory="app/admin/templates")
+
+def translate_status(status: str) -> str:
+    """Перевод статуса задачи на русский"""
+    translations = {
+        "pending": "Ожидает",
+        "in_progress": "В работе",
+        "completed": "Выполнено"
+    }
+    return translations.get(status, status)
 
 def get_current_user_from_request(request: Request):
     """Получить текущего пользователя из запроса"""
@@ -191,88 +201,7 @@ async def my_tasks_page(request: Request, current_user: dict = Depends(get_curre
         logger.error(f"Ошибка при загрузке страницы 'Мои задачи': {e}")
         raise HTTPException(status_code=500, detail="Ошибка при загрузке задач")
 
-@router.get("/", response_class=HTMLResponse)
-async def tasks_page(request: Request, current_user: dict = Depends(get_current_admin_user)):
-    """Страница планировщика задач"""
-    try:
-        with get_db_context() as db:
-            # Получаем все задачи
-            query = db.query(Task).outerjoin(AdminUser, Task.assigned_to_id == AdminUser.id)
-            
-            # Владелец видит все задачи, исполнители только свои
-            if current_user["role"] != "owner":
-                query = query.filter(Task.assigned_to_id == current_user["id"])
-            
-            tasks = query.order_by(Task.created_at.desc()).all()
-            
-            # Отладка
-            logger.info(f"=== Планировщик задач ===")
-            logger.info(f"Текущий пользователь: {current_user['username']} (ID: {current_user['id']}, Role: {current_user['role']})")
-            logger.info(f"Найдено задач для пользователя: {len(tasks)}")
-            for task in tasks[:3]:  # Показываем первые 3 задачи для отладки
-                logger.info(f"  - Task: {task.title[:30]}... (assigned_to_id={task.assigned_to_id})")
-            
-            # Преобразуем задачи в словари для передачи в шаблон
-            tasks_data = []
-            for task in tasks:
-                # Загружаем связанные объекты
-                if task.assigned_to_id:
-                    task.assigned_to = db.query(AdminUser).filter(AdminUser.id == task.assigned_to_id).first()
-                if task.created_by_id:
-                    task.created_by = db.query(AdminUser).filter(AdminUser.id == task.created_by_id).first()
-                
-                # Преобразуем в словарь с дополнительными полями
-                task_dict = task.to_dict()
-                task_dict["is_overdue"] = task.is_overdue
-                task_dict["days_until_deadline"] = task.days_until_deadline
-                task_dict["can_delete"] = current_user["role"] == "owner"
-                tasks_data.append(task_dict)
-            
-            # Получаем сотрудников для канбан-доски
-            employees = []
-            executors = []
-            if current_user["role"] == "owner":
-                # Владелец видит всех активных сотрудников (исполнителей + себя)
-                employees_raw = db.query(AdminUser).filter(
-                    AdminUser.is_active == True,
-                    AdminUser.role.in_(["owner", "executor"])
-                ).all()
-                employees = [emp.to_dict() for emp in employees_raw]
-                # Также получаем список исполнителей для селектора
-                executors = employees_raw
-            elif current_user["role"] == "executor":
-                # Исполнители видят только себя
-                employees = [current_user]
-            
-            # Статистика
-            stats = {
-                "total": len(tasks_data),
-                "pending": len([t for t in tasks_data if t["status"] == "pending"]),
-                "in_progress": len([t for t in tasks_data if t["status"] == "in_progress"]),
-                "completed": len([t for t in tasks_data if t["status"] == "completed"]),
-                "overdue": len([t for t in tasks_data if t["is_overdue"]])
-            }
-            
-            # Получаем элементы навигации
-            from app.admin.app import get_navigation_items
-            navigation_items = get_navigation_items(current_user['role'])
-            
-            return templates.TemplateResponse("tasks_new.html", {
-                "request": request,
-                "tasks": tasks_data,
-                "employees": employees,
-                "executors": executors,  # Добавляем список исполнителей
-                "stats": stats,
-                "current_user": current_user,
-                "current_user_id": current_user['id'],
-                "username": current_user['username'],
-                "user_role": current_user['role'],
-                "navigation_items": navigation_items
-            })
-            
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке страницы задач: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка при загрузке задач")
+# Старый HTML endpoint удалён - теперь используется JSON API для React
 
 @router.get("/{task_id}", response_class=HTMLResponse)
 async def task_detail_page(request: Request, task_id: int, current_user: dict = Depends(get_current_admin_user)):
@@ -306,23 +235,30 @@ async def task_detail_page(request: Request, task_id: int, current_user: dict = 
         logger.error(f"Ошибка при загрузке задачи {task_id}: {e}")
         raise HTTPException(status_code=500, detail="Ошибка при загрузке задачи")
 
-@router.get("/api/tasks")
-async def get_tasks(
+def _get_tasks_logic(
+    request: Request,
     status: Optional[str] = None,
     assigned_to_id: Optional[int] = None,
     created_by_id: Optional[int] = None,
     priority: Optional[str] = None,
-    current_user: dict = Depends(get_current_admin_user)
+    per_page: Optional[int] = 100
 ):
-    """Получить список задач с фильтрацией"""
+    """Общая логика получения задач"""
     try:
+        # Получаем текущего пользователя из запроса
+        current_user = get_current_user_from_request(request)
+
         with get_db_context() as db:
-            query = db.query(Task).join(AdminUser, Task.assigned_to_id == AdminUser.id)
-            
-            # Если пользователь исполнитель, показываем только его задачи
-            if current_user["role"] == "executor":
+            # Строим базовый запрос
+            query = db.query(Task).options(
+                joinedload(Task.created_by),
+                joinedload(Task.assigned_to)
+            )
+
+            # Владелец видит все задачи, исполнители только свои
+            if current_user["role"] != "owner":
                 query = query.filter(Task.assigned_to_id == current_user["id"])
-            
+
             # Применяем фильтры
             if status:
                 query = query.filter(Task.status == status)
@@ -332,38 +268,87 @@ async def get_tasks(
                 query = query.filter(Task.created_by_id == created_by_id)
             if priority:
                 query = query.filter(Task.priority == priority)
-            
-            tasks_raw = query.order_by(
-                Task.priority.desc(),
-                Task.deadline.asc(),
-                Task.created_at.desc()
-            ).all()
-            
-            tasks = []
-            for task in tasks_raw:
+
+            # Сортировка и лимит
+            query = query.order_by(Task.created_at.desc()).limit(per_page)
+
+            # Выполняем запрос
+            all_tasks = query.all()
+
+            # Фильтруем архивные задачи
+            tasks = [
+                task for task in all_tasks
+                if not task.task_metadata.get('archived', False)
+            ]
+
+            # Преобразуем задачи в словари
+            tasks_data = []
+            for task in tasks:
                 task_dict = task.to_dict()
-                # Добавляем дополнительные поля для UI
                 task_dict["is_overdue"] = task.is_overdue
                 task_dict["days_until_deadline"] = task.days_until_deadline
-                tasks.append(task_dict)
-        
-        return {"success": True, "tasks": tasks}
-        
+
+                # Имена создателя и исполнителя
+                task_dict["created_by_name"] = f"{task.created_by.first_name} {task.created_by.last_name}" if task.created_by else "Неизвестно"
+                task_dict["assigned_to_name"] = f"{task.assigned_to.first_name} {task.assigned_to.last_name}" if task.assigned_to else "Не назначен"
+
+                # Может ли пользователь удалить задачу
+                task_dict["can_delete"] = (
+                    current_user["role"] == "owner" or
+                    (task.created_by_id == current_user["id"])
+                )
+
+                tasks_data.append(task_dict)
+
+            logger.info(f"Возвращено {len(tasks_data)} задач для пользователя {current_user['username']}")
+
+            return {"success": True, "tasks": tasks_data}
+
     except Exception as e:
         logger.error(f"Ошибка получения задач: {e}")
-        return {"success": False, "error": str(e)}
+        import traceback
+        logger.error(traceback.format_exc())
+        return {"success": False, "error": str(e), "tasks": []}
 
-@router.post("/api/tasks")
-async def create_task(
+
+# Wrapper routes для поддержки обоих вариантов путей (с и без trailing slash)
+@router.get("/", response_class=JSONResponse)
+def get_tasks_with_slash(
     request: Request,
-    current_user: dict = Depends(get_current_admin_user)
+    status: Optional[str] = None,
+    assigned_to_id: Optional[int] = None,
+    created_by_id: Optional[int] = None,
+    priority: Optional[str] = None,
+    per_page: Optional[int] = 100
 ):
-    """Создать новую задачу"""
+    """Получить список задач с фильтрацией - вариант с trailing slash"""
+    return _get_tasks_logic(request, status, assigned_to_id, created_by_id, priority, per_page)
+
+
+@router.get("", response_class=JSONResponse)
+def get_tasks_no_slash(
+    request: Request,
+    status: Optional[str] = None,
+    assigned_to_id: Optional[int] = None,
+    created_by_id: Optional[int] = None,
+    priority: Optional[str] = None,
+    per_page: Optional[int] = 100
+):
+    """Получить список задач с фильтрацией - вариант без trailing slash"""
+    return _get_tasks_logic(request, status, assigned_to_id, created_by_id, priority, per_page)
+
+
+# Общая логика создания задачи
+async def _create_task_logic(
+    request: Request,
+    current_user: dict
+):
+    """Общая логика создания задачи"""
     try:
-        
+
         # Определяем тип контента
         content_type = request.headers.get("content-type", "")
-        
+
         if "application/json" in content_type:
             # JSON запрос (от канбан-доски)
             body = await request.json()
@@ -374,6 +359,7 @@ async def create_task(
             deadline = body.get("deadline")
             estimated_hours = body.get("estimated_hours")
             color = body.get("color", "normal")
+            tags = body.get("tags", [])
             created_by_admin = body.get("created_by_admin", False)
         else:
             # Form данные
@@ -385,11 +371,12 @@ async def create_task(
             deadline = form.get("deadline")
             estimated_hours = int(form.get("estimated_hours")) if form.get("estimated_hours") else None
             color = form.get("color", "normal")
+            tags = []
             created_by_admin = False
-        
+
         if not title:
             return {"success": False, "error": "Название задачи обязательно"}
-        
+
         # Парсим дату дедлайна
         deadline_dt = None
         if deadline:
@@ -397,24 +384,24 @@ async def create_task(
                 deadline_dt = datetime.fromisoformat(deadline.replace('T', ' '))
             except ValueError:
                 return {"success": False, "error": "Неверный формат даты"}
-        
+
         with get_db_context() as db:
             # Если исполнитель не указан, назначаем на создателя
             if not assigned_to_id:
                 assigned_to_id = current_user["id"]
-            
+
             # Проверяем существование исполнителя
             executor = db.query(AdminUser).filter(
                 AdminUser.id == assigned_to_id,
                 AdminUser.is_active == True
             ).first()
-            
+
             if not executor:
                 return {"success": False, "error": "Исполнитель не найден"}
-            
+
             # Создаем задачу
             creator_id = current_user["id"] if current_user["id"] > 0 else 1
-            
+
             new_task = Task(
                 title=title,
                 description=description,
@@ -426,45 +413,63 @@ async def create_task(
                 status="pending",
                 color=color
             )
-            
+
             db.add(new_task)
             db.commit()
             db.refresh(new_task)
-            
+
             # Отправляем уведомление о назначенной задаче
             try:
                 await task_notification_service.notify_task_assigned(db, new_task)
             except Exception as e:
                 logger.error(f"Ошибка отправки уведомления о назначенной задаче {new_task.id}: {e}")
-            
+
             # Загружаем связанные данные для возврата
             if new_task.created_by_id:
                 new_task.created_by = db.query(AdminUser).filter(AdminUser.id == new_task.created_by_id).first()
             if new_task.assigned_to_id:
                 new_task.assigned_to = db.query(AdminUser).filter(AdminUser.id == new_task.assigned_to_id).first()
-            
+
             task_dict = new_task.to_dict()
             task_dict["created_by_name"] = f"{new_task.created_by.first_name} {new_task.created_by.last_name}" if new_task.created_by else "Неизвестно"
             task_dict["assigned_to_name"] = f"{new_task.assigned_to.first_name} {new_task.assigned_to.last_name}" if new_task.assigned_to else "Не назначен"
             task_dict["created_by_admin"] = created_by_admin
             task_dict["can_delete"] = (
-                current_user["role"] == "owner" or 
+                current_user["role"] == "owner" or
                 (new_task.created_by_id == current_user["id"] and not created_by_admin)
             )
-            
+
             logger.info(f"Создана задача {new_task.id}: {title} пользователем {current_user['username']} (роль: {current_user['role']})")
-            
+
             return {
                 "success": True,
                 "message": "Задача создана",
                 "task": task_dict
             }
-        
+
     except Exception as e:
         logger.error(f"Ошибка создания задачи: {e}")
         return {"success": False, "error": str(e)}
 
-@router.get("/api/tasks/my-tasks")
+
+@router.post("/")
+async def create_task_with_slash(
+    request: Request,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Создать новую задачу - вариант с trailing slash"""
+    return await _create_task_logic(request, current_user)
+
+
+@router.post("")
+async def create_task_no_slash(
+    request: Request,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Создать новую задачу - вариант без trailing slash"""
+    return await _create_task_logic(request, current_user)
+
+@router.get("/my-tasks")
 async def get_my_tasks(
     current_user: dict = Depends(get_current_admin_user)
 ):
@@ -512,7 +517,7 @@ async def get_my_tasks(
         logger.error(f"Ошибка получения задач для канбан-доски: {e}")
         return {"success": False, "error": str(e)}
 
-@router.get("/api/tasks/employee/{employee_id}")
+@router.get("/employee/{employee_id}")
 async def get_employee_tasks(
     employee_id: str,
     current_user: dict = Depends(get_current_admin_user)
@@ -567,7 +572,7 @@ async def get_employee_tasks(
         logger.error(f"Ошибка получения задач сотрудника {employee_id}: {e}")
         return {"success": False, "error": str(e)}
 
-@router.get("/api/tasks/{task_id}")
+@router.get("/{task_id}")
 async def get_task(
     task_id: int,
     current_user: dict = Depends(get_current_admin_user)
@@ -601,7 +606,7 @@ async def get_task(
         logger.error(f"Ошибка получения задачи {task_id}: {e}")
         return {"success": False, "error": str(e)}
 
-@router.put("/api/tasks/{task_id}")
+@router.put("/{task_id}")
 async def update_task(
     task_id: int,
     request: Request,
@@ -624,6 +629,8 @@ async def update_task(
             actual_hours = body.get("actual_hours")
             assigned_to_id = body.get("assigned_to_id")
             color = body.get("color")
+            tags = body.get("tags")
+            deploy_url = body.get("deploy_url")
         else:
             # Form данные
             form = await request.form()
@@ -636,6 +643,8 @@ async def update_task(
             actual_hours = int(form.get("actual_hours")) if form.get("actual_hours") else None
             assigned_to_id = int(form.get("assigned_to_id")) if form.get("assigned_to_id") else None
             color = form.get("color")
+            tags = None
+            deploy_url = form.get("deploy_url")
         
         with get_db_context() as db:
             task = db.query(Task).filter(Task.id == task_id).first()
@@ -698,12 +707,25 @@ async def update_task(
                 old_color = task.color
                 task.color = color
                 changes.append(f"цвет: {old_color} → {color}")
-            
+
+            if tags is not None:
+                task.tags = tags if isinstance(tags, list) else []
+                changes.append(f"теги обновлены")
+
+            if deploy_url is not None:
+                old_deploy_url = task.deploy_url
+                task.deploy_url = deploy_url if deploy_url.strip() else None
+                if old_deploy_url != task.deploy_url:
+                    if task.deploy_url:
+                        changes.append(f"ссылка на деплой обновлена")
+                    else:
+                        changes.append(f"ссылка на деплой удалена")
+
             if status is not None and status != old_status:
                 task.status = status
                 if status == "completed":
                     task.completed_at = datetime.utcnow()
-                changes.append(f"статус: {old_status} → {status}")
+                changes.append(f"статус: {translate_status(old_status)} → {translate_status(status)}")
                 
                 # Отправляем уведомление об изменении статуса
                 try:
@@ -737,7 +759,7 @@ async def update_task(
         logger.error(f"Ошибка обновления задачи {task_id}: {e}")
         return {"success": False, "error": str(e)}
 
-@router.delete("/api/tasks/{task_id}")
+@router.delete("/{task_id}")
 async def delete_task(
     task_id: int,
     current_user: dict = Depends(get_current_admin_user)
@@ -787,7 +809,7 @@ async def delete_task(
         logger.error(f"Ошибка удаления задачи {task_id}: {e}")
         return {"success": False, "error": str(e)}
 
-@router.post("/api/tasks/{task_id}/comments")
+@router.post("/{task_id}/comments")
 async def add_task_comment(
     task_id: int,
     comment: str = Form(...),
@@ -876,7 +898,7 @@ async def add_task_comment(
         logger.error(f"Ошибка добавления комментария к задаче {task_id}: {e}")
         return {"success": False, "error": str(e)}
 
-@router.post("/api/tasks/{task_id}/comments/{comment_id}/mark_read")
+@router.post("/{task_id}/comments/{comment_id}/mark_read")
 async def mark_comment_as_read(
     task_id: int,
     comment_id: int,
@@ -907,7 +929,39 @@ async def mark_comment_as_read(
         logger.error(f"Ошибка отметки комментария {comment_id} как прочитанного: {e}")
         return {"success": False, "error": str(e)}
 
-@router.get("/api/tasks/{task_id}/unread_comments_count")
+@router.post("/{task_id}/mark_all_comments_read")
+async def mark_all_comments_as_read(
+    task_id: int,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Отметить все комментарии задачи как прочитанные"""
+    try:
+        with get_db_context() as db:
+            # Получаем все комментарии задачи
+            comments = db.query(TaskComment).filter(
+                TaskComment.task_id == task_id
+            ).all()
+
+            marked_count = 0
+            for comment in comments:
+                # Проверяем, не прочитан ли уже комментарий этим пользователем
+                read_by = comment.read_by or []
+                if current_user["id"] not in read_by:
+                    read_by.append(current_user["id"])
+                    comment.read_by = read_by
+                    comment.is_read = True
+                    marked_count += 1
+
+            db.commit()
+            logger.info(f"Отмечено {marked_count} комментариев как прочитанные для задачи {task_id}")
+
+            return {"success": True, "marked_count": marked_count}
+
+    except Exception as e:
+        logger.error(f"Ошибка отметки всех комментариев задачи {task_id} как прочитанных: {e}")
+        return {"success": False, "error": str(e)}
+
+@router.get("/{task_id}/unread_comments_count")
 async def get_unread_comments_count(
     task_id: int,
     current_user: dict = Depends(get_current_admin_user)
@@ -937,7 +991,7 @@ async def get_unread_comments_count(
         logger.error(f"Ошибка получения количества непрочитанных комментариев для задачи {task_id}: {e}")
         return {"success": False, "error": str(e)}
 
-@router.get("/api/tasks/{task_id}/comments")
+@router.get("/{task_id}/comments")
 async def get_task_comments(
     task_id: int,
     current_user: dict = Depends(get_current_admin_user)
@@ -950,10 +1004,11 @@ async def get_task_comments(
             if not task:
                 return {"success": False, "error": "Задача не найдена"}
 
-            # Проверяем права доступа
+            # Проверяем права доступа (owner, исполнитель или создатель)
             can_view = (
                 current_user["role"] == "owner" or
-                task.assigned_to_id == current_user["id"]
+                task.assigned_to_id == current_user["id"] or
+                task.created_by_id == current_user["id"]
             )
 
             if not can_view:
@@ -988,84 +1043,91 @@ async def get_task_comments(
         logger.error(f"Ошибка получения комментариев задачи {task_id}: {e}")
         return {"success": False, "error": str(e)}
 
-@router.get("/api/tasks/stats/dashboard")
-async def get_task_dashboard_stats(
-    current_user: dict = Depends(get_current_admin_user)
-):
+@router.get("/stats/dashboard")
+def get_task_dashboard_stats():
     """Получить статистику для дашборда задач"""
     try:
         with get_db_context() as db:
-            stats = {}
-            
-            # Базовый запрос в зависимости от роли
-            if current_user["role"] == "owner":
-                base_query = db.query(Task)
-            else:
-                base_query = db.query(Task).filter(Task.assigned_to_id == current_user["id"])
-            
-            # Общая статистика
-            stats["total_tasks"] = base_query.count()
-            stats["pending_tasks"] = base_query.filter(Task.status == "pending").count()
-            stats["in_progress_tasks"] = base_query.filter(Task.status == "in_progress").count()
-            stats["completed_tasks"] = base_query.filter(Task.status == "completed").count()
-            
-            # Просроченные задачи
-            overdue_tasks = base_query.filter(
-                Task.deadline < datetime.utcnow(),
-                Task.status.in_(["pending", "in_progress"])
-            ).count()
-            stats["overdue_tasks"] = overdue_tasks
-            
+            # Получаем все задачи, ИСКЛЮЧАЯ архивные
+            all_tasks = db.query(Task).options(
+                joinedload(Task.assigned_to),
+                joinedload(Task.created_by)
+            ).all()
+
+            # Фильтруем архивные задачи
+            active_tasks = [
+                task for task in all_tasks
+                if not task.task_metadata.get('archived', False)
+            ]
+
+            # Подсчитываем статистику только по активным задачам
+            total_tasks = len(active_tasks)
+            pending_tasks = sum(1 for t in active_tasks if t.status == "pending")
+            in_progress_tasks = sum(1 for t in active_tasks if t.status == "in_progress")
+            completed_tasks = sum(1 for t in active_tasks if t.status == "completed")
+            overdue_tasks = sum(1 for t in active_tasks if t.is_overdue)
+
             # Задачи на сегодня
-            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-            today_end = today_start + timedelta(days=1)
-            
-            stats["today_tasks"] = base_query.filter(
-                Task.deadline >= today_start,
-                Task.deadline < today_end
-            ).count()
-            
+            today = datetime.utcnow().date()
+            today_tasks = sum(
+                1 for t in active_tasks
+                if t.deadline and t.deadline.date() == today
+            )
+
             # Статистика по приоритетам
-            stats["priority_stats"] = {
-                "urgent": base_query.filter(Task.priority == "urgent").count(),
-                "high": base_query.filter(Task.priority == "high").count(),
-                "normal": base_query.filter(Task.priority == "normal").count(),
-                "low": base_query.filter(Task.priority == "low").count()
+            priority_stats = {
+                "urgent": sum(1 for t in active_tasks if t.priority == "urgent"),
+                "high": sum(1 for t in active_tasks if t.priority == "high"),
+                "normal": sum(1 for t in active_tasks if t.priority == "normal"),
+                "low": sum(1 for t in active_tasks if t.priority == "low")
             }
-            
-            # Последние задачи
-            recent_tasks = base_query.order_by(
-                Task.created_at.desc()
-            ).limit(5).all()
-            
-            stats["recent_tasks"] = [task.to_dict() for task in recent_tasks]
-            
-            # Если владелец, добавляем статистику по сотрудникам
-            if current_user["role"] == "owner":
-                employee_stats = db.query(AdminUser).filter(
-                    AdminUser.role == "executor",
-                    AdminUser.is_active == True
-                ).all()
-                
-                stats["employee_stats"] = []
-                for employee in employee_stats:
-                    emp_tasks = db.query(Task).filter(Task.assigned_to_id == employee.id)
-                    
-                    stats["employee_stats"].append({
-                        "employee": employee.to_dict(),
-                        "total_tasks": emp_tasks.count(),
-                        "pending_tasks": emp_tasks.filter(Task.status == "pending").count(),
-                        "completed_tasks": emp_tasks.filter(Task.status == "completed").count(),
-                        "overdue_tasks": emp_tasks.filter(
-                            Task.deadline < datetime.utcnow(),
-                            Task.status.in_(["pending", "in_progress"])
-                        ).count()
-                    })
-        
-        return {"success": True, "stats": stats}
-        
+
+            # Последние задачи (только активные)
+            recent_tasks = sorted(active_tasks, key=lambda x: x.created_at, reverse=True)[:5]
+            recent_tasks_data = []
+            for task in recent_tasks:
+                task_dict = task.to_dict()
+                task_dict["assigned_to_name"] = f"{task.assigned_to.first_name} {task.assigned_to.last_name}" if task.assigned_to else "Не назначен"
+                recent_tasks_data.append(task_dict)
+
+            # Статистика по сотрудникам (только активные задачи)
+            employees = db.query(AdminUser).filter(
+                AdminUser.role.in_(["executor", "owner"]),
+                AdminUser.is_active == True
+            ).all()
+
+            employee_stats = []
+            for emp in employees:
+                emp_active_tasks = [t for t in active_tasks if t.assigned_to_id == emp.id]
+                employee_stats.append({
+                    "id": emp.id,
+                    "name": f"{emp.first_name} {emp.last_name}",
+                    "total": len(emp_active_tasks),
+                    "pending": sum(1 for t in emp_active_tasks if t.status == "pending"),
+                    "in_progress": sum(1 for t in emp_active_tasks if t.status == "in_progress"),
+                    "completed": sum(1 for t in emp_active_tasks if t.status == "completed")
+                })
+
+            stats = {
+                "total_tasks": total_tasks,
+                "pending_tasks": pending_tasks,
+                "in_progress_tasks": in_progress_tasks,
+                "completed_tasks": completed_tasks,
+                "overdue_tasks": overdue_tasks,
+                "today_tasks": today_tasks,
+                "priority_stats": priority_stats,
+                "recent_tasks": recent_tasks_data,
+                "employee_stats": employee_stats
+            }
+
+            logger.info(f"Статистика дашборда: всего активных задач {total_tasks}, архивных исключено {len(all_tasks) - total_tasks}")
+
+            return {"success": True, "stats": stats}
+
     except Exception as e:
         logger.error(f"Ошибка получения статистики дашборда: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
 @router.get("/api/employees")
@@ -1105,7 +1167,7 @@ async def get_employees(
         logger.error(f"Ошибка получения списка сотрудников: {e}")
         return {"success": False, "error": str(e)}
 
-@router.put("/api/tasks/{task_id}/status")
+@router.put("/{task_id}/status")
 async def update_task_status(
     task_id: int,
     request: Request,
@@ -1156,7 +1218,7 @@ async def update_task_status(
                 status_comment = TaskComment(
                     task_id=task_id,
                     author_id=current_user["id"],
-                    comment=f"Статус изменен: {old_status} → {new_status}",
+                    comment=f"Статус изменен: {translate_status(old_status)} → {translate_status(new_status)}",
                     comment_type="status_change"
                 )
                 db.add(status_comment)
@@ -1197,7 +1259,7 @@ async def get_executors(
         logger.error(f"Ошибка получения списка исполнителей: {e}")
         return []
 
-@router.put("/api/tasks/{task_id}/reassign")
+@router.put("/{task_id}/reassign")
 async def reassign_task(
     task_id: int,
     request: Request,
@@ -1517,7 +1579,7 @@ async def stop_task_timer(
     except Exception as e:
         logger.error(f"Ошибка остановки таймера задачи {task_id}: {e}")
         return {"success": False, "message": str(e)}
-@router.post("/api/tasks/{task_id}/upload-image")
+@router.post("/{task_id}/upload-image")
 async def upload_task_image(
     task_id: int,
     request: Request,
@@ -1602,7 +1664,7 @@ async def upload_task_image(
         logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
-@router.post("/api/tasks/{task_id}/comments/upload")
+@router.post("/{task_id}/comments/upload")
 async def upload_comment_attachment(
     task_id: int,
     comment_id: int = Form(...),
@@ -1683,7 +1745,7 @@ async def upload_comment_attachment(
         logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
-@router.post("/api/tasks/{task_id}/progress")
+@router.post("/{task_id}/progress")
 async def update_task_progress(
     task_id: int,
     request: Request,
@@ -1720,7 +1782,7 @@ async def update_task_progress(
         logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
-@router.post("/api/tasks/{task_id}/mark-completed")
+@router.post("/{task_id}/mark-completed")
 async def mark_task_completed(
     task_id: int,
     current_user: dict = Depends(get_current_admin_user)
@@ -1773,7 +1835,7 @@ async def mark_task_completed(
         logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
-@router.post("/api/tasks/{task_id}/archive")
+@router.post("/{task_id}/archive")
 async def archive_task(
     task_id: int,
     current_user: dict = Depends(get_current_admin_user)
@@ -1790,10 +1852,6 @@ async def archive_task(
                 admin_user = db.query(AdminUser).filter(AdminUser.id == current_user['id']).first()
                 if not admin_user or admin_user.role != 'owner':
                     return {"success": False, "error": "Только владелец может архивировать задачи"}
-
-            # Проверяем что задача завершена
-            if task.status != "completed":
-                return {"success": False, "error": "Можно архивировать только выполненные задачи"}
 
             # Сохраняем в метаданные информацию об архивации
             if not task.task_metadata:
@@ -1827,7 +1885,7 @@ async def archive_task(
         logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
 
-@router.get("/api/tasks/archive/list")
+@router.get("/archive/list")
 async def get_archived_tasks(
     current_user: dict = Depends(get_current_admin_user),
     employee_id: int = None,
@@ -1839,7 +1897,7 @@ async def get_archived_tasks(
         with get_db_context() as db:
             # Базовый запрос - только архивные задачи
             query = db.query(Task).filter(
-                Task.task_metadata['archived'].astext == 'true'
+                cast(Task.task_metadata['archived'], String) == 'true'
             )
 
             # Фильтр по сотруднику

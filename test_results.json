@@ -1,0 +1,206 @@
+{
+  "timestamp": "2025-11-09T05:03:12.357338",
+  "total_pages": 20,
+  "results": [
+    {
+      "page": "Dashboard",
+      "path": "/",
+      "url": "http://localhost:5174/",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.53,
+      "timestamp": "2025-11-09T04:29:07.623617"
+    },
+    {
+      "page": "Проекты",
+      "path": "/projects",
+      "url": "http://localhost:5174/projects",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 1072.08,
+      "timestamp": "2025-11-09T04:29:11.180756"
+    },
+    {
+      "page": "База проектов",
+      "path": "/project-files",
+      "url": "http://localhost:5174/project-files",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.16,
+      "timestamp": "2025-11-09T04:47:04.264510"
+    },
+    {
+      "page": "Задачи",
+      "path": "/tasks",
+      "url": "http://localhost:5174/tasks",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.15,
+      "timestamp": "2025-11-09T04:47:07.431452"
+    },
+    {
+      "page": "Архив задач",
+      "path": "/tasks-archive",
+      "url": "http://localhost:5174/tasks-archive",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.11,
+      "timestamp": "2025-11-09T04:47:10.589993"
+    },
+    {
+      "page": "Мои задачи",
+      "path": "/my-tasks",
+      "url": "http://localhost:5174/my-tasks",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.09,
+      "timestamp": "2025-11-09T04:47:13.708111"
+    },
+    {
+      "page": "Ревизии",
+      "path": "/revisions",
+      "url": "http://localhost:5174/revisions",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.11,
+      "timestamp": "2025-11-09T04:47:16.808282"
+    },
+    {
+      "page": "Клиенты",
+      "path": "/clients",
+      "url": "http://localhost:5174/clients",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.14,
+      "timestamp": "2025-11-09T04:47:19.923851"
+    },
+    {
+      "page": "Лиды",
+      "path": "/leads",
+      "url": "http://localhost:5174/leads",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.11,
+      "timestamp": "2025-11-09T04:47:23.074005"
+    },
+    {
+      "page": "Сделки",
+      "path": "/deals",
+      "url": "http://localhost:5174/deals",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.08,
+      "timestamp": "2025-11-09T04:47:26.192139"
+    },
+    {
+      "page": "Исполнители",
+      "path": "/contractors",
+      "url": "http://localhost:5174/contractors",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.11,
+      "timestamp": "2025-11-09T04:47:29.273893"
+    },
+    {
+      "page": "Чаты",
+      "path": "/chats",
+      "url": "http://localhost:5174/chats",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.12,
+      "timestamp": "2025-11-09T04:47:32.387935"
+    },
+    {
+      "page": "Avito",
+      "path": "/avito",
+      "url": "http://localhost:5174/avito",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.11,
+      "timestamp": "2025-11-09T04:47:35.506732"
+    },
+    {
+      "page": "Документы",
+      "path": "/documents",
+      "url": "http://localhost:5174/documents",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.1,
+      "timestamp": "2025-11-09T04:47:38.632615"
+    },
+    {
+      "page": "Портфолио",
+      "path": "/portfolio",
+      "url": "http://localhost:5174/portfolio",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.08,
+      "timestamp": "2025-11-09T04:47:41.740810"
+    },
+    {
+      "page": "Финансы",
+      "path": "/finance",
+      "url": "http://localhost:5174/finance",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.13,
+      "timestamp": "2025-11-09T05:02:56.660460"
+    },
+    {
+      "page": "Услуги",
+      "path": "/services",
+      "url": "http://localhost:5174/services",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.11,
+      "timestamp": "2025-11-09T05:02:59.802915"
+    },
+    {
+      "page": "Аналитика",
+      "path": "/analytics",
+      "url": "http://localhost:5174/analytics",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.12,
+      "timestamp": "2025-11-09T05:03:02.924882"
+    },
+    {
+      "page": "Права доступа",
+      "path": "/permissions",
+      "url": "http://localhost:5174/permissions",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.09,
+      "timestamp": "2025-11-09T05:03:06.053732"
+    },
+    {
+      "page": "Настройки",
+      "path": "/settings",
+      "url": "http://localhost:5174/settings",
+      "status": "PASSED",
+      "errors": [],
+      "warnings": [],
+      "load_time": 2.08,
+      "timestamp": "2025-11-09T05:03:09.151678"
+    }
+  ]
+}
