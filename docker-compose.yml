@@ -99,6 +99,11 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - PYTHONUNBUFFERED=1
 
+      # Postgres credentials (for wait-for-postgres.sh)
+      - POSTGRES_USER=${POSTGRES_USER:-crm_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-crm_password_change_me}
+      - POSTGRES_DB=${POSTGRES_DB:-crm_db}
+
       # Database
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-crm_user}:${POSTGRES_PASSWORD:-crm_password_change_me}@postgres:5432/${POSTGRES_DB:-crm_db}
       - DATABASE_ECHO=${DATABASE_ECHO:-false}
@@ -179,8 +184,8 @@ services:
       start_period: 40s
     command: >
       sh -c "
-        alembic upgrade head &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --log-config logging.yaml
+        wait-for-postgres.sh postgres echo 'Postgres is ready' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
       "
 
   # ========== CELERY WORKERS ==========
@@ -207,6 +212,11 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY:-change_me_in_production}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_me_jwt_secret}
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
@@ -247,6 +257,14 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/2
       - CELERY_RESULT_BACKEND=redis://redis:6379/3
+      - BOT_TOKEN=${BOT_TOKEN}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY:-change_me_in_production}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_me_jwt_secret}
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -276,8 +294,21 @@ services:
       - redis
       - celery-worker
     environment:
+      - ENV=${ENV:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-crm_user}:${POSTGRES_PASSWORD:-crm_password_change_me}@postgres:5432/${POSTGRES_DB:-crm_db}
+      - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/2
       - CELERY_RESULT_BACKEND=redis://redis:6379/3
+      - BOT_TOKEN=${BOT_TOKEN}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SECRET_KEY=${SECRET_KEY:-change_me_in_production}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change_me_jwt_secret}
+      - ADMIN_SECRET_KEY=${ADMIN_SECRET_KEY}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
       - FLOWER_PORT=5555
       - FLOWER_BASIC_AUTH=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-admin}
     ports:
