@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 import json
 from sqlalchemy import desc, or_, cast, String, select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 import os
 import uuid
 from pathlib import Path
@@ -252,7 +252,8 @@ async def _get_tasks_logic(
             # Строим базовый запрос
             stmt = select(Task).options(
                 joinedload(Task.created_by),
-                joinedload(Task.assigned_to)
+                joinedload(Task.assigned_to),
+                selectinload(Task.comments)  # Предзагрузка комментариев для избежания lazy loading
             )
 
             # Владелец видит все задачи, исполнители только свои
