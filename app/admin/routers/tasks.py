@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta
 from typing import Optional, List
 import json
-from sqlalchemy import desc, or_, cast, String
+from sqlalchemy import desc, or_, cast, String, select
 from sqlalchemy.orm import joinedload
 import os
 import uuid
@@ -250,30 +250,31 @@ async def _get_tasks_logic(
 
         async with get_db_context() as db:
             # Строим базовый запрос
-            query = db.query(Task).options(
+            stmt = select(Task).options(
                 joinedload(Task.created_by),
                 joinedload(Task.assigned_to)
             )
 
             # Владелец видит все задачи, исполнители только свои
             if current_user["role"] != "owner":
-                query = query.filter(Task.assigned_to_id == current_user["id"])
+                stmt = stmt.filter(Task.assigned_to_id == current_user["id"])
 
             # Применяем фильтры
             if status:
-                query = query.filter(Task.status == status)
+                stmt = stmt.filter(Task.status == status)
             if assigned_to_id:
-                query = query.filter(Task.assigned_to_id == assigned_to_id)
+                stmt = stmt.filter(Task.assigned_to_id == assigned_to_id)
             if created_by_id:
-                query = query.filter(Task.created_by_id == created_by_id)
+                stmt = stmt.filter(Task.created_by_id == created_by_id)
             if priority:
-                query = query.filter(Task.priority == priority)
+                stmt = stmt.filter(Task.priority == priority)
 
             # Сортировка и лимит
-            query = query.order_by(Task.created_at.desc()).limit(per_page)
+            stmt = stmt.order_by(Task.created_at.desc()).limit(per_page)
 
             # Выполняем запрос
-            all_tasks = query.all()
+            result = await db.execute(stmt)
+            all_tasks = result.scalars().all()
 
             # Фильтруем архивные задачи
             tasks = [
