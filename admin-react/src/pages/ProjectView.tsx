@@ -45,7 +45,9 @@ export const ProjectView = () => {
       try {
         setLoading(true)
         const response = await axiosInstance.get(`/admin/api/projects/${projectId}`)
-        setProject(response.data)
+        // Backend может возвращать {success: true, project: {...}} или прямой объект
+        const projectData = response.data.project || response.data
+        setProject(projectData)
         setError(null)
       } catch (err: any) {
         console.error('Error loading project:', err)

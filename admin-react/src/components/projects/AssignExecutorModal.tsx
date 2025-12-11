@@ -88,21 +88,21 @@ export const AssignExecutorModal = ({
     setError('')
 
     try {
-      const response = await fetch(`http://localhost:8001/admin/api/projects/${projectId}/assign`, {
-        method: 'POST',
+      const response = await fetch(`/admin/api/projects/${projectId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: 'Basic ' + btoa('admin:qwerty123'),
+          Authorization: 'Basic ' + btoa('admin:admin123'),
         },
         body: JSON.stringify({
-          executor_id: selectedExecutorId,
+          assigned_executor_id: selectedExecutorId,
           executor_cost: executorCost || 0,
         }),
       })
 
       const data = await response.json()
 
-      if (response.ok) {
+      if (response.ok && data.success) {
         onAssigned()
         onClose()
       } else {

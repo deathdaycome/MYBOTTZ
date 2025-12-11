@@ -93,19 +93,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
    */
   const login = async (username: string, password: string): Promise<void> => {
     try {
-      // Проверяем учетные данные через API
-      const response = await axiosInstance.get('/admin/api/auth/me', {
-        auth: { username, password },
+      // Используем правильный endpoint для логина
+      const response = await axiosInstance.post('/admin/api/auth/login', {
+        username,
+        password,
       })
 
-      if (response.status === 200) {
-        const userData = response.data
+      if (response.status === 200 && response.data.success) {
+        const { user: userData } = response.data
 
         // Формируем данные для сохранения
+        // Конвертируем роль в верхний регистр для совместимости (backend возвращает "owner", нужно "OWNER")
+        const role = (userData.role?.toUpperCase() || 'EXECUTOR') as UserRole
+
         const authData: AuthData = {
           username,
           password,
-          role: userData.role as UserRole,
+          role,
           firstName: userData.first_name,
           lastName: userData.last_name,
           email: userData.email,
@@ -118,12 +122,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser({
           id: userData.id,
           username,
-          role: userData.role,
+          role,
           email: userData.email,
           firstName: userData.first_name,
           lastName: userData.last_name,
           telegramId: userData.telegram_id,
         })
+      } else {
+        throw new Error('Login failed')
       }
     } catch (error: any) {
       console.error('Login error:', error)

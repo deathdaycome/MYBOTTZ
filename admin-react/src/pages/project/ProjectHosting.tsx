@@ -13,16 +13,28 @@ interface Project {
   title: string
 }
 
-interface HostingInfo {
+interface HostingServer {
   id: number
-  server_id: number
-  domain?: string
-  ftp_login?: string
+  project_id: number | null
+  client_id: number | null
+  client_name: string
+  client_company: string | null
+  server_name: string
+  configuration: string | null
+  ip_address: string | null
+  cost_price: number
+  client_price: number
+  service_fee: number
+  total_price: number
+  profit_amount: number
+  profit_percent: number
+  start_date: string
+  next_payment_date: string
+  payment_period: string
   status: string
+  notes: string | null
   created_at: string
-  expires_at?: string
-  server_name?: string
-  ip_address?: string
+  updated_at: string
 }
 
 interface OutletContext {
@@ -31,10 +43,13 @@ interface OutletContext {
 
 export const ProjectHosting = () => {
   const { project } = useOutletContext<OutletContext>()
-  const [hosting, setHosting] = useState<HostingInfo | null>(null)
+  const [servers, setServers] = useState<HostingServer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+  const [showLinkModal, setShowLinkModal] = useState(false)
+  const [availableServers, setAvailableServers] = useState<HostingServer[]>([])
+  const [selectedServerId, setSelectedServerId] = useState<number | null>(null)
 
   // Загрузка информации о хостинге
   useEffect(() => {
@@ -44,10 +59,10 @@ export const ProjectHosting = () => {
   const loadHosting = async () => {
     try {
       setLoading(true)
-      const response = await axiosInstance.get(`/admin/api/projects/${project.id}/hosting`)
+      const response = await axiosInstance.get(`/admin/hosting/api/servers?project_id=${project.id}`)
 
       if (response.data.success) {
-        setHosting(response.data.hosting)
+        setServers(response.data.servers || [])
       }
       setError(null)
     } catch (err: any) {
@@ -63,6 +78,50 @@ export const ProjectHosting = () => {
     navigator.clipboard.writeText(text)
     setCopiedField(field)
     setTimeout(() => setCopiedField(null), 2000)
+  }
+
+  // Загрузка доступных серверов
+  const loadAvailableServers = async () => {
+    try {
+      const response = await axiosInstance.get('/admin/hosting/api/servers')
+      if (response.data.success) {
+        // Фильтруем серверы, которые еще не привязаны к этому проекту
+        const currentServerIds = servers.map(s => s.id)
+        const available = (response.data.servers || []).filter(
+          (server: HostingServer) => !currentServerIds.includes(server.id)
+        )
+        setAvailableServers(available)
+      }
+    } catch (err: any) {
+      console.error('Error loading available servers:', err)
+      setError('Ошибка загрузки списка серверов')
+    }
+  }
+
+  // Открыть модальное окно привязки
+  const handleOpenLinkModal = () => {
+    loadAvailableServers()
+    setShowLinkModal(true)
+  }
+
+  // Привязать сервер к проекту
+  const handleLinkServer = async () => {
+    if (!selectedServerId) return
+
+    try {
+      const response = await axiosInstance.put(`/admin/hosting/api/server/${selectedServerId}`, {
+        project_id: project.id,
+      })
+
+      if (response.data.success) {
+        setShowLinkModal(false)
+        setSelectedServerId(null)
+        loadHosting()
+      }
+    } catch (err: any) {
+      console.error('Error linking server:', err)
+      setError('Ошибка привязки сервера')
+    }
   }
 
   // Статусы хостинга
@@ -87,7 +146,16 @@ export const ProjectHosting = () => {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white">Хостинг проекта</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">Хостинг проекта</h2>
+        <button
+          onClick={handleOpenLinkModal}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        >
+          <Server className="w-4 h-4" />
+          <span>Привязать сервер</span>
+        </button>
+      </div>
 
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -95,212 +163,197 @@ export const ProjectHosting = () => {
         </div>
       )}
 
-      {hosting ? (
-        <>
-          {/* Статус хостинга */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Статус хостинга</h3>
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-medium bg-${
-                  getHostingStatus(hosting.status).color
-                }-100 text-${getHostingStatus(hosting.status).color}-700 dark:bg-${
-                  getHostingStatus(hosting.status).color
-                }-900/30 dark:text-${getHostingStatus(hosting.status).color}-400`}
+      {servers.length > 0 ? (
+        <div className="space-y-4">
+          {servers.map((server) => {
+            const statusInfo = getHostingStatus(server.status)
+
+            return (
+              <div
+                key={server.id}
+                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6"
               >
-                {getHostingStatus(hosting.status).label}
-              </span>
-            </div>
-
-            {hosting.expires_at && (
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                <span className="font-medium">Истекает:</span>{' '}
-                {new Date(hosting.expires_at).toLocaleDateString('ru-RU')}
-              </div>
-            )}
-          </div>
-
-          {/* Карточки с информацией */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Домен */}
-            <div className="bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-900/20 dark:to-sky-800/20 rounded-lg p-6 border border-sky-200 dark:border-sky-800">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 bg-sky-500 rounded-lg">
-                  <Globe className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-sky-900 dark:text-sky-100">Домен</h3>
-              </div>
-
-              {hosting.domain ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <p className="text-gray-900 dark:text-white font-mono text-sm">{hosting.domain}</p>
-                    <button
-                      onClick={() => copyToClipboard(hosting.domain!, 'domain')}
-                      className="p-1 hover:bg-sky-200 dark:hover:bg-sky-800 rounded transition-colors"
-                      title="Копировать"
-                    >
-                      {copiedField === 'domain' ? (
-                        <CheckCircle className="w-4 h-4 text-green-600" />
-                      ) : (
-                        <Copy className="w-4 h-4 text-sky-600" />
-                      )}
-                    </button>
-                    <a
-                      href={`https://${hosting.domain}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1 hover:bg-sky-200 dark:hover:bg-sky-800 rounded transition-colors"
-                      title="Открыть в новой вкладке"
-                    >
-                      <ExternalLink className="w-4 h-4 text-sky-600" />
-                    </a>
-                  </div>
-                </div>
-              ) : (
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Домен не настроен</p>
-              )}
-            </div>
-
-            {/* Сервер */}
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-6 border border-purple-200 dark:border-purple-800">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 bg-purple-500 rounded-lg">
-                  <Server className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100">Сервер</h3>
-              </div>
-
-              {hosting.server_name ? (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    <span className="font-medium">Название:</span> {hosting.server_name}
-                  </p>
-                  {hosting.ip_address && (
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        <span className="font-medium">IP:</span>{' '}
-                        <span className="font-mono">{hosting.ip_address}</span>
+                {/* Заголовок сервера */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-500 rounded-lg">
+                      <Server className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {server.server_name}
+                      </h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {server.configuration || 'Без описания'}
                       </p>
-                      <button
-                        onClick={() => copyToClipboard(hosting.ip_address!, 'ip')}
-                        className="p-1 hover:bg-purple-200 dark:hover:bg-purple-800 rounded transition-colors"
-                        title="Копировать IP"
-                      >
-                        {copiedField === 'ip' ? (
-                          <CheckCircle className="w-3 h-3 text-green-600" />
-                        ) : (
-                          <Copy className="w-3 h-3 text-purple-600" />
-                        )}
-                      </button>
+                    </div>
+                  </div>
+                  <span
+                    className={`px-3 py-1 rounded-full text-sm font-medium bg-${statusInfo.color}-100 text-${statusInfo.color}-700 dark:bg-${statusInfo.color}-900/30 dark:text-${statusInfo.color}-400`}
+                  >
+                    {statusInfo.label}
+                  </span>
+                </div>
+
+                {/* Информация о сервере */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* IP адрес */}
+                  {server.ip_address && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">IP адрес</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-mono text-gray-900 dark:text-white">
+                          {server.ip_address}
+                        </p>
+                        <button
+                          onClick={() => copyToClipboard(server.ip_address!, `ip-${server.id}`)}
+                          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                          title="Копировать IP"
+                        >
+                          {copiedField === `ip-${server.id}` ? (
+                            <CheckCircle className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-gray-600" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
-                </div>
-              ) : (
-                <p className="text-gray-500 dark:text-gray-400 text-sm">Сервер не привязан</p>
-              )}
-            </div>
 
-            {/* FTP доступ */}
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg p-6 border border-orange-200 dark:border-orange-800">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 bg-orange-500 rounded-lg">
-                  <Key className="w-6 h-6 text-white" />
-                </div>
-                <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-100">FTP доступ</h3>
-              </div>
-
-              {hosting.ftp_login ? (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      <span className="font-medium">Логин:</span>{' '}
-                      <span className="font-mono">{hosting.ftp_login}</span>
-                    </p>
-                    <button
-                      onClick={() => copyToClipboard(hosting.ftp_login!, 'ftp')}
-                      className="p-1 hover:bg-orange-200 dark:hover:bg-orange-800 rounded transition-colors"
-                      title="Копировать логин"
-                    >
-                      {copiedField === 'ftp' ? (
-                        <CheckCircle className="w-3 h-3 text-green-600" />
-                      ) : (
-                        <Copy className="w-3 h-3 text-orange-600" />
-                      )}
-                    </button>
+                  {/* Клиент */}
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Клиент</p>
+                    <p className="text-sm text-gray-900 dark:text-white">{server.client_name}</p>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    Пароль хранится в безопасном месте
-                  </p>
-                </div>
-              ) : (
-                <p className="text-gray-500 dark:text-gray-400 text-sm">FTP не настроен</p>
-              )}
-            </div>
 
-            {/* База данных */}
-            <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-6 border border-green-200 dark:border-green-800">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-3 bg-green-500 rounded-lg">
-                  <HardDrive className="w-6 h-6 text-white" />
+                  {/* Следующий платеж */}
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Следующий платеж</p>
+                    <p className="text-sm text-gray-900 dark:text-white">
+                      {new Date(server.next_payment_date).toLocaleDateString('ru-RU')}
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-lg font-semibold text-green-900 dark:text-green-100">База данных</h3>
+
+                {/* Финансовая информация */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Себестоимость</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {server.cost_price.toLocaleString('ru-RU')} ₽
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Цена клиента</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {server.client_price.toLocaleString('ru-RU')} ₽
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Комиссия</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                      {server.service_fee.toLocaleString('ru-RU')} ₽
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Прибыль</p>
+                    <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                      {server.profit_amount.toLocaleString('ru-RU')} ₽ ({server.profit_percent.toFixed(1)}%)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Заметки */}
+                {server.notes && (
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Заметки</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">{server.notes}</p>
+                  </div>
+                )}
               </div>
-
-              <p className="text-gray-500 dark:text-gray-400 text-sm">
-                Информация о БД будет добавлена
-              </p>
-            </div>
-          </div>
-
-          {/* Дополнительная информация */}
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              <strong>Создан:</strong> {new Date(hosting.created_at).toLocaleDateString('ru-RU')}
-            </p>
-          </div>
-        </>
+            )
+          })}
+        </div>
       ) : (
         /* Пустое состояние */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-900/20 dark:to-sky-800/20 rounded-lg p-6 border border-sky-200 dark:border-sky-800">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-sky-500 rounded-lg">
-                <Globe className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-sky-900 dark:text-sky-100">Домен</h3>
-            </div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Домен не настроен</p>
-          </div>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Server className="w-16 h-16 text-gray-300 dark:text-gray-600 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            Нет привязанных серверов
+          </h3>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
+            Привяжите сервер к проекту для управления хостингом
+          </p>
+          <button
+            onClick={handleOpenLinkModal}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            <Server className="w-4 h-4" />
+            <span>Привязать сервер</span>
+          </button>
+        </div>
+      )}
 
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-lg p-6 border border-purple-200 dark:border-purple-800">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-purple-500 rounded-lg">
-                <Server className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-purple-900 dark:text-purple-100">Сервер</h3>
+      {/* Модальное окно привязки сервера */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Привязать сервер</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Выберите сервер для привязки к проекту "{project.title}"
+              </p>
             </div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">Сервер не привязан</p>
-          </div>
 
-          <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-lg p-6 border border-orange-200 dark:border-orange-800">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-orange-500 rounded-lg">
-                <Key className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-orange-900 dark:text-orange-100">FTP доступ</h3>
+            <div className="p-6 space-y-4">
+              {availableServers.length > 0 ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Доступные серверы
+                  </label>
+                  <select
+                    value={selectedServerId || ''}
+                    onChange={(e) => setSelectedServerId(Number(e.target.value))}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Выберите сервер...</option>
+                    {availableServers.map((server) => (
+                      <option key={server.id} value={server.id}>
+                        {server.server_name} - {server.client_name} ({server.client_price.toLocaleString('ru-RU')} ₽)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Нет доступных серверов для привязки
+                  </p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
+                    Создайте новый сервер в разделе "Хостинг"
+                  </p>
+                </div>
+              )}
             </div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">FTP не настроен</p>
-          </div>
 
-          <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg p-6 border border-green-200 dark:border-green-800">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="p-2 bg-green-500 rounded-lg">
-                <HardDrive className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="text-lg font-semibold text-green-900 dark:text-green-100">База данных</h3>
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowLinkModal(false)
+                  setSelectedServerId(null)
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleLinkServer}
+                disabled={!selectedServerId}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Привязать сервер
+              </button>
             </div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm">БД не создана</p>
           </div>
         </div>
       )}

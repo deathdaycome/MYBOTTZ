@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   FolderKanban,
   Plus,
@@ -151,6 +152,19 @@ interface Project {
   } | null
 }
 
+interface ProjectStatistics {
+  total_projects: number
+  active_projects: number
+  completed_projects: number
+  total_cost: number
+  total_received: number
+  remaining_budget: number
+  total_prepayments: number
+  total_paid_to_executors: number
+  total_planned_executor_payments: number
+  total_profit: number
+}
+
 // Helper functions for table display
 const getStatusName = (status: string) => {
   const names: Record<string, string> = {
@@ -219,8 +233,12 @@ const calculateProgress = (status: string) => {
 }
 
 export const Projects = () => {
+  // Hooks
+  const navigate = useNavigate()
+
   // State
   const [projects, setProjects] = useState<Project[]>([])
+  const [statistics, setStatistics] = useState<ProjectStatistics | null>(null)
   const [loading, setLoading] = useState(true)
   const [showArchived, setShowArchived] = useState(false) // По умолчанию показываем активные проекты (не архивные)
   const [currentView, setCurrentView] = useState<'table' | 'cards'>('cards')
@@ -275,6 +293,10 @@ export const Projects = () => {
     dateFrom: '',
     dateTo: '',
     hasPayment: '',
+    hasOverdue: false,
+    noExecutor: false,
+    priceFrom: '',
+    priceTo: '',
   })
 
   // New modal states (Functions 31-65)
@@ -359,9 +381,18 @@ export const Projects = () => {
   const loadProjects = useCallback(async () => {
     try {
       setLoading(true)
-      const response = await apiService.getProjects(showArchived)
-      if (response.projects) {
-        setProjects(response.projects)
+      // Загружаем проекты и статистику параллельно
+      const [projectsResponse, statsResponse] = await Promise.all([
+        apiService.getProjects(showArchived),
+        apiService.getProjectStatistics(showArchived)
+      ])
+
+      if (projectsResponse.projects) {
+        setProjects(projectsResponse.projects)
+      }
+
+      if (statsResponse.success && statsResponse.stats) {
+        setStatistics(statsResponse.stats)
       }
     } catch (error) {
       console.error('Error loading projects:', error)
@@ -471,6 +502,81 @@ export const Projects = () => {
       filtered = filtered.filter((p) => p.complexity === complexityFilter)
     }
 
+    // Advanced Filters - Executor
+    if (advancedFilters.executorId) {
+      filtered = filtered.filter((p) => p.assigned_executor_id === advancedFilters.executorId)
+    }
+
+    // Advanced Filters - Client
+    if (advancedFilters.clientId) {
+      filtered = filtered.filter((p) => p.user?.id === advancedFilters.clientId)
+    }
+
+    // Advanced Filters - Color
+    if (advancedFilters.colorFilter) {
+      filtered = filtered.filter((p) => p.color === advancedFilters.colorFilter)
+    }
+
+    // Advanced Filters - Date Range
+    if (advancedFilters.dateFrom) {
+      const fromDate = new Date(advancedFilters.dateFrom)
+      filtered = filtered.filter((p) => new Date(p.created_at) >= fromDate)
+    }
+    if (advancedFilters.dateTo) {
+      const toDate = new Date(advancedFilters.dateTo)
+      toDate.setHours(23, 59, 59, 999) // Include the entire day
+      filtered = filtered.filter((p) => new Date(p.created_at) <= toDate)
+    }
+
+    // Advanced Filters - Payment Status
+    if (advancedFilters.hasPayment) {
+      filtered = filtered.filter((p) => {
+        const hasPrepayment = p.prepayment_amount > 0
+        const totalPaid = p.client_paid_total || 0
+        const estimatedCost = p.estimated_cost || 0
+
+        switch (advancedFilters.hasPayment) {
+          case 'paid':
+            return hasPrepayment || totalPaid > 0
+          case 'unpaid':
+            return !hasPrepayment && totalPaid === 0
+          case 'partially':
+            return totalPaid > 0 && totalPaid < estimatedCost
+          case 'fully':
+            return totalPaid >= estimatedCost && estimatedCost > 0
+          default:
+            return true
+        }
+      })
+    }
+
+    // Advanced Filters - Has Overdue (NEW)
+    if (advancedFilters.hasOverdue) {
+      const now = new Date()
+      filtered = filtered.filter((p) => {
+        if (!p.deadline) return false
+        const deadline = new Date(p.deadline)
+        const isOverdue = deadline < now
+        const isNotCompleted = p.status !== 'completed' && p.status !== 'cancelled'
+        return isOverdue && isNotCompleted
+      })
+    }
+
+    // Advanced Filters - No Executor (NEW)
+    if (advancedFilters.noExecutor) {
+      filtered = filtered.filter((p) => !p.assigned_executor_id && !p.assigned_to)
+    }
+
+    // Advanced Filters - Price Range (NEW)
+    if (advancedFilters.priceFrom) {
+      const minPrice = Number(advancedFilters.priceFrom)
+      filtered = filtered.filter((p) => (p.estimated_cost || 0) >= minPrice)
+    }
+    if (advancedFilters.priceTo) {
+      const maxPrice = Number(advancedFilters.priceTo)
+      filtered = filtered.filter((p) => (p.estimated_cost || 0) <= maxPrice)
+    }
+
     // Sort
     filtered.sort((a, b) => {
       if (sortBy === 'created_at' || sortBy === 'updated_at') {
@@ -484,13 +590,25 @@ export const Projects = () => {
     })
 
     return filtered
-  }, [projects, searchTerm, statusFilter, complexityFilter, sortBy])
+  }, [projects, searchTerm, statusFilter, complexityFilter, sortBy, advancedFilters])
 
   const clearFilters = useCallback(() => {
     setSearchTerm('')
     setStatusFilter('')
     setComplexityFilter('')
     setSortBy('created_at')
+    setAdvancedFilters({
+      executorId: null,
+      clientId: null,
+      colorFilter: '',
+      dateFrom: '',
+      dateTo: '',
+      hasPayment: '',
+      hasOverdue: false,
+      noExecutor: false,
+      priceFrom: '',
+      priceTo: '',
+    })
   }, [])
 
   const handleRefresh = useCallback(() => {
@@ -508,17 +626,10 @@ export const Projects = () => {
   }
 
   // Project Actions
-  const handleView = useCallback(async (projectId: number) => {
-    try {
-      const response = await apiService.getProject(projectId)
-      // Backend возвращает {success: true, project: {...}}
-      setSelectedProject(response.project || response)
-      setIsViewModalOpen(true)
-    } catch (error) {
-      console.error('Error loading project:', error)
-      showToast('Ошибка при загрузке проекта', 'error')
-    }
-  }, [showToast])
+  const handleView = useCallback((projectId: number) => {
+    // Навигация к ProjectView с 7 вкладками
+    navigate(`/projects/${projectId}/overview`)
+  }, [navigate])
 
   const handleEdit = useCallback((projectId: number) => {
     setSelectedProjectId(projectId)
@@ -651,20 +762,20 @@ export const Projects = () => {
     }
   }
 
-  // Statistics
-  const totalProjects = projects.length
-  const activeProjects = projects.filter((p) =>
+  // Statistics - используем данные из API, если есть, иначе fallback на локальные расчеты
+  const totalProjects = statistics?.total_projects ?? projects.length
+  const activeProjects = statistics?.active_projects ?? projects.filter((p) =>
     ['new', 'review', 'accepted', 'in_progress', 'testing'].includes(p.status)
   ).length
-  const completedProjects = projects.filter((p) => p.status === 'completed').length
-  const totalRevenue = projects.reduce((sum, p) => sum + (p.estimated_cost || 0), 0)
-  const totalPaid = projects.reduce((sum, p) => sum + (p.client_paid_total || 0), 0)
-  const remainingPayment = totalRevenue - totalPaid
-  const totalPrepayments = projects.reduce((sum, p) => sum + (p.prepayment_amount || 0), 0)
-  const totalExecutorPayments = projects.reduce((sum, p) => sum + (p.executor_paid_total || 0), 0)
-  const totalExecutorCost = projects.reduce((sum, p) => sum + (p.executor_cost || 0), 0)
+  const completedProjects = statistics?.completed_projects ?? projects.filter((p) => p.status === 'completed').length
+  const totalRevenue = statistics?.total_cost ?? projects.reduce((sum, p) => sum + (p.estimated_cost || 0), 0)
+  const totalPaid = statistics?.total_received ?? projects.reduce((sum, p) => sum + (p.client_paid_total || 0), 0)
+  const remainingPayment = statistics?.remaining_budget ?? (totalRevenue - totalPaid)
+  const totalPrepayments = statistics?.total_prepayments ?? projects.reduce((sum, p) => sum + (p.prepayment_amount || 0), 0)
+  const totalExecutorPayments = statistics?.total_paid_to_executors ?? projects.reduce((sum, p) => sum + (p.executor_paid_total || 0), 0)
+  const totalExecutorCost = statistics?.total_planned_executor_payments ?? projects.reduce((sum, p) => sum + (p.executor_cost || 0), 0)
   const remainingExecutorPayments = totalExecutorCost - totalExecutorPayments
-  const currentProfit = totalPaid - totalExecutorPayments
+  const currentProfit = statistics?.total_profit ?? (totalPaid - totalExecutorPayments)
 
   if (loading) {
     return (
@@ -879,6 +990,10 @@ export const Projects = () => {
                 dateFrom: '',
                 dateTo: '',
                 hasPayment: '',
+                hasOverdue: false,
+                noExecutor: false,
+                priceFrom: '',
+                priceTo: '',
               })
             }}
           />

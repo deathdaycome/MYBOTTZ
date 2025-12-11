@@ -11,6 +11,13 @@ import axiosInstance from '../../services/api'
 interface Project {
   id: number
   title: string
+  assigned_executor_id?: number
+  assigned_executor?: {
+    id: number
+    username: string
+    first_name?: string
+    last_name?: string
+  }
 }
 
 interface Task {
@@ -36,6 +43,22 @@ export const ProjectTasks = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    title: '',
+    description: '',
+    priority: 'medium',
+    deadline: '',
+  })
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    status: '',
+    priority: '',
+    deadline: '',
+  })
 
   // Загрузка задач
   useEffect(() => {
@@ -58,6 +81,75 @@ export const ProjectTasks = () => {
       setError('Ошибка загрузки задач')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Создание задачи
+  const handleCreateTask = async () => {
+    try {
+      const taskData: any = {
+        project_id: project.id,
+        title: createForm.title,
+        description: createForm.description,
+        priority: createForm.priority,
+        deadline: createForm.deadline || null,
+        status: 'new',
+        type: 'TASK',
+      }
+
+      // Автоматически назначаем задачу на исполнителя проекта, если он есть
+      if (project.assigned_executor_id) {
+        taskData.assigned_to_id = project.assigned_executor_id
+      }
+
+      const response = await axiosInstance.post('/admin/api/tasks', taskData)
+
+      if (response.data.success) {
+        setShowCreateModal(false)
+        setCreateForm({ title: '', description: '', priority: 'medium', deadline: '' })
+        loadTasks()
+      }
+    } catch (err: any) {
+      console.error('Error creating task:', err)
+      setError('Ошибка создания задачи')
+    }
+  }
+
+  // Открытие модального окна редактирования
+  const handleOpenEdit = (task: Task) => {
+    setEditingTask(task)
+    setEditForm({
+      title: task.title,
+      description: task.description || '',
+      status: task.status,
+      priority: task.priority,
+      deadline: task.deadline || '',
+    })
+    setShowEditModal(true)
+  }
+
+  // Редактирование задачи
+  const handleEditTask = async () => {
+    if (!editingTask) return
+
+    try {
+      const response = await axiosInstance.put(`/admin/api/tasks/${editingTask.id}`, {
+        title: editForm.title,
+        description: editForm.description,
+        status: editForm.status,
+        priority: editForm.priority,
+        deadline: editForm.deadline || null,
+      })
+
+      if (response.data.success) {
+        setShowEditModal(false)
+        setEditingTask(null)
+        setEditForm({ title: '', description: '', status: '', priority: '', deadline: '' })
+        loadTasks()
+      }
+    } catch (err: any) {
+      console.error('Error updating task:', err)
+      setError('Ошибка обновления задачи')
     }
   }
 
@@ -110,7 +202,10 @@ export const ProjectTasks = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900 dark:text-white">Задачи проекта</h2>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+        >
           <Plus className="w-4 h-4" />
           <span>Создать задачу</span>
         </button>
@@ -161,6 +256,7 @@ export const ProjectTasks = () => {
             return (
               <div
                 key={task.id}
+                onClick={() => handleOpenEdit(task)}
                 className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md transition-shadow cursor-pointer"
               >
                 <div className="flex items-start justify-between gap-4">
@@ -229,11 +325,221 @@ export const ProjectTasks = () => {
               : 'Попробуйте изменить фильтр'}
           </p>
           {statusFilter === 'all' && (
-            <button className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
               <Plus className="w-4 h-4" />
               <span>Создать задачу</span>
             </button>
           )}
+        </div>
+      )}
+
+      {/* Модальное окно создания задачи */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Создать задачу</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Проект: {project.title}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Название */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Название задачи *
+                </label>
+                <input
+                  type="text"
+                  value={createForm.title}
+                  onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Введите название задачи"
+                />
+              </div>
+
+              {/* Описание */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Описание
+                </label>
+                <textarea
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Опишите задачу..."
+                />
+              </div>
+
+              {/* Приоритет и Дедлайн */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Приоритет
+                  </label>
+                  <select
+                    value={createForm.priority}
+                    onChange={(e) => setCreateForm({ ...createForm, priority: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="low">Низкий</option>
+                    <option value="medium">Средний</option>
+                    <option value="high">Высокий</option>
+                    <option value="urgent">Срочный</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Дедлайн
+                  </label>
+                  <input
+                    type="date"
+                    value={createForm.deadline}
+                    onChange={(e) => setCreateForm({ ...createForm, deadline: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowCreateModal(false)
+                  setCreateForm({ title: '', description: '', priority: 'medium', deadline: '' })
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleCreateTask}
+                disabled={!createForm.title.trim()}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Создать задачу
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно редактирования задачи */}
+      {showEditModal && editingTask && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Редактировать задачу</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Проект: {project.title}
+              </p>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {/* Название */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Название задачи *
+                </label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Введите название задачи"
+                />
+              </div>
+
+              {/* Описание */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Описание
+                </label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Опишите задачу..."
+                />
+              </div>
+
+              {/* Статус и Приоритет */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Статус
+                  </label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="new">Новая</option>
+                    <option value="in_progress">В работе</option>
+                    <option value="review">На проверке</option>
+                    <option value="completed">Завершена</option>
+                    <option value="cancelled">Отменена</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Приоритет
+                  </label>
+                  <select
+                    value={editForm.priority}
+                    onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="low">Низкий</option>
+                    <option value="medium">Средний</option>
+                    <option value="high">Высокий</option>
+                    <option value="urgent">Срочный</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Дедлайн */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Дедлайн
+                </label>
+                <input
+                  type="date"
+                  value={editForm.deadline}
+                  onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-3">
+              <button
+                onClick={() => {
+                  setShowEditModal(false)
+                  setEditingTask(null)
+                  setEditForm({ title: '', description: '', status: '', priority: '', deadline: '' })
+                }}
+                className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleEditTask}
+                disabled={!editForm.title.trim()}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Сохранить изменения
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

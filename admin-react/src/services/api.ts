@@ -115,13 +115,32 @@ export const apiService = {
     return response.data
   },
 
+  async getProjectStatistics(showArchived = false) {
+    const response = await axiosInstance.get(
+      `/admin/api/projects/statistics?show_archived=${showArchived}`
+    )
+    return response.data
+  },
+
   async getProject(projectId: number) {
     const response = await axiosInstance.get(`/admin/api/projects/${projectId}`)
     return response.data
   },
 
   async createProject(data: any) {
-    const response = await axiosInstance.post('/admin/api/projects/create', data)
+    // Backend ожидает Form Data, конвертируем объект в FormData
+    const formData = new FormData()
+    Object.keys(data).forEach(key => {
+      // Пропускаем null, undefined и пустые строки
+      if (data[key] !== null && data[key] !== undefined && data[key] !== '') {
+        formData.append(key, data[key])
+      }
+    })
+    const response = await axiosInstance.post('/admin/api/projects/create', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
     return response.data
   },
 

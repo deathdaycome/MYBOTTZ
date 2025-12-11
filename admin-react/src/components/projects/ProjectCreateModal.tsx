@@ -134,7 +134,8 @@ export const ProjectCreateModal = ({ isOpen, onClose, onSuccess }: ProjectCreate
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!title || !description || (!clientId && !showNewClientFields)) {
+    // Только title обязателен, description опционален
+    if (!title || (!clientId && !showNewClientFields)) {
       alert('Пожалуйста, заполните все обязательные поля')
       return
     }
@@ -172,6 +173,10 @@ export const ProjectCreateModal = ({ isOpen, onClose, onSuccess }: ProjectCreate
       alert('Проект успешно создан!')
       resetForm()
       onSuccess()
+
+      // Отправляем глобальное событие для обновления Dashboard
+      window.dispatchEvent(new Event('dashboardUpdate'))
+
       onClose()
     } catch (error) {
       console.error('Error creating project:', error)

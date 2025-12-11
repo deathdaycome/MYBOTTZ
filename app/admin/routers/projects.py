@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, File, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, asc, func, text
+from sqlalchemy import and_, or_, desc, asc, func, text, select
 from pydantic import BaseModel
 
 from ...core.database import get_db, get_db_context
@@ -381,28 +381,29 @@ async def get_projects(
 async def get_projects_stats(
     request: Request,
     show_archived: bool = False,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: dict = Depends(get_current_user)
 ):
     """Получить KPI статистику по проектам"""
     try:
         logger.info(f"[API] GET /api/projects/statistics - Пользователь: {current_user['username']}, Роль: {current_user['role']}")
 
-        # Базовый запрос проектов
-        query = db.query(Project)
+        async with get_db_context() as db:
+            # Базовый запрос проектов
+            stmt = select(Project)
 
-        # Фильтр архивных проектов
-        if show_archived:
-            query = query.filter(Project.is_archived == True)
-        else:
-            query = query.filter(or_(Project.is_archived == False, Project.is_archived == None))
+            # Фильтр архивных проектов
+            if show_archived:
+                stmt = stmt.filter(Project.is_archived == True)
+            else:
+                stmt = stmt.filter(or_(Project.is_archived == False, Project.is_archived == None))
 
-        # Фильтрация по роли пользователя
-        if current_user["role"] == "executor":
-            query = query.filter(Project.assigned_executor_id == current_user["id"])
+            # Фильтрация по роли пользователя
+            if current_user["role"] == "executor":
+                stmt = stmt.filter(Project.assigned_executor_id == current_user["id"])
 
-        # Получаем все проекты для расчетов
-        projects = query.all()
+            # Получаем все проекты для расчетов
+            result = await db.execute(stmt)
+            projects = result.scalars().all()
 
         # Расчет статистики
         total_projects = len(projects)

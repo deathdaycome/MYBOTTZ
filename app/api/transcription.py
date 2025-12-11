@@ -10,7 +10,7 @@ from typing import Optional
 from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks, Body
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 import logging
@@ -74,12 +74,12 @@ async def upload_recording_chunk(
 
         logger.info(f"chunk_uploaded session_id={session_id} timestamp={timestamp} size={len(content)}")
 
-        return {
+        return JSONResponse(content={
             "success": True,
             "session_id": session_id,
             "timestamp": timestamp,
             "message": "Chunk saved successfully"
-        }
+        })
 
     except Exception as e:
         logger.error(f"chunk_upload_error: {str(e)}", exc_info=True)
@@ -159,7 +159,7 @@ async def upload_video(
             "stage": "Сохранение файла (потоковая запись)...",
         }
 
-        logger.info(f"video_upload_started task_id={{task_id}}             filename={{video.filename")
+        logger.info(f"video_upload_started task_id={task_id} filename={video.filename}")
 
         # Save file SYNCHRONOUSLY to disk before starting background task
         file_extension = Path(video.filename).suffix
@@ -190,11 +190,7 @@ async def upload_video(
                     raise HTTPException(status_code=413, detail="Файл слишком большой. Максимальный размер 10GB")
 
         logger.info(
-            "video_saved",
-            task_id=task_id,
-            filename=video.filename,
-            size=total_size,
-            path=str(file_path)
+            f"Video saved - task_id: {task_id}, filename: {video.filename}, size: {total_size}, path: {file_path}"
         )
 
         # Update task status
@@ -333,10 +329,10 @@ async def delete_task(task_id: str):
 
         logger.info(f"task_deleted task_id={task_id}")
 
-        return {
+        return JSONResponse(content={
             "success": True,
             "message": "Task and files deleted successfully"
-        }
+        })
 
     except HTTPException:
         raise
@@ -376,7 +372,7 @@ async def upload_chunk(
             size=len(content)
         )
 
-        return {"success": True, "chunkIndex": chunkIndex}
+        return JSONResponse(content={"success": True, "chunkIndex": chunkIndex})
 
     except Exception as e:
         logger.error(f"chunk_upload_error: {str(e)}")
@@ -478,11 +474,11 @@ async def list_transcriptions():
                     "audio_size": audio_file.stat().st_size
                 })
 
-        return {
+        return JSONResponse(content={
             "success": True,
             "transcriptions": transcriptions,
             "total": len(transcriptions)
-        }
+        })
 
     except Exception as e:
         logger.error(f"list_transcriptions_error: {str(e)}")
@@ -509,17 +505,17 @@ async def health_check():
         except ImportError:
             whisper_available = False
 
-        return {
+        return JSONResponse(content={
             "status": "healthy",
             "ffmpeg_available": ffmpeg_available,
             "whisper_available": whisper_available,
             "openrouter_configured": bool(transcription_service.openrouter_api_key),
             "active_tasks": len(transcription_service.tasks)
-        }
+        })
 
     except Exception as e:
         logger.error(f"health_check_error: {str(e)}")
-        return {
+        return JSONResponse(content={
             "status": "unhealthy",
             "error": str(e)
-        }
+        })

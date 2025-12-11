@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import axiosInstance from '../services/api'
 import { useNavigate } from 'react-router-dom'
 import MagicBento, { type BentoCardProps } from '../components/common/MagicBentoNew'
 import BlurText from '../components/effects/BlurText'
@@ -16,6 +17,111 @@ import {
 } from 'lucide-react'
 import { API_BASE_URL } from '../config'
 
+// Интерфейсы для нового API dashboard/stats
+interface DashboardData {
+  user: {
+    id: number
+    username: string
+    role: 'owner' | 'teamlead' | 'executor'
+    full_name?: string
+  }
+  greeting: {
+    title: string
+    subtitle: string
+  }
+  summary: {
+    active_projects?: number
+    active_clients?: number
+    month_revenue?: number
+    projects_in_work?: number
+    overdue_tasks?: number
+    tasks_today?: number
+  }
+  projects: Array<{
+    id: number
+    title: string
+    client_name?: string
+    status: string
+    deadline?: string
+    progress: number
+  }>
+  tasks: {
+    overdue: Array<{
+      id: number
+      title: string
+      deadline: string
+      priority: string
+      status: string
+      executor_name?: string
+    }>
+    upcoming: Array<{
+      id: number
+      title: string
+      deadline: string
+      priority: string
+      status: string
+      executor_name?: string
+    }>
+    new: Array<{
+      id: number
+      title: string
+      created_at: string
+      priority: string
+      status: string
+      executor_name?: string
+    }>
+  }
+  clients: {
+    active_count: number
+    new_leads_week: number
+    recent: Array<{
+      id: number
+      name: string
+      contact?: string
+      created_at: string
+    }>
+  }
+  finance: {
+    month_revenue: number
+    paid: number
+    pending: number
+    overdue: number
+  }
+  alerts: Array<{
+    type: string
+    message: string
+    level: 'warning' | 'error' | 'info'
+    count?: number
+    link?: string
+  }>
+  documents: Array<{
+    id: number
+    filename: string
+    uploaded_at: string
+    project_title?: string
+    uploader_name?: string
+  }>
+  activity: Array<{
+    user: string
+    action: string
+    text: string[]
+    target: string
+    time_ago: string
+    timestamp: string
+  }>
+  quick_actions: Array<{
+    id: string
+    label: string
+    link: string
+    icon: string
+  }>
+  charts?: {
+    tasks_by_status: Record<string, number>
+    projects_distribution: Record<string, number>
+  }
+}
+
+// Старый интерфейс для совместимости с MagicBento
 interface DashboardStats {
   projects: {
     total: number
@@ -256,6 +362,7 @@ const motivationalPhrases = [
 
 export const Dashboard = () => {
   const navigate = useNavigate()
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [stats, setStats] = useState<DashboardStats>({
     projects: { total: 0, active: 0, completed: 0 },
     tasks: { total: 0, pending: 0, completed: 0 },
@@ -281,76 +388,90 @@ export const Dashboard = () => {
     }
 
     fetchDashboardStats()
+
+    // Обновляем данные при возврате на страницу/вкладку
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 Page visible again, refreshing dashboard...')
+        fetchDashboardStats()
+      }
+    }
+
+    const handleFocus = () => {
+      console.log('🔄 Window focused, refreshing dashboard...')
+      fetchDashboardStats()
+    }
+
+    // Слушаем кастомное событие обновления данных (когда создается/изменяется проект)
+    const handleDataUpdate = () => {
+      console.log('🔄 Data update event received, refreshing dashboard...')
+      fetchDashboardStats()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('dashboardUpdate', handleDataUpdate)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('dashboardUpdate', handleDataUpdate)
+    }
   }, [])
 
   const fetchDashboardStats = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Fetching dashboard stats...')
+      console.log('🔄 Fetching dashboard stats from new API...')
 
-      // Get auth credentials
-      const authString = localStorage.getItem('auth')
-      if (!authString) {
-        navigate('/login')
-        return
-      }
+      // Используем новый endpoint /admin/api/dashboard/stats
+      const response = await axiosInstance.get('/admin/api/dashboard/stats')
 
-      const { username, password } = JSON.parse(authString)
-      const authHeader = `Basic ${btoa(`${username}:${password}`)}`
+      if (response.data.success && response.data.data) {
+        const data: DashboardData = response.data.data
+        console.log('✅ Dashboard data fetched:', data)
 
-      // Fetch projects
-      console.log('📊 Fetching projects from:', `${API_BASE_URL}/api/projects/?show_archived=false`)
-      const projectsRes = await fetch(`${API_BASE_URL}/api/projects/?show_archived=false`, {
-        headers: { 'Authorization': authHeader }
-      })
-      const projectsData = await projectsRes.json()
-      const projects = projectsData.projects || []
-      console.log('✅ Projects fetched:', projects.length, projects)
+        setDashboardData(data)
 
-      // Fetch tasks
-      console.log('📋 Fetching tasks from:', `${API_BASE_URL}/tasks/`)
-      const tasksRes = await fetch(`${API_BASE_URL}/tasks/`, {
-        headers: { 'Authorization': authHeader }
-      })
-      const tasksData = await tasksRes.json()
-      const tasks = tasksData.tasks || []
-      console.log('✅ Tasks fetched:', tasks.length, tasks)
+        // Преобразуем данные для старого формата stats (для совместимости с MagicBento)
+        const projectsTotal = data.projects.length
+        const projectsActive = data.projects.filter(p => p.status === 'in_progress').length
+        const projectsCompleted = data.projects.filter(p => p.status === 'completed').length
 
-      // Fetch clients
-      console.log('👥 Fetching clients from:', `${API_BASE_URL}/api/clients/simple`)
-      const clientsRes = await fetch(`${API_BASE_URL}/api/clients/simple`, {
-        headers: { 'Authorization': authHeader }
-      })
-      const clientsData = await clientsRes.json()
-      const clients = clientsData.clients || []
-      console.log('✅ Clients fetched:', clients.length, clients)
+        const tasksTotal =
+          data.tasks.overdue.length +
+          data.tasks.upcoming.length +
+          data.tasks.new.length
+        const tasksPending = data.tasks.overdue.length + data.tasks.upcoming.length
 
-      const newStats = {
-        projects: {
-          total: projects.length,
-          active: projects.filter((p: any) => p.status === 'in_progress').length,
-          completed: projects.filter((p: any) => p.status === 'completed').length
-        },
-        tasks: {
-          total: tasks.length,
-          pending: tasks.filter((t: any) => t.status === 'pending' || t.status === 'in_progress').length,
-          completed: tasks.filter((t: any) => t.status === 'completed').length
-        },
-        clients: {
-          total: clients.length,
-          active: clients.filter((c: any) => c.is_active).length
-        },
-        finance: {
-          totalRevenue: projects.reduce((sum: number, p: any) => sum + (p.project_cost || 0), 0),
-          pending: projects.reduce((sum: number, p: any) => sum + ((p.project_cost || 0) - (p.paid_total || 0)), 0),
-          received: projects.reduce((sum: number, p: any) => sum + (p.paid_total || 0), 0)
+        const newStats = {
+          projects: {
+            total: projectsTotal,
+            active: projectsActive,
+            completed: projectsCompleted
+          },
+          tasks: {
+            total: tasksTotal,
+            pending: tasksPending,
+            completed: 0 // Будем показывать из графиков если есть
+          },
+          clients: {
+            total: data.clients.active_count + data.clients.new_leads_week,
+            active: data.clients.active_count
+          },
+          finance: {
+            totalRevenue: data.finance.month_revenue,
+            pending: data.finance.pending,
+            received: data.finance.paid
+          }
         }
-      }
 
-      console.log('📈 Setting stats:', newStats)
-      setStats(newStats)
+        console.log('📈 Setting stats:', newStats)
+        setStats(newStats)
+      }
     } catch (error) {
       console.error('❌ Error fetching dashboard stats:', error)
+      // Axios interceptor will handle 401 redirects
     } finally {
       setLoading(false)
     }
@@ -409,17 +530,77 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-6">
-      {/* Header */}
+      {/* Header - Greeting */}
       <div className="mb-8">
-        <div className="bg-white backdrop-blur-xl rounded-2xl p-12 border border-gray-200 shadow-lg flex items-center justify-center min-h-[200px]">
-          <BlurText
-            key={currentPhraseIndex}
-            text={motivationalPhrases[currentPhraseIndex]}
-            delay={80}
-            direction="top"
-            animateBy="words"
-            className="text-5xl text-gray-900 font-normal text-center"
-          />
+        <div className="bg-white backdrop-blur-xl rounded-2xl p-12 border border-gray-200 shadow-lg min-h-[200px]">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="animate-pulse text-gray-400 text-2xl">Загрузка...</div>
+            </div>
+          ) : dashboardData ? (
+            <div className="space-y-4">
+              <BlurText
+                key={dashboardData.greeting.title}
+                text={dashboardData.greeting.title}
+                delay={80}
+                direction="top"
+                animateBy="words"
+                className="text-4xl text-gray-900 font-normal text-center"
+              />
+              {/* Резюме по роли */}
+              {dashboardData.summary && (
+                <div className="flex items-center justify-center gap-6 text-sm text-gray-600">
+                  {dashboardData.summary.active_projects !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <FolderKanban className="w-4 h-4 text-purple-600" />
+                      <span>Активных проектов: <strong>{dashboardData.summary.active_projects}</strong></span>
+                    </div>
+                  )}
+                  {dashboardData.summary.active_clients !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-blue-600" />
+                      <span>Активных клиентов: <strong>{dashboardData.summary.active_clients}</strong></span>
+                    </div>
+                  )}
+                  {dashboardData.summary.month_revenue !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-green-600" />
+                      <span>Доход за месяц: <strong>{dashboardData.summary.month_revenue.toLocaleString('ru-RU')} ₽</strong></span>
+                    </div>
+                  )}
+                  {dashboardData.summary.projects_in_work !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <FolderKanban className="w-4 h-4 text-purple-600" />
+                      <span>Проектов в работе: <strong>{dashboardData.summary.projects_in_work}</strong></span>
+                    </div>
+                  )}
+                  {dashboardData.summary.overdue_tasks !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600" />
+                      <span>Просроченных задач: <strong>{dashboardData.summary.overdue_tasks}</strong></span>
+                    </div>
+                  )}
+                  {dashboardData.summary.tasks_today !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="w-4 h-4 text-blue-600" />
+                      <span>Задач на сегодня: <strong>{dashboardData.summary.tasks_today}</strong></span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center">
+              <BlurText
+                key={currentPhraseIndex}
+                text={motivationalPhrases[currentPhraseIndex]}
+                delay={80}
+                direction="top"
+                animateBy="words"
+                className="text-5xl text-gray-900 font-normal text-center"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -438,38 +619,138 @@ export const Dashboard = () => {
         cards={bentoCards}
       />
 
-      {/* Quick Stats Footer */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
-          <div className="flex items-center gap-3 mb-2">
-            <Activity className="w-5 h-5 text-purple-600" />
-            <span className="text-sm text-gray-600 font-normal">Активность</span>
+      {/* Stats Cards - Финансы, Клиенты, Алерты, Документы */}
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Финансы */}
+        <div
+          onClick={() => navigate('/finance')}
+          className="bg-gradient-to-br from-green-50 to-emerald-100 backdrop-blur-xl rounded-2xl p-6 border border-green-200 shadow-lg hover:shadow-xl transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <DollarSign className="w-6 h-6 text-green-600" />
+            <span className="text-sm text-green-700 font-semibold">Финансы за месяц</span>
           </div>
-          <p className="text-xl font-normal text-gray-900">Высокая</p>
+          {dashboardData ? (
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">Доход:</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {dashboardData.finance.month_revenue.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-green-600">Оплачено:</span>
+                <span className="text-sm font-medium text-green-700">
+                  {dashboardData.finance.paid.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-yellow-600">Ожидается:</span>
+                <span className="text-sm font-medium text-yellow-700">
+                  {dashboardData.finance.pending.toLocaleString('ru-RU')} ₽
+                </span>
+              </div>
+              {dashboardData.finance.overdue > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-red-600">Просрочено:</span>
+                  <span className="text-sm font-medium text-red-700">
+                    {dashboardData.finance.overdue.toLocaleString('ru-RU')} ₽
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xl font-normal text-gray-900">Загрузка...</p>
+          )}
         </div>
 
-        <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
-          <div className="flex items-center gap-3 mb-2">
-            <Clock className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-600 font-normal">Ближайший дедлайн</span>
+        {/* Клиенты */}
+        <div
+          onClick={() => navigate('/clients')}
+          className="bg-gradient-to-br from-blue-50 to-sky-100 backdrop-blur-xl rounded-2xl p-6 border border-blue-200 shadow-lg hover:shadow-xl transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <Users className="w-6 h-6 text-blue-600" />
+            <span className="text-sm text-blue-700 font-semibold">Клиенты</span>
           </div>
-          <p className="text-xl font-normal text-gray-900">3 дня</p>
+          {dashboardData ? (
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-gray-600">Активных:</span>
+                <span className="text-lg font-bold text-gray-900">{dashboardData.clients.active_count}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-blue-600">Новых лидов:</span>
+                <span className="text-sm font-medium text-blue-700">{dashboardData.clients.new_leads_week}</span>
+              </div>
+              {dashboardData.clients.recent.length > 0 && (
+                <div className="text-xs text-gray-500 mt-2">
+                  Последний: {dashboardData.clients.recent[0].name}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-xl font-normal text-gray-900">Загрузка...</p>
+          )}
         </div>
 
-        <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
-          <div className="flex items-center gap-3 mb-2">
-            <AlertCircle className="w-5 h-5 text-orange-600" />
-            <span className="text-sm text-gray-600 font-normal">Требует внимания</span>
+        {/* Требует внимания */}
+        <div className="bg-gradient-to-br from-orange-50 to-red-100 backdrop-blur-xl rounded-2xl p-6 border border-orange-200 shadow-lg">
+          <div className="flex items-center gap-3 mb-3">
+            <AlertCircle className="w-6 h-6 text-orange-600" />
+            <span className="text-sm text-orange-700 font-semibold">Требует внимания</span>
           </div>
-          <p className="text-xl font-normal text-gray-900">{stats.tasks.pending}</p>
+          {dashboardData && dashboardData.alerts.length > 0 ? (
+            <div className="space-y-2">
+              {dashboardData.alerts.slice(0, 3).map((alert, index) => (
+                <div key={index} className="text-xs text-gray-700 flex items-start gap-2">
+                  <span
+                    className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ${
+                      alert.level === 'error'
+                        ? 'bg-red-500'
+                        : alert.level === 'warning'
+                        ? 'bg-yellow-500'
+                        : 'bg-blue-500'
+                    }`}
+                  ></span>
+                  <span className="line-clamp-2">{alert.message}</span>
+                </div>
+              ))}
+              {dashboardData.alerts.length > 3 && (
+                <div className="text-xs text-gray-500 mt-2">+{dashboardData.alerts.length - 3} еще</div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Все в порядке ✓</p>
+          )}
         </div>
 
-        <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
-          <div className="flex items-center gap-3 mb-2">
-            <FileText className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-gray-600 font-normal">Документы</span>
+        {/* Документы */}
+        <div
+          onClick={() => navigate('/documents')}
+          className="bg-gradient-to-br from-purple-50 to-pink-100 backdrop-blur-xl rounded-2xl p-6 border border-purple-200 shadow-lg hover:shadow-xl transition-all cursor-pointer"
+        >
+          <div className="flex items-center gap-3 mb-3">
+            <FileText className="w-6 h-6 text-purple-600" />
+            <span className="text-sm text-purple-700 font-semibold">Документы</span>
           </div>
-          <p className="text-xl font-normal text-gray-900">Актуальны</p>
+          {dashboardData && dashboardData.documents.length > 0 ? (
+            <div className="space-y-2">
+              {dashboardData.documents.slice(0, 3).map((doc) => (
+                <div key={doc.id} className="text-xs text-gray-700">
+                  <div className="font-medium truncate">{doc.filename}</div>
+                  <div className="text-gray-500">
+                    {doc.project_title ? `${doc.project_title}` : 'Без проекта'}
+                  </div>
+                </div>
+              ))}
+              {dashboardData.documents.length > 3 && (
+                <div className="text-xs text-gray-500">+{dashboardData.documents.length - 3} еще</div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">Нет документов</p>
+          )}
         </div>
       </div>
 
@@ -480,7 +761,7 @@ export const Dashboard = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <CheckSquare className="w-5 h-5 text-purple-600" />
-              <h2 className="text-xl font-normal text-gray-900">Последние задачи</h2>
+              <h2 className="text-xl font-normal text-gray-900">Задачи</h2>
             </div>
             <button
               onClick={() => navigate('/tasks')}
@@ -492,33 +773,64 @@ export const Dashboard = () => {
           <div className="space-y-3">
             {loading ? (
               <div className="text-center py-8 text-gray-400">Загрузка...</div>
-            ) : (
+            ) : dashboardData ? (
               <>
-                <TaskItem
-                  title="Доработка функционала CRM"
-                  status="in_progress"
-                  priority="high"
-                  deadline="Сегодня"
-                />
-                <TaskItem
-                  title="Оптимизация базы данных"
-                  status="pending"
-                  priority="medium"
-                  deadline="Завтра"
-                />
-                <TaskItem
-                  title="Тестирование новых функций"
-                  status="in_progress"
-                  priority="high"
-                  deadline="2 дня"
-                />
-                <TaskItem
-                  title="Написание документации"
-                  status="pending"
-                  priority="low"
-                  deadline="Неделя"
-                />
+                {/* Просроченные */}
+                {dashboardData.tasks.overdue.length > 0 && (
+                  <>
+                    <div className="text-xs font-semibold text-red-600 uppercase mb-2">Просроченные ({dashboardData.tasks.overdue.length})</div>
+                    {dashboardData.tasks.overdue.slice(0, 2).map((task) => (
+                      <TaskItem
+                        key={task.id}
+                        title={task.title}
+                        status="pending"
+                        priority={task.priority as 'low' | 'medium' | 'high'}
+                        deadline={new Date(task.deadline).toLocaleDateString('ru-RU')}
+                      />
+                    ))}
+                  </>
+                )}
+
+                {/* Предстоящие */}
+                {dashboardData.tasks.upcoming.length > 0 && (
+                  <>
+                    <div className="text-xs font-semibold text-blue-600 uppercase mb-2">Предстоящие ({dashboardData.tasks.upcoming.length})</div>
+                    {dashboardData.tasks.upcoming.slice(0, 3).map((task) => (
+                      <TaskItem
+                        key={task.id}
+                        title={task.title}
+                        status="in_progress"
+                        priority={task.priority as 'low' | 'medium' | 'high'}
+                        deadline={new Date(task.deadline).toLocaleDateString('ru-RU')}
+                      />
+                    ))}
+                  </>
+                )}
+
+                {/* Новые */}
+                {dashboardData.tasks.new.length > 0 && (
+                  <>
+                    <div className="text-xs font-semibold text-green-600 uppercase mb-2">Новые задачи ({dashboardData.tasks.new.length})</div>
+                    {dashboardData.tasks.new.slice(0, 1).map((task) => (
+                      <TaskItem
+                        key={task.id}
+                        title={task.title}
+                        status="pending"
+                        priority={task.priority as 'low' | 'medium' | 'high'}
+                        deadline={new Date(task.created_at).toLocaleDateString('ru-RU')}
+                      />
+                    ))}
+                  </>
+                )}
+
+                {dashboardData.tasks.overdue.length === 0 &&
+                  dashboardData.tasks.upcoming.length === 0 &&
+                  dashboardData.tasks.new.length === 0 && (
+                    <div className="text-center py-8 text-gray-400">Нет задач</div>
+                  )}
               </>
+            ) : (
+              <div className="text-center py-8 text-gray-400">Нет данных</div>
             )}
           </div>
         </div>
@@ -526,42 +838,33 @@ export const Dashboard = () => {
         {/* Team Activity */}
         <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
           <div className="flex items-center gap-3 mb-6">
-            <Users className="w-5 h-5 text-purple-600" />
+            <Activity className="w-5 h-5 text-purple-600" />
             <h2 className="text-xl font-normal text-gray-900">Активность команды</h2>
           </div>
           <div className="space-y-4">
-            <ActivityItem
-              user="Алексей"
-              action="завершил задачу"
-              item="Дизайн главной страницы"
-              time="5 мин назад"
-              avatar="A"
-              color="purple"
-            />
-            <ActivityItem
-              user="Мария"
-              action="создала проект"
-              item="Интернет-магазин"
-              time="1 час назад"
-              avatar="M"
-              color="pink"
-            />
-            <ActivityItem
-              user="Дмитрий"
-              action="обновил статус"
-              item="Рефакторинг кода"
-              time="2 часа назад"
-              avatar="Д"
-              color="blue"
-            />
-            <ActivityItem
-              user="Екатерина"
-              action="добавила комментарий"
-              item="Баг в форме авторизации"
-              time="3 часа назад"
-              avatar="Е"
-              color="green"
-            />
+            {loading ? (
+              <div className="text-center py-8 text-gray-400">Загрузка...</div>
+            ) : dashboardData && dashboardData.activity.length > 0 ? (
+              dashboardData.activity.map((activity, index) => {
+                const colors: ('purple' | 'pink' | 'blue' | 'green')[] = ['purple', 'pink', 'blue', 'green']
+                const color = colors[index % colors.length]
+                const avatar = activity.user.charAt(0).toUpperCase()
+
+                return (
+                  <ActivityItem
+                    key={index}
+                    user={activity.user}
+                    action={activity.action}
+                    item={activity.target}
+                    time={activity.timestamp}
+                    avatar={avatar}
+                    color={color}
+                  />
+                )
+              })
+            ) : (
+              <div className="text-center py-8 text-gray-400">Нет активности</div>
+            )}
           </div>
         </div>
 
@@ -570,7 +873,7 @@ export const Dashboard = () => {
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <FolderKanban className="w-5 h-5 text-purple-600" />
-              <h2 className="text-xl font-normal text-gray-900">Активные проекты</h2>
+              <h2 className="text-xl font-normal text-gray-900">Топ проектов</h2>
             </div>
             <button
               onClick={() => navigate('/projects')}
@@ -580,34 +883,22 @@ export const Dashboard = () => {
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ProjectCard
-              title="CRM Система"
-              client="ООО Технологии"
-              progress={75}
-              status="in_progress"
-              deadline="15 дней"
-            />
-            <ProjectCard
-              title="Корпоративный сайт"
-              client="ИП Иванов"
-              progress={45}
-              status="in_progress"
-              deadline="30 дней"
-            />
-            <ProjectCard
-              title="Мобильное приложение"
-              client="Магазин Электроники"
-              progress={90}
-              status="in_progress"
-              deadline="5 дней"
-            />
-            <ProjectCard
-              title="Редизайн интерфейса"
-              client="Финансовая компания"
-              progress={20}
-              status="in_progress"
-              deadline="45 дней"
-            />
+            {loading ? (
+              <div className="col-span-2 text-center py-8 text-gray-400">Загрузка...</div>
+            ) : dashboardData && dashboardData.projects.length > 0 ? (
+              dashboardData.projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  title={project.title}
+                  client={project.client_name || 'Без клиента'}
+                  progress={project.progress}
+                  status={project.status as 'in_progress' | 'completed' | 'on_hold'}
+                  deadline={project.deadline ? new Date(project.deadline).toLocaleDateString('ru-RU') : 'Не указан'}
+                />
+              ))
+            ) : (
+              <div className="col-span-2 text-center py-8 text-gray-400">Нет проектов</div>
+            )}
           </div>
         </div>
 
@@ -618,69 +909,116 @@ export const Dashboard = () => {
             <h2 className="text-xl font-normal text-gray-900">Быстрые действия</h2>
           </div>
           <div className="space-y-3">
-            <QuickActionButton
-              icon={<CheckSquare className="w-5 h-5" />}
-              text="Создать задачу"
-              onClick={() => navigate('/tasks')}
-              color="purple"
-            />
-            <QuickActionButton
-              icon={<FolderKanban className="w-5 h-5" />}
-              text="Новый проект"
-              onClick={() => navigate('/projects')}
-              color="pink"
-            />
-            <QuickActionButton
-              icon={<Users className="w-5 h-5" />}
-              text="Добавить клиента"
-              onClick={() => navigate('/clients')}
-              color="blue"
-            />
-            <QuickActionButton
-              icon={<FileText className="w-5 h-5" />}
-              text="Создать документ"
-              onClick={() => navigate('/documents')}
-              color="green"
-            />
-          </div>
-        </div>
-      </div>
+            {loading ? (
+              <div className="text-center py-8 text-gray-400">Загрузка...</div>
+            ) : dashboardData && dashboardData.quick_actions.length > 0 ? (
+              dashboardData.quick_actions.map((action, index) => {
+                const colors: ('purple' | 'pink' | 'blue' | 'green')[] = ['purple', 'pink', 'blue', 'green']
+                const color = colors[index % colors.length]
+                const icons = {
+                  tasks: <CheckSquare className="w-5 h-5" />,
+                  projects: <FolderKanban className="w-5 h-5" />,
+                  clients: <Users className="w-5 h-5" />,
+                  documents: <FileText className="w-5 h-5" />,
+                }
+                const icon = icons[action.icon as keyof typeof icons] || <Zap className="w-5 h-5" />
 
-      {/* Bottom Stats - Charts Section */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
-          <div className="flex items-center gap-3 mb-6">
-            <TrendingUp className="w-5 h-5 text-purple-600" />
-            <h2 className="text-xl font-normal text-gray-900">Доход за месяц</h2>
-          </div>
-          <div className="h-64 flex items-end justify-between gap-2">
-            {[65, 45, 80, 55, 90, 70, 85, 60, 95, 75, 88, 92].map((height, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <div
-                  className="w-full bg-white rounded-t-lg transition-all hover:bg-gray-300"
-                  style={{ height: `${height}%` }}
+                return (
+                  <QuickActionButton
+                    key={index}
+                    icon={icon}
+                    text={action.label}
+                    onClick={() => navigate(action.link)}
+                    color={color}
+                  />
+                )
+              })
+            ) : (
+              <>
+                <QuickActionButton
+                  icon={<CheckSquare className="w-5 h-5" />}
+                  text="Создать задачу"
+                  onClick={() => navigate('/tasks')}
+                  color="purple"
                 />
-                <span className="text-xs text-gray-400">{i + 1}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Task Distribution */}
-        <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
-          <div className="flex items-center gap-3 mb-6">
-            <Activity className="w-5 h-5 text-purple-600" />
-            <h2 className="text-xl font-normal text-gray-900">Распределение задач</h2>
-          </div>
-          <div className="space-y-4">
-            <ProgressBar label="В работе" value={stats.tasks.pending} max={stats.tasks.total} color="purple" />
-            <ProgressBar label="Выполнено" value={stats.tasks.completed} max={stats.tasks.total} color="green" />
-            <ProgressBar label="Просрочено" value={3} max={stats.tasks.total} color="red" />
-            <ProgressBar label="На проверке" value={5} max={stats.tasks.total} color="blue" />
+                <QuickActionButton
+                  icon={<FolderKanban className="w-5 h-5" />}
+                  text="Новый проект"
+                  onClick={() => navigate('/projects')}
+                  color="pink"
+                />
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Bottom Stats - Charts Section - только для OWNER */}
+      {dashboardData && dashboardData.user.role === 'owner' && dashboardData.charts && (
+        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Task Distribution Chart */}
+          <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
+            <div className="flex items-center gap-3 mb-6">
+              <Activity className="w-5 h-5 text-purple-600" />
+              <h2 className="text-xl font-normal text-gray-900">Распределение задач</h2>
+            </div>
+            <div className="space-y-4">
+              {Object.entries(dashboardData.charts.tasks_by_status).map(([status, count], index) => {
+                const colors: ('purple' | 'green' | 'red' | 'blue')[] = ['purple', 'green', 'red', 'blue']
+                const color = colors[index % colors.length]
+                const labels: Record<string, string> = {
+                  pending: 'Ожидает',
+                  in_progress: 'В работе',
+                  completed: 'Выполнено',
+                  overdue: 'Просрочено',
+                }
+                const label = labels[status] || status
+
+                return (
+                  <ProgressBar
+                    key={status}
+                    label={label}
+                    value={count}
+                    max={stats.tasks.total}
+                    color={color}
+                  />
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Projects Distribution Chart */}
+          <div className="bg-white backdrop-blur-xl rounded-2xl p-6 border border-gray-200 shadow-lg">
+            <div className="flex items-center gap-3 mb-6">
+              <TrendingUp className="w-5 h-5 text-purple-600" />
+              <h2 className="text-xl font-normal text-gray-900">Распределение проектов</h2>
+            </div>
+            <div className="space-y-4">
+              {Object.entries(dashboardData.charts.projects_distribution).map(([status, count], index) => {
+                const colors: ('purple' | 'green' | 'red' | 'blue')[] = ['blue', 'green', 'red', 'purple']
+                const color = colors[index % colors.length]
+                const labels: Record<string, string> = {
+                  in_progress: 'В работе',
+                  completed: 'Завершено',
+                  on_hold: 'На паузе',
+                  planning: 'Планирование',
+                }
+                const label = labels[status] || status
+
+                return (
+                  <ProgressBar
+                    key={status}
+                    label={label}
+                    value={count}
+                    max={stats.projects.total}
+                    color={color}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

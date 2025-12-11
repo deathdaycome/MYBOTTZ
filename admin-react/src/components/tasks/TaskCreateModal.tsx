@@ -16,9 +16,10 @@ interface TaskCreateModalProps {
   onClose: () => void
   onSuccess: () => void
   employees: Employee[]
+  projectId?: number  // ID проекта (опционально, для задач из проектов)
 }
 
-export const TaskCreateModal = ({ isOpen, onClose, onSuccess, employees }: TaskCreateModalProps) => {
+export const TaskCreateModal = ({ isOpen, onClose, onSuccess, employees, projectId }: TaskCreateModalProps) => {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; assigned_to?: string }>({})
 
@@ -32,6 +33,7 @@ export const TaskCreateModal = ({ isOpen, onClose, onSuccess, employees }: TaskC
     color: 'normal',
     tags: [],
     created_by_admin: true,
+    project_id: projectId,  // Добавляем project_id
   })
 
   // Suggested tags
@@ -56,6 +58,7 @@ export const TaskCreateModal = ({ isOpen, onClose, onSuccess, employees }: TaskC
         color: 'normal',
         tags: [],
         created_by_admin: true,
+        project_id: projectId,  // Сохраняем project_id
       })
       setErrors({})
 
@@ -64,7 +67,7 @@ export const TaskCreateModal = ({ isOpen, onClose, onSuccess, employees }: TaskC
         setErrors({ assigned_to: 'Нет доступных исполнителей. Добавьте исполнителей в системе.' })
       }
     }
-  }, [isOpen, employees])
+  }, [isOpen, employees, projectId])
 
   useEffect(() => {
     if (isOpen) {

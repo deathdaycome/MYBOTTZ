@@ -108,6 +108,7 @@ export interface CreateTaskData {
   color?: 'normal' | 'red' | 'yellow' | 'green'
   tags?: string[]
   created_by_admin?: boolean
+  project_id?: number  // ID проекта (опционально, для задач из проектов)
 }
 
 export interface UpdateTaskData {
@@ -262,6 +263,12 @@ const tasksApi = {
   getProjects: async () => {
     const response = await axiosInstance.get('/admin/api/projects/')
     return response.data.projects || []
+  },
+
+  // Получение задач конкретного проекта
+  getProjectTasks: async (projectId: number) => {
+    const response = await axiosInstance.get(`/admin/api/projects/${projectId}/tasks`)
+    return response.data as { success: boolean; tasks: Task[]; total_count: number }
   },
 
   // Обновление прогресса

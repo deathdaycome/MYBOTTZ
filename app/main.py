@@ -258,9 +258,7 @@ api_v1_router.include_router(users_router)
 # Register integration routers (temporarily commented out)
 # api_v1_router.include_router(wildberries_router)
 
-# Register transcription router
-api_v1_router.include_router(transcription_router)
-print("Роутер транскрибации подключен")
+# Note: transcription router is mounted separately at /admin/v1 (see line 349)
 
 
 # ============ Version Info Endpoints ============
@@ -344,6 +342,9 @@ async def get_api_version_info(version: str):
 
 # Register API routers
 app.include_router(api_v1_router)
+
+# Also mount transcription router at /admin/v1 for admin panel compatibility
+app.include_router(transcription_router, prefix="/admin/v1", tags=["Transcription Admin"])
 
 logger.info("api_routes_registered", message="Users module routes registered")
 
