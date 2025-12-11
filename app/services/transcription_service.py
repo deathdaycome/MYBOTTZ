@@ -98,7 +98,7 @@ class TranscriptionService:
             async with aiofiles.open(chunk_file, "wb") as f:
                 await f.write(chunk)
 
-            logger.info(f"audio_chunk_saved session_id={session_id, file=str(chunk_file}"))
+            logger.info(f"audio_chunk_saved session_id={session_id}, file={chunk_file}")
             return str(chunk_file)
 
         except Exception as e:
@@ -119,7 +119,7 @@ class TranscriptionService:
 
             # Check file size
             file_size_mb = audio_file.stat().st_size / (1024 * 1024)
-            logger.info(f"checking_file_size task_id={task_id, size_mb=round(file_size_mb, 2}"))
+            logger.info(f"checking_file_size task_id={task_id}, size_mb={round(file_size_mb, 2)}")
 
             # ПРОСТОЕ РЕШЕНИЕ: Просто извлекаем аудиодорожку из видео (аудио намного меньше видео!)
             # Видео 218MB может содержать аудио всего 10-20MB
@@ -172,14 +172,14 @@ class TranscriptionService:
             try:
                 if audio_file.exists() and audio_file != audio_path:
                     audio_file.unlink()
-                    logger.info(f"original_file_deleted file={str(audio_file}"))
+                    logger.info(f"original_file_deleted file={str(audio_file)}")
 
                 # Также удаляем временный аудио файл если он отличается от итогового
                 if audio_path.exists() and audio_path != audio_output:
                     audio_path.unlink()
-                    logger.info(f"temp_audio_deleted file={str(audio_path}"))
+                    logger.info(f"temp_audio_deleted file={str(audio_path)}")
             except Exception as cleanup_error:
-                logger.warning(f"cleanup_error error={str(cleanup_error}"))
+                logger.warning(f"cleanup_error error={str(cleanup_error)}")
 
             logger.info(f"transcription_completed task_id={task_id}")
             return self.tasks[task_id]
@@ -191,9 +191,9 @@ class TranscriptionService:
             try:
                 if audio_file.exists():
                     audio_file.unlink()
-                    logger.info(f"failed_file_deleted file={str(audio_file}"))
+                    logger.info(f"failed_file_deleted file={str(audio_file)}")
             except Exception as cleanup_error:
-                logger.warning(f"cleanup_error_on_failure error={str(cleanup_error}"))
+                logger.warning(f"cleanup_error_on_failure error={str(cleanup_error)}")
 
             self.tasks[task_id] = {
                 "status": "error",
@@ -326,14 +326,14 @@ class TranscriptionService:
             return output_path
 
         except Exception as e:
-            logger.error(f"audio_extraction_error: {str(e)}")
+            logger.error(f"audio_extraction_error: {e}")
             raise
 
     async def _transcribe_file_subprocess(self, audio_path: Path) -> str:
         """Transcribe using subprocess to isolate memory - РЕШЕНИЕ ПРОБЛЕМЫ OOM"""
         try:
             import json
-            logger.info(f"transcribing_via_subprocess audio_file={str(audio_path}"))
+            logger.info(f"transcribing_via_subprocess audio_file={str(audio_path)}")
 
             # Создаем временный Python скрипт для транскрипции
             script = f"""
@@ -390,11 +390,11 @@ except Exception as e:
                 raise Exception(result.get("error", "Unknown error"))
 
             transcript = result["transcript"]
-            logger.info(f"subprocess_transcription_completed chars={len(transcript}"))
+            logger.info(f"subprocess_transcription_completed chars={len(transcript)}")
             return transcript
 
         except Exception as e:
-            logger.error(f"subprocess_transcription_error: {str(e)}")
+            logger.error(f"subprocess_transcription_error: {e}")
             raise
 
     async def _transcribe_with_whisper(self, audio_path: Path) -> str:
@@ -412,7 +412,7 @@ except Exception as e:
             return transcript
 
         except Exception as e:
-            logger.error(f"whisper_transcription_error: {str(e)}")
+            logger.error(f"whisper_transcription_error: {e}")
             raise
 
     async def _analyze_with_gpt(self, transcript: str) -> Dict:
@@ -485,7 +485,7 @@ except Exception as e:
             return analysis
 
         except Exception as e:
-            logger.error(f"gpt_analysis_error: {str(e)}")
+            logger.error(f"gpt_analysis_error: {e}")
             return {
                 "summary": "Ошибка при анализе",
                 "key_points": [],
@@ -596,11 +596,11 @@ except Exception as e:
             output_path = self.upload_dir / f"{task_id}_transcript.docx"
             doc.save(str(output_path))
 
-            logger.info(f"docx_created output_path={str(output_path}"))
+            logger.info(f"docx_created output_path={str(output_path)}")
             return output_path
 
         except Exception as e:
-            logger.error(f"docx_creation_error: {str(e)}")
+            logger.error(f"docx_creation_error: {e}")
             raise
 
     async def _convert_to_mp3(self, input_path: Path, output_path: Path) -> None:
@@ -630,10 +630,10 @@ except Exception as e:
             if process.returncode != 0:
                 raise Exception(f"FFmpeg conversion error: {stderr.decode()}")
 
-            logger.info(f"audio_converted output_path={str(output_path}"))
+            logger.info(f"audio_converted output_path={str(output_path)}")
 
         except Exception as e:
-            logger.error(f"audio_conversion_error: {str(e)}")
+            logger.error(f"audio_conversion_error: {e}")
             raise
 
     async def save_uploaded_file(self, file_content: bytes, filename: str) -> Path:
@@ -646,7 +646,7 @@ except Exception as e:
             async with aiofiles.open(file_path, "wb") as f:
                 await f.write(file_content)
 
-            logger.info(f"file_saved file_path={str(file_path}"), size=len(file_content))
+            logger.info(f"file_saved file_path={file_path}, size={len(file_content)}")
 
             # АВТООЧИСТКА: запускаем очистку старых файлов в фоне
             # Удаляем файлы старше 7 дней для экономии места
@@ -655,7 +655,7 @@ except Exception as e:
             return file_path
 
         except Exception as e:
-            logger.error(f"file_save_error: {str(e)}")
+            logger.error(f"file_save_error: {e}")
             raise
 
     def get_task_status(self, task_id: str) -> Optional[Dict]:
@@ -752,7 +752,7 @@ except Exception as e:
             self.tasks[task_id] = {
                 "status": "error",
                 "progress": 0,
-                "error": f"Ошибка при объединении файлов: {str(e)}",
+                "error": f"Ошибка при объединении файлов: {e}",
                 "failed_at": datetime.now().isoformat()
             }
 
