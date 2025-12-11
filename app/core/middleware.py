@@ -534,10 +534,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     "detail": f"Rate limit exceeded. Max {self.max_requests} requests per {self.window} seconds."
                 },
             )
-            return add_rate_limit_headers(response)
+            return await add_rate_limit_headers(response)
 
         # Process request
         response = await call_next(request)
 
         # Add rate limit headers
-        return add_rate_limit_headers(response)
+        return await add_rate_limit_headers(response)
