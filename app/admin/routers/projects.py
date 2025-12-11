@@ -140,7 +140,7 @@ async def get_current_user(credentials: HTTPBasicCredentials = Depends(security)
 
     # Если не подошло, проверяем новую систему (исполнители)
     try:
-        async with get_db_context() as db:
+        with get_db_context() as db:
             from ...services.auth_service import AuthService
             from sqlalchemy.orm import selectinload
 
@@ -148,7 +148,7 @@ async def get_current_user(credentials: HTTPBasicCredentials = Depends(security)
                 AdminUser.username == credentials.username,
                 AdminUser.is_active == True
             )
-            result = await db.execute(stmt)
+            result = db.execute(stmt)
             admin_user = result.scalar_one_or_none()
 
             if admin_user and AuthService.verify_password(credentials.password, admin_user.password_hash):
@@ -214,7 +214,7 @@ async def get_projects(
     try:
         logger.info(f"[API] GET /api/projects/ - Пользователь: {current_user['username']}, Роль: {current_user['role']}, ID: {current_user['id']}")
 
-        async with get_db_context() as db:
+        with get_db_context() as db:
             from sqlalchemy.orm import joinedload, selectinload
 
             # Начинаем с базового запроса
@@ -265,7 +265,7 @@ async def get_projects(
 
             # Подсчитываем общее количество
             count_stmt = select(func.count()).select_from(stmt.subquery())
-            total_result = await db.execute(count_stmt)
+            total_result = db.execute(count_stmt)
             total = total_result.scalar()
             logger.info(f"[API] После фильтрации найдено проектов: {total}")
 
@@ -274,7 +274,7 @@ async def get_projects(
             stmt = stmt.offset(offset).limit(per_page)
 
             # Выполняем запрос
-            result = await db.execute(stmt)
+            result = db.execute(stmt)
             projects = result.scalars().all()
             logger.info(f"[API] Возвращаем проектов на странице: {len(projects)}")
 
@@ -308,7 +308,7 @@ async def get_projects(
                 # Добавляем информацию об исполнителе
                 if project.assigned_executor_id:
                     executor_stmt = select(AdminUser).filter(AdminUser.id == project.assigned_executor_id)
-                    executor_result = await db.execute(executor_stmt)
+                    executor_result = db.execute(executor_stmt)
                     executor = executor_result.scalar_one_or_none()
 
                     if executor:
@@ -326,7 +326,7 @@ async def get_projects(
                 # Добавляем информацию о менеджере
                 if project.responsible_manager_id:
                     manager_stmt = select(AdminUser).filter(AdminUser.id == project.responsible_manager_id)
-                    manager_result = await db.execute(manager_stmt)
+                    manager_result = db.execute(manager_stmt)
                     manager = manager_result.scalar_one_or_none()
 
                     if manager:
@@ -340,12 +340,12 @@ async def get_projects(
 
                 # Добавляем количество файлов
                 files_stmt = select(func.count()).select_from(ProjectFile).filter(ProjectFile.project_id == project.id)
-                files_result = await db.execute(files_stmt)
+                files_result = db.execute(files_stmt)
                 project_dict["files_count"] = files_result.scalar()
 
                 # Добавляем количество ревизий
                 revisions_stmt = select(func.count()).select_from(ProjectRevision).filter(ProjectRevision.project_id == project.id)
-                revisions_result = await db.execute(revisions_stmt)
+                revisions_result = db.execute(revisions_stmt)
                 project_dict["revisions_count"] = revisions_result.scalar()
 
                 # Добавляем читаемые названия статуса и приоритета
@@ -430,7 +430,7 @@ async def get_projects_stats(
     try:
         logger.info(f"[API] GET /api/projects/statistics - Пользователь: {current_user['username']}, Роль: {current_user['role']}")
 
-        async with get_db_context() as db:
+        with get_db_context() as db:
             # Базовый запрос проектов
             stmt = select(Project)
 
@@ -445,7 +445,7 @@ async def get_projects_stats(
                 stmt = stmt.filter(Project.assigned_executor_id == current_user["id"])
 
             # Получаем все проекты для расчетов
-            result = await db.execute(stmt)
+            result = db.execute(stmt)
             projects = result.scalars().all()
 
         # Расчет статистики
