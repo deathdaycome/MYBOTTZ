@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 
 from ...config.logging import get_logger
-from ...core.database import get_db_context
+from ...database.database import get_db_context  # Use synchronous context manager
 from ...database.models import Task, TaskComment, AdminUser, Project
 from ..middleware.auth import get_current_admin_user
 from ...services.task_notification_service import task_notification_service
