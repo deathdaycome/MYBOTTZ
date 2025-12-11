@@ -185,7 +185,7 @@ class TranscriptionService:
             return self.tasks[task_id]
 
         except Exception as e:
-            logger.error("transcription_error", task_id=task_id, error=str(e), exc_info=True)
+            logger.error(f"transcription_error task_id={task_id}, error={str(e)}", exc_info=True)
 
             # АВТООЧИСТКА: удаляем файл даже при ошибке
             try:
@@ -294,7 +294,7 @@ class TranscriptionService:
             return parts
 
         except Exception as e:
-            logger.error("video_split_error", task_id=task_id, error=str(e))
+            logger.error(f"video_split_error task_id={task_id}, error={str(e)}")
             raise
 
     async def _extract_audio_from_video(self, file_path: Path) -> Path:
