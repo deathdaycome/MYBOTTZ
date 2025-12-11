@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import Project, User
 from ...config.logging import get_logger
 

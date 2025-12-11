@@ -14,7 +14,7 @@ from PIL import Image
 import shutil
 import secrets
 
-from ...database.database import get_db_context, get_db
+from ...core.database import get_db_context, get_db
 from ...database.models import Portfolio
 from ...config.settings import settings
 from ...config.logging import get_logger

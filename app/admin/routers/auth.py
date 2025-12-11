@@ -10,7 +10,7 @@ import hashlib
 import secrets
 
 from ...database.models import AdminUser
-from ...database.database import get_db
+from ...core.database import get_db
 
 router = APIRouter()
 security = HTTPBasic()

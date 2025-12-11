@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc, func
 from pydantic import BaseModel
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import User, AdminUser, ContractorPayment, Task
 from ...config.logging import get_logger
 from ..middleware.auth import require_admin_auth

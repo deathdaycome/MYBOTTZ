@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional
 import os
 import io
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser
 from ...services.backup_service import backup_service
 from ...config.logging import get_logger

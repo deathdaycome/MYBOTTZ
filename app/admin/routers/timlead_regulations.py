@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser
 from ..middleware.auth import get_current_admin_user
 from ...config.logging import get_logger

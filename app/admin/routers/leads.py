@@ -10,7 +10,7 @@ from sqlalchemy import or_, and_, func
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser
 from ...database.crm_models import Lead, LeadStatus, Client, Deal, DealStatus
 from ...database.audit_models import AuditLog, AuditActionType, AuditEntityType

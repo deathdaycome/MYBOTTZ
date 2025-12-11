@@ -7,7 +7,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser
 from ...config.logging import get_logger
 from ...services.auth_service import AuthService
@@ -402,7 +402,7 @@ async def view_user_password(
             )
         
         # Получаем пользователя из базы
-        from ...database.database import get_db_context
+        from ...core.database import get_db_context
         with get_db_context() as db:
             user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
             if not user:
@@ -441,7 +441,7 @@ async def get_user(
                 "message": "Недостаточно прав доступа"
             }
         
-        from ...database.database import get_db_context
+        from ...core.database import get_db_context
         with get_db_context() as db:
             user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
             if not user:
@@ -478,7 +478,7 @@ async def update_user(
         
         data = await request.json()
         
-        from ...database.database import get_db_context
+        from ...core.database import get_db_context
         with get_db_context() as db:
             user = db.query(AdminUser).filter(AdminUser.id == user_id).first()
             if not user:

@@ -14,7 +14,7 @@ from pathlib import Path
 from PIL import Image
 import io
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import (
     ProjectRevision, RevisionMessage, RevisionFile, RevisionMessageFile,
     Project, User, AdminUser
@@ -734,7 +734,7 @@ async def send_revision_notification(revision: ProjectRevision, action: str):
     """Отправить уведомление о правке"""
     try:
         from ...services.notification_service import notification_service
-        from ...database.database import get_db_context
+        from ...core.database import get_db_context
         
         with get_db_context() as db:
             # Получаем данные проекта и клиента
@@ -761,7 +761,7 @@ async def send_revision_message_notification(revision: ProjectRevision, message:
     """Отправить уведомление о новом сообщении"""
     try:
         from ...services.notification_service import notification_service
-        from ...database.database import get_db_context
+        from ...core.database import get_db_context
         from telegram import Bot
         from ...config.settings import settings
 

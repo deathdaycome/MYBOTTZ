@@ -8,7 +8,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
 
-from ...database.database import get_db
+from ...core.database import get_db
 from sqlalchemy.orm import Session
 from ..middleware.auth import get_current_admin_user
 from ...services.document_service import DocumentService

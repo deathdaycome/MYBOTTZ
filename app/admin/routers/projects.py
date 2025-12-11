@@ -12,11 +12,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc, func, text
 from pydantic import BaseModel
 
-from ...database.database import get_db, get_db_context
+from ...core.database import get_db, get_db_context
 from ...database.models import (
     Project, User, AdminUser, ProjectFile, ProjectStatus, ProjectRevision,
     RevisionMessage, RevisionFile, ProjectStatusLog, ConsultantSession,
-    FinanceTransaction, ContractorPayment, ServiceExpense, FinanceCategory
+    FinanceTransaction, ContractorPayment, ServiceExpense, FinanceCategory, Task
 )
 from ...config.logging import get_logger
 from ...config.settings import settings
@@ -376,6 +376,114 @@ async def get_projects(
             "message": f"Ошибка получения проектов: {str(e)}",
             "projects": []
         }
+
+@router.get("/statistics", response_class=JSONResponse)
+async def get_projects_stats(
+    request: Request,
+    show_archived: bool = False,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить KPI статистику по проектам"""
+    try:
+        logger.info(f"[API] GET /api/projects/statistics - Пользователь: {current_user['username']}, Роль: {current_user['role']}")
+
+        # Базовый запрос проектов
+        query = db.query(Project)
+
+        # Фильтр архивных проектов
+        if show_archived:
+            query = query.filter(Project.is_archived == True)
+        else:
+            query = query.filter(or_(Project.is_archived == False, Project.is_archived == None))
+
+        # Фильтрация по роли пользователя
+        if current_user["role"] == "executor":
+            query = query.filter(Project.assigned_executor_id == current_user["id"])
+
+        # Получаем все проекты для расчетов
+        projects = query.all()
+
+        # Расчет статистики
+        total_projects = len(projects)
+
+        # Активные проекты (Новый, В работе, На проверке)
+        active_statuses = ['new', 'review', 'accepted', 'in_progress', 'testing']
+        active_projects = [p for p in projects if p.status in active_statuses]
+        active_count = len(active_projects)
+
+        # Завершенные проекты
+        completed_projects = [p for p in projects if p.status == 'completed']
+        completed_count = len(completed_projects)
+
+        # Общая стоимость
+        total_cost = sum([p.estimated_cost or 0 for p in projects])
+
+        # Получено от клиентов (оплаченные платежи)
+        total_received = sum([p.client_paid_total or 0 for p in projects])
+
+        # Оставшийся бюджет
+        remaining_budget = total_cost - total_received
+
+        # Предоплаты
+        total_prepayments = sum([p.prepayment_amount or 0 for p in projects])
+
+        # Выплачено исполнителям
+        total_paid_to_executors = sum([p.executor_paid_total or 0 for p in projects])
+
+        # К выплате исполнителям (запланировано)
+        total_planned_executor_payments = sum([p.executor_cost or 0 for p in projects if p.executor_cost])
+
+        # Прибыль (получено - выплачено исполнителям)
+        total_profit = total_received - total_paid_to_executors
+
+        return {
+            "success": True,
+            "stats": {
+                "total_projects": total_projects,
+                "active_projects": active_count,
+                "completed_projects": completed_count,
+                "total_cost": round(total_cost, 2),
+                "total_received": round(total_received, 2),
+                "remaining_budget": round(remaining_budget, 2),
+                "total_prepayments": round(total_prepayments, 2),
+                "total_paid_to_executors": round(total_paid_to_executors, 2),
+                "total_planned_executor_payments": round(total_planned_executor_payments, 2),
+                "total_profit": round(total_profit, 2),
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"[API] Ошибка получения статистики: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Ошибка получения статистики: {str(e)}")
+
+@router.get("/{project_id}/tasks", response_class=JSONResponse)
+async def get_project_tasks(
+    project_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Получить задачи проекта"""
+    try:
+        # Проверяем существование проекта
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if not project:
+            return {"success": False, "message": "Проект не найден"}
+
+        # Получаем задачи проекта
+        tasks = db.query(Task).filter(
+            Task.project_id == project_id
+        ).order_by(desc(Task.created_at)).all()
+
+        return {
+            "success": True,
+            "tasks": [task.to_dict() for task in tasks]
+        }
+    except Exception as e:
+        logger.error(f"Error getting project tasks: {str(e)}")
+        return {"success": False, "message": f"Ошибка получения задач: {str(e)}"}
+
 
 @router.get("/{project_id}")
 async def get_project(
@@ -775,11 +883,7 @@ async def update_project(
                     await employee_notification_service.notify_project_assigned(
                         db=db,
                         project_id=project.id,
-                        executor_id=project.assigned_executor_id,
-                        project_title=project.title,
-                        description=project.description,
-                        deadline=project.deadline,
-                        estimated_hours=project.estimated_hours
+                        executor_id=project.assigned_executor_id
                     )
                     logger.info(f"Уведомление о назначении на проект отправлено исполнителю {project.assigned_executor_id}")
                     

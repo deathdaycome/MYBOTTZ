@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser
 from ...database.rbac_models import Role, Permission, DataAccessRule
 from ...database.crm_models import Client, Lead, Deal

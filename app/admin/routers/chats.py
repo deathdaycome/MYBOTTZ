@@ -8,7 +8,7 @@ import shutil
 import os
 import uuid
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import ProjectChat, ProjectChatMessage, Project, AdminUser
 from ..middleware.auth import get_current_admin_user
 

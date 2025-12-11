@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, extract
 from pydantic import BaseModel, Field
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import Transaction, Project, User, AdminUser, ExpenseCategory
 from ...config.logging import get_logger
 from fastapi.security import HTTPBasic, HTTPBasicCredentials

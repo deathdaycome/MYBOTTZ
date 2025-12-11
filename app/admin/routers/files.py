@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 import uuid
 import secrets
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser, Project, ProjectFile
 from ...config.logging import get_logger
 from ...config.settings import settings

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any
 import asyncio
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser
 from ...services.project_automation import ProjectAutomationService
 from ...services.scheduler import scheduler

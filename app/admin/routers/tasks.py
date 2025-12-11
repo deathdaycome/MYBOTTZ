@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 
 from ...config.logging import get_logger
-from ...database.database import get_db_context
+from ...core.database import get_db_context
 from ...database.models import Task, TaskComment, AdminUser, Project
 from ..middleware.auth import get_current_admin_user
 from ...services.task_notification_service import task_notification_service

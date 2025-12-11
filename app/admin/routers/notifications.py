@@ -12,7 +12,7 @@ import json
 from datetime import datetime, timedelta
 
 from ..middleware.auth import get_current_admin_user
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser
 from ...database.notification_models import (
     EmployeeNotificationSettings,

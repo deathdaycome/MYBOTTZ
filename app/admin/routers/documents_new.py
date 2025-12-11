@@ -13,7 +13,7 @@ import os
 import uuid
 import shutil
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser, Project
 from ...database.crm_models import Document
 from ..middleware.auth import get_current_admin_user

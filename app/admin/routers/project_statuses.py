@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import secrets
 from telegram import Bot
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import ProjectStatus, ProjectStatusLog, Project, AdminUser, User
 from ...config.logging import get_logger
 from ...config.settings import get_settings

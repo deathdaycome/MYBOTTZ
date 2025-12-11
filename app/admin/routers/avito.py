@@ -17,7 +17,7 @@ from datetime import datetime
 import logging
 import os
 
-from ...database.database import get_db_context, get_db
+from ...core.database import get_db_context, get_db
 from ...services.notification_service import NotificationService
 from ...services.avito_polling_service import polling_service
 from ...database.crm_models import Client, ClientStatus, ClientType, AvitoClientStatus

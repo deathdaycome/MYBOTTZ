@@ -11,7 +11,7 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser, HostingServer, HostingPayment, Project, User
 from ...database.crm_models import Client
 from ..middleware.auth import get_current_admin_user
@@ -150,6 +150,7 @@ async def get_hosting_stats(
 @router.get("/api/servers")
 async def get_servers(
     status: Optional[str] = None,
+    project_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
@@ -160,6 +161,10 @@ async def get_servers(
         # Фильтр по статусу
         if status:
             query = query.filter(HostingServer.status == status)
+
+        # Фильтр по проекту
+        if project_id:
+            query = query.filter(HostingServer.project_id == project_id)
 
         servers = query.order_by(HostingServer.next_payment_date.asc()).all()
 

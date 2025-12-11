@@ -8,7 +8,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Optional
 
-from ...database.database import get_db
+from ...core.database import get_db
 from ...database.models import AdminUser
 from ..middleware.auth import get_current_admin_user
 from ..navigation import get_navigation_items

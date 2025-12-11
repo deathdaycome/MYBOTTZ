@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_
 
-from ...database.database import get_db, get_db_context
+from ...core.database import get_db, get_db_context
 from ...database.models import User, Project, ConsultantSession, FinanceTransaction
 from ...config.logging import get_logger
 from ...services.analytics_service import analytics_service, get_dashboard_data
