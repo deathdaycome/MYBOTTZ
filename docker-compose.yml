@@ -183,10 +183,7 @@ services:
       retries: 3
       start_period: 40s
     command: >
-      sh -c "
-        wait-for-postgres.sh postgres echo 'Postgres is ready' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
-      "
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
 
   # ========== CELERY WORKERS ==========
 
