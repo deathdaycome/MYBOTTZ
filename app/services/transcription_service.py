@@ -419,7 +419,7 @@ except Exception as e:
         """Analyze transcript using OpenRouter GPT"""
         try:
             if not self.openrouter_api_key:
-                logger.warning(f"openrouter_key_missing message={"Skipping GPT analysis"}")
+                logger.warning(f'openrouter_key_missing message="Skipping GPT analysis"')
                 return {
                     "summary": "Анализ не выполнен (отсутствует API ключ)",
                     "key_points": [],
