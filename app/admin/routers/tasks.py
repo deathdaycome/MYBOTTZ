@@ -15,7 +15,7 @@ import uuid
 from pathlib import Path
 
 from ...config.logging import get_logger
-from ...database.database import get_db_context  # Use synchronous context manager
+from ...core.database import get_db_context  # Use async context manager
 from ...database.models import Task, TaskComment, AdminUser, Project
 from ..middleware.auth import get_current_admin_user
 from ...services.task_notification_service import task_notification_service
@@ -235,7 +235,7 @@ async def task_detail_page(request: Request, task_id: int, current_user: dict = 
         logger.error(f"Ошибка при загрузке задачи {task_id}: {e}")
         raise HTTPException(status_code=500, detail="Ошибка при загрузке задачи")
 
-def _get_tasks_logic(
+async def _get_tasks_logic(
     request: Request,
     status: Optional[str] = None,
     assigned_to_id: Optional[int] = None,
@@ -248,7 +248,7 @@ def _get_tasks_logic(
         # Получаем текущего пользователя из запроса
         current_user = get_current_user_from_request(request)
 
-        with get_db_context() as db:
+        async with get_db_context() as db:
             # Строим базовый запрос
             query = db.query(Task).options(
                 joinedload(Task.created_by),
@@ -313,7 +313,7 @@ def _get_tasks_logic(
 
 # Wrapper routes для поддержки обоих вариантов путей (с и без trailing slash)
 @router.get("/", response_class=JSONResponse)
-def get_tasks_with_slash(
+async def get_tasks_with_slash(
     request: Request,
     status: Optional[str] = None,
     assigned_to_id: Optional[int] = None,
@@ -322,11 +322,11 @@ def get_tasks_with_slash(
     per_page: Optional[int] = 100
 ):
     """Получить список задач с фильтрацией - вариант с trailing slash"""
-    return _get_tasks_logic(request, status, assigned_to_id, created_by_id, priority, per_page)
+    return await _get_tasks_logic(request, status, assigned_to_id, created_by_id, priority, per_page)
 
 
 @router.get("", response_class=JSONResponse)
-def get_tasks_no_slash(
+async def get_tasks_no_slash(
     request: Request,
     status: Optional[str] = None,
     assigned_to_id: Optional[int] = None,
@@ -335,7 +335,7 @@ def get_tasks_no_slash(
     per_page: Optional[int] = 100
 ):
     """Получить список задач с фильтрацией - вариант без trailing slash"""
-    return _get_tasks_logic(request, status, assigned_to_id, created_by_id, priority, per_page)
+    return await _get_tasks_logic(request, status, assigned_to_id, created_by_id, priority, per_page)
 
 
 # Общая логика создания задачи
