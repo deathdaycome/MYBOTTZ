@@ -120,7 +120,7 @@ class ExecutorAssign(BaseModel):
     executor_id: int
     executor_cost: Optional[float] = 0
 
-def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> dict:
+async def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> dict:
     """Получение текущего пользователя с проверкой аутентификации"""
     logger.info(f"[API] Аутентификация пользователя: {credentials.username}")
 
@@ -140,12 +140,16 @@ def get_current_user(credentials: HTTPBasicCredentials = Depends(security)) -> d
 
     # Если не подошло, проверяем новую систему (исполнители)
     try:
-        with get_db_context() as db:
+        async with get_db_context() as db:
             from ...services.auth_service import AuthService
-            admin_user = db.query(AdminUser).filter(
+            from sqlalchemy.orm import selectinload
+
+            stmt = select(AdminUser).filter(
                 AdminUser.username == credentials.username,
                 AdminUser.is_active == True
-            ).first()
+            )
+            result = await db.execute(stmt)
+            admin_user = result.scalar_one_or_none()
 
             if admin_user and AuthService.verify_password(credentials.password, admin_user.password_hash):
                 logger.info(f"[API] Пользователь {credentials.username} = {admin_user.role.upper()} (ID: {admin_user.id})")
@@ -204,173 +208,212 @@ async def get_projects(
     search: Optional[str] = None,
     sort_by: str = "created_desc",
     show_archived: bool = False,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    current_user: dict = Depends(get_current_user)
 ):
     """Получить список проектов с фильтрами (с учетом ролей доступа)"""
     try:
         logger.info(f"[API] GET /api/projects/ - Пользователь: {current_user['username']}, Роль: {current_user['role']}, ID: {current_user['id']}")
 
-        # Начинаем с базового запроса
-        query = db.query(Project).join(User, Project.user_id == User.id)
+        async with get_db_context() as db:
+            from sqlalchemy.orm import joinedload, selectinload
 
-        # Фильтр архивных проектов
-        if show_archived:
-            query = query.filter(Project.is_archived == True)
-        else:
-            query = query.filter(or_(Project.is_archived == False, Project.is_archived == None))
-
-        # Фильтрация по роли пользователя
-        if current_user["role"] == "executor":
-            # Исполнитель видит только назначенные ему проекты
-            logger.info(f"[API] Фильтрация для исполнителя: assigned_executor_id == {current_user['id']}")
-            query = query.filter(Project.assigned_executor_id == current_user["id"])
-        else:
-            logger.info(f"[API] Роль {current_user['role']} - показываем все проекты")
-        # Владелец видит все проекты (без дополнительных фильтров)
-        
-        # Применяем остальные фильтры
-        if status:
-            query = query.filter(Project.status == status)
-        
-        if search:
-            search_filter = or_(
-                Project.title.ilike(f"%{search}%"),
-                Project.description.ilike(f"%{search}%"),
-                User.first_name.ilike(f"%{search}%"),
-                User.last_name.ilike(f"%{search}%")
+            # Начинаем с базового запроса
+            stmt = select(Project).options(
+                joinedload(Project.user)  # Предзагрузка пользователя
             )
-            query = query.filter(search_filter)
-        
-        # Применяем сортировку
-        if sort_by == "created_desc":
-            query = query.order_by(desc(Project.created_at))
-        elif sort_by == "created_asc":
-            query = query.order_by(asc(Project.created_at))
-        else:
-            query = query.order_by(desc(Project.updated_at))
-        
-        # Подсчитываем общее количество
-        total = query.count()
-        logger.info(f"[API] После фильтрации найдено проектов: {total}")
 
-        # Применяем пагинацию
-        offset = (page - 1) * per_page
-        projects = query.offset(offset).limit(per_page).all()
-        logger.info(f"[API] Возвращаем проектов на странице: {len(projects)}")
-        
-        # Конвертируем в словари с дополнительной информацией
-        projects_data = []
-        for project in projects:
-            project_dict = project.to_dict()
-            
-            # Добавляем информацию о пользователе (клиенте)
-            user = db.query(User).filter(User.id == project.user_id).first()
-            if user:
-                user_dict = user.to_dict()
-
-                # Добавляем Telegram ID из preferences или metadata проекта
-                telegram_id = ""
-                if user.preferences and user.preferences.get('telegram_id'):
-                    telegram_id = user.preferences.get('telegram_id', '')
-                elif project.project_metadata and project.project_metadata.get('user_telegram_id'):
-                    telegram_id = project.project_metadata.get('user_telegram_id', '')
-
-                user_dict["telegram_id"] = telegram_id
-
-                # Для исполнителей скрываем username и контактные данные клиента
-                if current_user["role"] == "executor":
-                    user_dict.pop("username", None)
-                    user_dict.pop("phone", None)
-                    user_dict.pop("email", None)
-                    user_dict.pop("telegram_id", None)
-
-                project_dict["user"] = user_dict
-            
-            # Добавляем информацию об исполнителе
-            if project.assigned_executor_id:
-                executor = db.query(AdminUser).filter(AdminUser.id == project.assigned_executor_id).first()
-                if executor:
-                    executor_data = {
-                        "id": executor.id,
-                        "username": executor.username,
-                        "first_name": executor.first_name,
-                        "last_name": executor.last_name,
-                        "role": executor.role
-                    }
-                    project_dict["assigned_executor"] = executor_data
-                    project_dict["assigned_to"] = executor_data  # Алиас для совместимости с шаблоном
-                else:
-                    project_dict["assigned_executor"] = None
-                    project_dict["assigned_to"] = None
+            # Фильтр архивных проектов
+            if show_archived:
+                stmt = stmt.filter(Project.is_archived == True)
             else:
-                project_dict["assigned_executor"] = None
-                project_dict["assigned_to"] = None
-            
-            # Добавляем читаемые названия статуса и приоритета
-            project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)
-            
-            # Для исполнителей скрываем полную стоимость и показываем только их цену
+                stmt = stmt.filter(or_(Project.is_archived == False, Project.is_archived == None))
+
+            # Фильтрация по роли пользователя
             if current_user["role"] == "executor":
-                executor_price = project.executor_cost or 0
-                project_dict["estimated_cost"] = executor_price
-                project_dict["final_cost"] = executor_price
-                # Скрываем реальные суммы от клиента
-                project_dict["client_paid_total"] = None
-                project_dict["prepayment_amount"] = None
-                project_dict["paid_amount"] = None
-                project_dict.pop("executor_cost", None)  # Убираем дублирование
-            
-            # Добавляем информацию о новых полях из metadata
-            if project.project_metadata:
-                # Информация о боте
-                project_dict["bot_token"] = project.project_metadata.get('bot_token', '')
-                
-                # Информация о Timeweb
-                if 'timeweb_login' in project.project_metadata or 'timeweb_credentials' in project.project_metadata:
-                    # Новый формат
-                    if 'timeweb_login' in project.project_metadata:
-                        project_dict["timeweb"] = {
-                            "login": project.project_metadata.get('timeweb_login', ''),
-                            "has_credentials": bool(project.project_metadata.get('timeweb_login', '')),
-                            "created_at": project.project_metadata.get('created_at', '')
+                # Исполнитель видит только назначенные ему проекты
+                logger.info(f"[API] Фильтрация для исполнителя: assigned_executor_id == {current_user['id']}")
+                stmt = stmt.filter(Project.assigned_executor_id == current_user["id"])
+            else:
+                logger.info(f"[API] Роль {current_user['role']} - показываем все проекты")
+            # Владелец видит все проекты (без дополнительных фильтров)
+
+            # Применяем остальные фильтры
+            if status:
+                stmt = stmt.filter(Project.status == status)
+
+            if priority:
+                stmt = stmt.filter(Project.priority == priority)
+
+            if search:
+                # Добавляем join для поиска по имени пользователя
+                stmt = stmt.join(User, Project.user_id == User.id, isouter=True)
+                search_filter = or_(
+                    Project.title.ilike(f"%{search}%"),
+                    Project.description.ilike(f"%{search}%"),
+                    User.first_name.ilike(f"%{search}%"),
+                    User.last_name.ilike(f"%{search}%")
+                )
+                stmt = stmt.filter(search_filter)
+
+            # Применяем сортировку
+            if sort_by == "created_desc":
+                stmt = stmt.order_by(desc(Project.created_at))
+            elif sort_by == "created_asc":
+                stmt = stmt.order_by(asc(Project.created_at))
+            else:
+                stmt = stmt.order_by(desc(Project.updated_at))
+
+            # Подсчитываем общее количество
+            count_stmt = select(func.count()).select_from(stmt.subquery())
+            total_result = await db.execute(count_stmt)
+            total = total_result.scalar()
+            logger.info(f"[API] После фильтрации найдено проектов: {total}")
+
+            # Применяем пагинацию
+            offset = (page - 1) * per_page
+            stmt = stmt.offset(offset).limit(per_page)
+
+            # Выполняем запрос
+            result = await db.execute(stmt)
+            projects = result.scalars().all()
+            logger.info(f"[API] Возвращаем проектов на странице: {len(projects)}")
+
+            # Конвертируем в словари с дополнительной информацией
+            projects_data = []
+            for project in projects:
+                project_dict = project.to_dict()
+
+                # Информация о пользователе уже загружена через joinedload
+                if project.user:
+                    user_dict = project.user.to_dict()
+
+                    # Добавляем Telegram ID из preferences или metadata проекта
+                    telegram_id = ""
+                    if project.user.preferences and project.user.preferences.get('telegram_id'):
+                        telegram_id = project.user.preferences.get('telegram_id', '')
+                    elif project.project_metadata and project.project_metadata.get('user_telegram_id'):
+                        telegram_id = project.project_metadata.get('user_telegram_id', '')
+
+                    user_dict["telegram_id"] = telegram_id
+
+                    # Для исполнителей скрываем username и контактные данные клиента
+                    if current_user["role"] == "executor":
+                        user_dict.pop("username", None)
+                        user_dict.pop("phone", None)
+                        user_dict.pop("email", None)
+                        user_dict.pop("telegram_id", None)
+
+                    project_dict["user"] = user_dict
+
+                # Добавляем информацию об исполнителе
+                if project.assigned_executor_id:
+                    executor_stmt = select(AdminUser).filter(AdminUser.id == project.assigned_executor_id)
+                    executor_result = await db.execute(executor_stmt)
+                    executor = executor_result.scalar_one_or_none()
+
+                    if executor:
+                        executor_data = {
+                            "id": executor.id,
+                            "username": executor.username,
+                            "first_name": executor.first_name,
+                            "last_name": executor.last_name,
+                            "role": executor.role
                         }
-                    # Старый формат для совместимости
-                    elif 'timeweb_credentials' in project.project_metadata:
-                        timeweb_data = project.project_metadata['timeweb_credentials']
+                        project_dict["executor"] = executor_data
+                        project_dict["assigned_executor"] = executor_data
+                        project_dict["assigned_to"] = executor_data  # Алиас для совместимости с шаблоном
+
+                # Добавляем информацию о менеджере
+                if project.responsible_manager_id:
+                    manager_stmt = select(AdminUser).filter(AdminUser.id == project.responsible_manager_id)
+                    manager_result = await db.execute(manager_stmt)
+                    manager = manager_result.scalar_one_or_none()
+
+                    if manager:
+                        manager_data = {
+                            "id": manager.id,
+                            "username": manager.username,
+                            "first_name": manager.first_name,
+                            "last_name": manager.last_name
+                        }
+                        project_dict["responsible_manager"] = manager_data
+
+                # Добавляем количество файлов
+                files_stmt = select(func.count()).select_from(ProjectFile).filter(ProjectFile.project_id == project.id)
+                files_result = await db.execute(files_stmt)
+                project_dict["files_count"] = files_result.scalar()
+
+                # Добавляем количество ревизий
+                revisions_stmt = select(func.count()).select_from(ProjectRevision).filter(ProjectRevision.project_id == project.id)
+                revisions_result = await db.execute(revisions_stmt)
+                project_dict["revisions_count"] = revisions_result.scalar()
+
+                # Добавляем читаемые названия статуса и приоритета
+                project_dict["status_name"] = PROJECT_STATUSES.get(project.status, project.status)
+
+                # Для исполнителей скрываем полную стоимость и показываем только их цену
+                if current_user["role"] == "executor":
+                    executor_price = project.executor_cost or 0
+                    project_dict["estimated_cost"] = executor_price
+                    project_dict["final_cost"] = executor_price
+                    # Скрываем реальные суммы от клиента
+                    project_dict["client_paid_total"] = None
+                    project_dict["prepayment_amount"] = None
+                    project_dict["paid_amount"] = None
+                    project_dict.pop("executor_cost", None)  # Убираем дублирование
+
+                # Добавляем информацию о новых полях из metadata
+                if project.project_metadata:
+                    # Информация о боте
+                    project_dict["bot_token"] = project.project_metadata.get('bot_token', '')
+
+                    # Информация о Timeweb
+                    if 'timeweb_login' in project.project_metadata or 'timeweb_credentials' in project.project_metadata:
+                        # Новый формат
+                        if 'timeweb_login' in project.project_metadata:
+                            project_dict["timeweb"] = {
+                                "login": project.project_metadata.get('timeweb_login', ''),
+                                "has_credentials": bool(project.project_metadata.get('timeweb_login', '')),
+                                "created_at": project.project_metadata.get('created_at', '')
+                            }
+                        # Старый формат для совместимости
+                        elif 'timeweb_credentials' in project.project_metadata:
+                            timeweb_data = project.project_metadata['timeweb_credentials']
+                            project_dict["timeweb"] = {
+                                "login": timeweb_data.get('login', ''),
+                                "has_credentials": True,
+                                "created_at": timeweb_data.get('created_at', '')
+                            }
+                    else:
                         project_dict["timeweb"] = {
-                            "login": timeweb_data.get('login', ''),
-                            "has_credentials": True,
-                            "created_at": timeweb_data.get('created_at', '')
+                            "has_credentials": False
                         }
                 else:
+                    project_dict["bot_token"] = ''
                     project_dict["timeweb"] = {
                         "has_credentials": False
                     }
-            else:
-                project_dict["bot_token"] = ''
-                project_dict["timeweb"] = {
-                    "has_credentials": False
-                }
-            
-            projects_data.append(project_dict)
-        
-        response_data = {
-            "success": True,
-            "projects": projects_data,
-            "pagination": {
-                "page": page,
-                "per_page": per_page,
-                "total": total,
-                "pages": (total + per_page - 1) // per_page
-            },
-            "user_role": current_user["role"]
-        }
 
-        return response_data
-        
+                projects_data.append(project_dict)
+
+            response_data = {
+                "success": True,
+                "projects": projects_data,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": total,
+                    "pages": (total + per_page - 1) // per_page
+                },
+                "user_role": current_user["role"]
+            }
+
+            return response_data
+
     except Exception as e:
         logger.error(f"Ошибка получения проектов: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return {
             "success": False,
             "message": f"Ошибка получения проектов: {str(e)}",

@@ -3,17 +3,37 @@ API для управления транскрибациями
 Привязка к Lead/Deal/Project
 """
 
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request, Depends
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 import sqlite3
 import os
+from pathlib import Path
+from ..middleware.auth import get_current_admin_user
 
 router = APIRouter()
+
+# Настройка шаблонов
+templates_path = Path(__file__).parent.parent / "templates"
+templates = Jinja2Templates(directory=str(templates_path))
 
 # Путь к БД
 DB_PATH = os.getenv('DATABASE_PATH', '/app/data/bot.db')
 if not os.path.exists(DB_PATH):
     DB_PATH = 'data/bot.db'
+
+
+@router.get("/transcriptions", response_class=HTMLResponse)
+async def transcriptions_page(
+    request: Request,
+    user=Depends(get_current_admin_user)
+):
+    """Страница транскрибации"""
+    return templates.TemplateResponse("transcription.html", {
+        "request": request,
+        "user": user,
+        "username": user.get("username", "Admin")
+    })
 
 
 @router.get("/api/transcriptions")
