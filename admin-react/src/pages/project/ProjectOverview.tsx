@@ -4,8 +4,11 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useOutletContext } from 'react-router-dom'
-import { Users, Calendar, TrendingUp, Clock, User, Activity as ActivityIcon, Mail, Phone, DollarSign } from 'lucide-react'
+import { useOutletContext, useNavigate } from 'react-router-dom'
+import {
+  Users, Calendar, TrendingUp, Clock, User, Activity as ActivityIcon,
+  Mail, Phone, DollarSign, CheckSquare, MessageSquare, AlertCircle
+} from 'lucide-react'
 import axiosInstance from '../../services/api'
 
 interface Project {
@@ -47,6 +50,23 @@ interface OutletContext {
   project: Project
 }
 
+interface Task {
+  id: number
+  title: string
+  status: string
+  priority: string
+  deadline?: string
+  comments_count?: number
+}
+
+interface Payment {
+  id: number
+  type: string
+  amount: number
+  status: string
+  due_date?: string
+}
+
 interface Activity {
   id: number
   action: string
@@ -57,8 +77,13 @@ interface Activity {
 
 export const ProjectOverview = () => {
   const { project } = useOutletContext<OutletContext>()
+  const navigate = useNavigate()
   const [activities, setActivities] = useState<Activity[]>([])
   const [loadingActivity, setLoadingActivity] = useState(false)
+  const [recentTasks, setRecentTasks] = useState<Task[]>([])
+  const [loadingTasks, setLoadingTasks] = useState(false)
+  const [recentPayments, setRecentPayments] = useState<Payment[]>([])
+  const [loadingPayments, setLoadingPayments] = useState(false)
 
   // Загрузка активности проекта
   useEffect(() => {
@@ -89,6 +114,51 @@ export const ProjectOverview = () => {
     loadActivity()
   }, [project.id])
 
+  // Загрузка последних задач
+  useEffect(() => {
+    const loadRecentTasks = async () => {
+      try {
+        setLoadingTasks(true)
+        const response = await axiosInstance.get(`/admin/api/projects/${project.id}/tasks`)
+        if (response.data.success) {
+          const tasks = response.data.tasks || []
+          // Показываем только последние 5 задач в работе или новые
+          const activeTasks = tasks
+            .filter((t: Task) => t.status === 'in_progress' || t.status === 'pending' || t.status === 'new')
+            .slice(0, 5)
+          setRecentTasks(activeTasks)
+        }
+      } catch (error) {
+        console.error('Error loading tasks:', error)
+      } finally {
+        setLoadingTasks(false)
+      }
+    }
+
+    loadRecentTasks()
+  }, [project.id])
+
+  // Загрузка последних платежей
+  useEffect(() => {
+    const loadRecentPayments = async () => {
+      try {
+        setLoadingPayments(true)
+        const response = await axiosInstance.get(`/admin/api/projects/${project.id}/payments`)
+        if (response.data.success) {
+          const payments = response.data.payments || []
+          // Показываем последние 3 платежа
+          setRecentPayments(payments.slice(0, 3))
+        }
+      } catch (error) {
+        console.error('Error loading payments:', error)
+      } finally {
+        setLoadingPayments(false)
+      }
+    }
+
+    loadRecentPayments()
+  }, [project.id])
+
   // Форматирование даты для активности
   const formatActivityDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -100,6 +170,27 @@ export const ProjectOverview = () => {
     if (days === 1) return 'Вчера'
     if (days < 7) return `${days} дней назад`
     return date.toLocaleDateString('ru-RU')
+  }
+
+  // Статусы задач
+  const taskStatuses: Record<string, { label: string; color: string }> = {
+    pending: { label: 'Ожидает', color: 'gray' },
+    new: { label: 'Новая', color: 'blue' },
+    in_progress: { label: 'В работе', color: 'yellow' },
+    review: { label: 'На проверке', color: 'purple' },
+    completed: { label: 'Завершена', color: 'green' },
+  }
+
+  const getTaskStatus = (status: string) => {
+    return taskStatuses[status] || taskStatuses.pending
+  }
+
+  // Типы платежей
+  const paymentTypes: Record<string, string> = {
+    PREPAYMENT: 'Предоплата',
+    MILESTONE: 'Этап',
+    FINAL: 'Финальный',
+    ADDITIONAL: 'Дополнительный',
   }
 
   return (
@@ -213,7 +304,7 @@ export const ProjectOverview = () => {
         </div>
       )}
 
-      {/* Команда и Активность */}
+      {/* Команда, Последние задачи и Платежи */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Команда проекта */}
         <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
@@ -272,6 +363,125 @@ export const ProjectOverview = () => {
               </p>
             )}
           </div>
+        </div>
+
+        {/* Последние задачи */}
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Задачи в работе</h3>
+            </div>
+            <button
+              onClick={() => navigate(`/projects/${project.id}/tasks`)}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Все задачи →
+            </button>
+          </div>
+
+          {loadingTasks ? (
+            <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">Загрузка...</p>
+          ) : recentTasks.length > 0 ? (
+            <div className="space-y-2">
+              {recentTasks.map((task) => {
+                const statusInfo = getTaskStatus(task.status)
+                return (
+                  <div
+                    key={task.id}
+                    onClick={() => navigate(`/projects/${project.id}/tasks`)}
+                    className="flex items-start gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {task.title}
+                        </p>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          statusInfo.color === 'yellow' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                          statusInfo.color === 'blue' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                        }`}>
+                          {statusInfo.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400">
+                        {task.deadline && (
+                          <span>{new Date(task.deadline).toLocaleDateString('ru-RU')}</span>
+                        )}
+                        {task.comments_count !== undefined && task.comments_count > 0 && (
+                          <div className="flex items-center gap-1">
+                            <MessageSquare className="w-3 h-3" />
+                            <span>{task.comments_count}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+              Нет активных задач
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Последние платежи и Активность */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Последние платежи */}
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Последние платежи</h3>
+            </div>
+            <button
+              onClick={() => navigate(`/projects/${project.id}/finance`)}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Все платежи →
+            </button>
+          </div>
+
+          {loadingPayments ? (
+            <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">Загрузка...</p>
+          ) : recentPayments.length > 0 ? (
+            <div className="space-y-2">
+              {recentPayments.map((payment) => (
+                <div
+                  key={payment.id}
+                  onClick={() => navigate(`/projects/${project.id}/finance`)}
+                  className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-emerald-300 dark:hover:border-emerald-600 cursor-pointer transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                      {paymentTypes[payment.type] || payment.type}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {payment.due_date && new Date(payment.due_date).toLocaleDateString('ru-RU')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">
+                      {payment.amount.toLocaleString('ru-RU')} ₽
+                    </p>
+                    <span className={`text-xs ${
+                      payment.status === 'PAID' ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
+                    }`}>
+                      {payment.status === 'PAID' ? 'Оплачен' : 'Ожидает'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 dark:text-gray-400 text-sm text-center py-4">
+              Нет платежей
+            </p>
+          )}
         </div>
 
         {/* Последняя активность */}
