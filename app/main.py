@@ -244,6 +244,7 @@ from app.api.transcription import router as transcription_router
 # Register module routers to API v1
 api_v1_router.include_router(auth_router)
 api_v1_router.include_router(users_router)
+api_v1_router.include_router(transcription_router)
 
 # Register logistics routers (temporarily commented out)
 # api_v1_router.include_router(vehicles_router)
@@ -343,9 +344,6 @@ async def get_api_version_info(version: str):
 # Register API routers
 app.include_router(api_v1_router)
 
-# Also mount transcription router at /admin/v1 for admin panel compatibility
-app.include_router(transcription_router, prefix="/admin/v1", tags=["Transcription Admin"])
-
 logger.info("api_routes_registered", message="Users module routes registered")
 
 
@@ -357,6 +355,10 @@ logger.info("api_routes_registered", message="Users module routes registered")
 try:
     from app.admin.app import admin_router, ui_permissions_router, catch_all_router
     from app.api.miniapp import router as miniapp_router
+
+    # Mount React admin assets BEFORE admin router
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/admin/assets", StaticFiles(directory="app/admin/static/assets"), name="admin-react-assets")
 
     # Mount legacy routes (WITHOUT catch-all router)
     app.include_router(admin_router, prefix="/admin", tags=["Admin Panel"])

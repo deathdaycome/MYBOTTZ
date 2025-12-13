@@ -19,6 +19,10 @@ export default defineConfig({
   server: {
     proxy: {
       // Проксируем все API запросы на backend в режиме разработки
+      '/admin/hosting': {
+        target: 'http://localhost:8001',
+        changeOrigin: true,
+      },
       '/admin/api': {
         target: 'http://localhost:8001',
         changeOrigin: true,

@@ -5,8 +5,8 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, and_, or_, select
 from typing import Optional, List
 from datetime import datetime, timedelta
 from pydantic import BaseModel
@@ -58,7 +58,7 @@ class PaymentCreate(BaseModel):
 @router.get("/", response_class=HTMLResponse)
 async def hosting_page(
     request: Request,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Страница управления хостингом"""
@@ -79,7 +79,7 @@ async def hosting_page(
 
 @router.get("/api/stats")
 async def get_hosting_stats(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить статистику по хостингу"""
@@ -87,17 +87,21 @@ async def get_hosting_stats(
         now = datetime.utcnow()
 
         # Общее количество активных серверов
-        active_servers = db.query(HostingServer).filter(
-            HostingServer.status == "active"
-        ).count()
+        result = await db.execute(
+            select(func.count()).select_from(HostingServer).where(
+                HostingServer.status == "active"
+            )
+        )
+        active_servers = result.scalar()
 
         # Прибыль за текущий месяц
         current_month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Получаем все активные серверы для расчета прибыли
-        servers = db.query(HostingServer).filter(
-            HostingServer.status == "active"
-        ).all()
+        result = await db.execute(
+            select(HostingServer).where(HostingServer.status == "active")
+        )
+        servers = result.scalars().all()
 
         total_profit_month = sum([
             (s.client_price + (s.service_fee or 0) - s.cost_price)
@@ -105,29 +109,39 @@ async def get_hosting_stats(
         ])
 
         # Прибыль за всё время (из платежей)
-        all_payments = db.query(HostingPayment).filter(
-            HostingPayment.status == "paid"
-        ).all()
+        result = await db.execute(
+            select(HostingPayment).where(HostingPayment.status == "paid")
+        )
+        all_payments = result.scalars().all()
 
         total_profit_all_time = 0
         for payment in all_payments:
-            server = db.query(HostingServer).filter(HostingServer.id == payment.server_id).first()
+            result = await db.execute(
+                select(HostingServer).where(HostingServer.id == payment.server_id)
+            )
+            server = result.scalar_one_or_none()
             if server:
                 # Прибыль = платеж - себестоимость
                 profit = payment.amount - server.cost_price
                 total_profit_all_time += profit
 
         # Просрочки
-        overdue_count = db.query(HostingServer).filter(
-            HostingServer.next_payment_date < now,
-            HostingServer.status.in_(["active", "overdue"])
-        ).count()
+        result = await db.execute(
+            select(func.count()).select_from(HostingServer).where(
+                HostingServer.next_payment_date < now,
+                HostingServer.status.in_(["active", "overdue"])
+            )
+        )
+        overdue_count = result.scalar()
 
         overdue_sum = 0
-        overdue_servers = db.query(HostingServer).filter(
-            HostingServer.next_payment_date < now,
-            HostingServer.status.in_(["active", "overdue"])
-        ).all()
+        result = await db.execute(
+            select(HostingServer).where(
+                HostingServer.next_payment_date < now,
+                HostingServer.status.in_(["active", "overdue"])
+            )
+        )
+        overdue_servers = result.scalars().all()
 
         for server in overdue_servers:
             overdue_sum += server.client_price + (server.service_fee or 0)
@@ -151,22 +165,24 @@ async def get_hosting_stats(
 async def get_servers(
     status: Optional[str] = None,
     project_id: Optional[int] = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить список серверов"""
     try:
-        query = db.query(HostingServer)
+        query = select(HostingServer)
 
         # Фильтр по статусу
         if status:
-            query = query.filter(HostingServer.status == status)
+            query = query.where(HostingServer.status == status)
 
         # Фильтр по проекту
         if project_id:
-            query = query.filter(HostingServer.project_id == project_id)
+            query = query.where(HostingServer.project_id == project_id)
 
-        servers = query.order_by(HostingServer.next_payment_date.asc()).all()
+        query = query.order_by(HostingServer.next_payment_date.asc())
+        result = await db.execute(query)
+        servers = result.scalars().all()
 
         return {
             "success": True,
@@ -181,19 +197,25 @@ async def get_servers(
 @router.get("/api/server/{server_id}")
 async def get_server(
     server_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить информацию о сервере"""
-    server = db.query(HostingServer).filter(HostingServer.id == server_id).first()
+    result = await db.execute(
+        select(HostingServer).where(HostingServer.id == server_id)
+    )
+    server = result.scalar_one_or_none()
 
     if not server:
         raise HTTPException(status_code=404, detail="Сервер не найден")
 
     # Получаем платежи
-    payments = db.query(HostingPayment).filter(
-        HostingPayment.server_id == server_id
-    ).order_by(HostingPayment.expected_date.desc()).all()
+    result = await db.execute(
+        select(HostingPayment).where(
+            HostingPayment.server_id == server_id
+        ).order_by(HostingPayment.expected_date.desc())
+    )
+    payments = result.scalars().all()
 
     return {
         "success": True,
@@ -205,7 +227,7 @@ async def get_server(
 @router.post("/api/server")
 async def create_server(
     data: ServerCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Создать новый сервер"""
@@ -238,8 +260,8 @@ async def create_server(
         )
 
         db.add(server)
-        db.commit()
-        db.refresh(server)
+        await db.commit()
+        await db.refresh(server)
 
         # Создаем первый платеж (ожидается)
         payment = HostingPayment(
@@ -251,7 +273,7 @@ async def create_server(
             status="pending"
         )
         db.add(payment)
-        db.commit()
+        await db.commit()
 
         # Обновляем затраты клиента если указан client_id
         if server.client_id:
@@ -265,7 +287,7 @@ async def create_server(
         }
 
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка создания сервера: {str(e)}")
 
 
@@ -273,11 +295,14 @@ async def create_server(
 async def update_server(
     server_id: int,
     data: ServerCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Обновить информацию о сервере"""
-    server = db.query(HostingServer).filter(HostingServer.id == server_id).first()
+    result = await db.execute(
+        select(HostingServer).where(HostingServer.id == server_id)
+    )
+    server = result.scalar_one_or_none()
 
     if not server:
         raise HTTPException(status_code=404, detail="Сервер не найден")
@@ -310,8 +335,8 @@ async def update_server(
         server.notes = data.notes
         server.updated_at = datetime.utcnow()
 
-        db.commit()
-        db.refresh(server)
+        await db.commit()
+        await db.refresh(server)
 
         # Обновляем затраты клиента если указан client_id
         if server.client_id:
@@ -325,25 +350,28 @@ async def update_server(
         }
 
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка обновления сервера: {str(e)}")
 
 
 @router.delete("/api/server/{server_id}")
 async def delete_server(
     server_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Удалить сервер"""
-    server = db.query(HostingServer).filter(HostingServer.id == server_id).first()
+    result = await db.execute(
+        select(HostingServer).where(HostingServer.id == server_id)
+    )
+    server = result.scalar_one_or_none()
 
     if not server:
         raise HTTPException(status_code=404, detail="Сервер не найден")
 
     try:
-        db.delete(server)
-        db.commit()
+        await db.delete(server)
+        await db.commit()
 
         return {
             "success": True,
@@ -351,14 +379,14 @@ async def delete_server(
         }
 
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка удаления сервера: {str(e)}")
 
 
 @router.post("/api/payment")
 async def create_payment(
     data: PaymentCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Зарегистрировать платеж"""
@@ -379,7 +407,10 @@ async def create_payment(
 
         # Обновляем дату следующего платежа у сервера
         if data.status == "paid":
-            server = db.query(HostingServer).filter(HostingServer.id == data.server_id).first()
+            result = await db.execute(
+                select(HostingServer).where(HostingServer.id == data.server_id)
+            )
+            server = result.scalar_one_or_none()
             if server:
                 # Рассчитываем следующий платеж в зависимости от периодичности
                 if server.payment_period == "monthly":
@@ -394,8 +425,8 @@ async def create_payment(
                 server.next_payment_date = next_date
                 server.status = "active"
 
-        db.commit()
-        db.refresh(payment)
+        await db.commit()
+        await db.refresh(payment)
 
         return {
             "success": True,
@@ -404,7 +435,7 @@ async def create_payment(
         }
 
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         raise HTTPException(status_code=500, detail=f"Ошибка регистрации платежа: {str(e)}")
 
 
@@ -412,7 +443,7 @@ async def create_payment(
 async def get_payment_calendar(
     month: Optional[int] = None,
     year: Optional[int] = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить данные для календаря платежей"""
@@ -429,17 +460,23 @@ async def get_payment_calendar(
             month_end = datetime(target_year, target_month + 1, 1)
 
         # Получаем платежи за месяц
-        payments = db.query(HostingPayment).filter(
-            and_(
-                HostingPayment.expected_date >= month_start,
-                HostingPayment.expected_date < month_end
+        result = await db.execute(
+            select(HostingPayment).where(
+                and_(
+                    HostingPayment.expected_date >= month_start,
+                    HostingPayment.expected_date < month_end
+                )
             )
-        ).all()
+        )
+        payments = result.scalars().all()
 
         # Получаем информацию о серверах
         calendar_data = []
         for payment in payments:
-            server = db.query(HostingServer).filter(HostingServer.id == payment.server_id).first()
+            result = await db.execute(
+                select(HostingServer).where(HostingServer.id == payment.server_id)
+            )
+            server = result.scalar_one_or_none()
             if server:
                 # Определяем цвет
                 if payment.status == "paid":
@@ -475,17 +512,20 @@ async def get_payment_calendar(
 @router.get("/api/clients/search")
 async def search_clients(
     q: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Поиск клиентов для автодополнения"""
     try:
-        clients = db.query(Client).filter(
-            or_(
-                Client.name.ilike(f"%{q}%"),
-                Client.company.ilike(f"%{q}%")
-            )
-        ).limit(10).all()
+        result = await db.execute(
+            select(Client).where(
+                or_(
+                    Client.name.ilike(f"%{q}%"),
+                    Client.company.ilike(f"%{q}%")
+                )
+            ).limit(10)
+        )
+        clients = result.scalars().all()
 
         return {
             "success": True,
@@ -503,14 +543,17 @@ async def search_clients(
 
 @router.get("/api/projects")
 async def get_active_projects(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить список активных проектов для выбора"""
     try:
-        projects = db.query(Project).filter(
-            Project.status.in_(["in_progress", "new", "review", "accepted", "testing"])
-        ).order_by(Project.created_at.desc()).all()
+        result = await db.execute(
+            select(Project).where(
+                Project.status.in_(["in_progress", "new", "review", "accepted", "testing"])
+            ).order_by(Project.created_at.desc())
+        )
+        projects = result.scalars().all()
 
         return {
             "success": True,
@@ -530,18 +573,24 @@ async def get_active_projects(
 @router.get("/api/project/{project_id}")
 async def get_project_data(
     project_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить данные проекта для автозаполнения формы сервера"""
     try:
-        project = db.query(Project).filter(Project.id == project_id).first()
+        result = await db.execute(
+            select(Project).where(Project.id == project_id)
+        )
+        project = result.scalar_one_or_none()
 
         if not project:
             raise HTTPException(status_code=404, detail="Проект не найден")
 
         # Получаем данные клиента (пользователя) из проекта
-        user = db.query(User).filter(User.id == project.user_id).first()
+        result = await db.execute(
+            select(User).where(User.id == project.user_id)
+        )
+        user = result.scalar_one_or_none()
 
         if not user:
             return {
@@ -595,7 +644,7 @@ async def get_timeweb_status(
 
 @router.get("/api/timeweb/servers")
 async def get_timeweb_servers(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить список серверов из Timeweb Cloud"""
@@ -613,9 +662,10 @@ async def get_timeweb_servers(
         timeweb_servers = await timeweb_service.get_servers()
 
         # Получаем существующие серверы в CRM
-        existing_servers = db.query(HostingServer).filter(
-            HostingServer.timeweb_id.isnot(None)
-        ).all()
+        result = await db.execute(
+            select(HostingServer).where(HostingServer.timeweb_id.isnot(None))
+        )
+        existing_servers = result.scalars().all()
 
         existing_ids = {server.timeweb_id for server in existing_servers}
 
@@ -657,7 +707,7 @@ async def get_timeweb_servers(
 @router.post("/api/timeweb/import")
 async def import_timeweb_servers(
     server_ids: List[int],
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """
@@ -684,9 +734,10 @@ async def import_timeweb_servers(
         for server_id in server_ids:
             try:
                 # Проверяем, не импортирован ли уже
-                existing = db.query(HostingServer).filter(
-                    HostingServer.timeweb_id == server_id
-                ).first()
+                result = await db.execute(
+                    select(HostingServer).where(HostingServer.timeweb_id == server_id)
+                )
+                existing = result.scalar_one_or_none()
 
                 if existing:
                     errors.append({
@@ -771,7 +822,7 @@ async def import_timeweb_servers(
 @router.post("/api/server/{server_id}/sync")
 async def sync_server_with_timeweb(
     server_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Синхронизировать сервер с Timeweb Cloud (обновить данные)"""
@@ -779,7 +830,10 @@ async def sync_server_with_timeweb(
         from ...services.timeweb_service import timeweb_service
         import json
 
-        server = db.query(HostingServer).filter(HostingServer.id == server_id).first()
+        result = await db.execute(
+            select(HostingServer).where(HostingServer.id == server_id)
+        )
+        server = result.scalar_one_or_none()
 
         if not server:
             raise HTTPException(status_code=404, detail="Сервер не найден")
@@ -836,7 +890,7 @@ async def sync_server_with_timeweb(
 
 @router.post("/api/timeweb/sync-all")
 async def sync_all_timeweb_servers(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """
@@ -883,9 +937,10 @@ async def sync_all_timeweb_servers(
                     continue
 
                 # Проверяем, существует ли сервер в CRM
-                existing = db.query(HostingServer).filter(
-                    HostingServer.timeweb_id == server_id
-                ).first()
+                result = await db.execute(
+                    select(HostingServer).where(HostingServer.timeweb_id == server_id)
+                )
+                existing = result.scalar_one_or_none()
 
                 # Парсим данные из Timeweb
                 configuration = timeweb_service.parse_server_configuration(tw_server)
@@ -1003,7 +1058,7 @@ async def sync_all_timeweb_servers(
 @router.get("/api/balance/low")
 async def get_low_balance_clients(
     days_threshold: int = 5,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить клиентов с низким балансом"""
@@ -1025,7 +1080,7 @@ async def get_low_balance_clients(
 
 @router.get("/api/balance/summary")
 async def get_balance_summary(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить общую статистику по балансам"""
@@ -1046,7 +1101,7 @@ async def get_balance_summary(
 @router.get("/api/balance/{client_id}")
 async def get_client_balance(
     client_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить баланс клиента"""
@@ -1054,9 +1109,12 @@ async def get_client_balance(
         from ...services.balance_service import balance_service
 
         # Получаем имя клиента из серверов
-        server = db.query(HostingServer).filter(
-            HostingServer.client_id == client_id
-        ).first()
+        result = await db.execute(
+            select(HostingServer).where(
+                HostingServer.client_id == client_id
+            )
+        )
+        server = result.scalar_one_or_none()
 
         if not server:
             raise HTTPException(status_code=404, detail="Клиент не найден")
@@ -1082,7 +1140,7 @@ async def add_client_balance(
     client_id: int,
     amount: float,
     description: str = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """
@@ -1101,9 +1159,10 @@ async def add_client_balance(
             raise HTTPException(status_code=400, detail="Сумма должна быть положительной")
 
         # Получаем данные клиента
-        server = db.query(HostingServer).filter(
-            HostingServer.client_id == client_id
-        ).first()
+        result = await db.execute(
+            select(HostingServer).where(HostingServer.client_id == client_id)
+        )
+        server = result.scalar_one_or_none()
 
         if not server:
             raise HTTPException(status_code=404, detail="Клиент не найден")
@@ -1142,7 +1201,7 @@ async def add_client_balance(
 async def get_client_transactions(
     client_id: int,
     limit: int = 50,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: AdminUser = Depends(get_current_admin_user),
 ):
     """Получить историю транзакций клиента"""

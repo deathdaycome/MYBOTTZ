@@ -125,6 +125,7 @@ class Project(Base):
     responsible_manager = relationship("AdminUser", foreign_keys=[responsible_manager_id])
     status_logs = relationship("ProjectStatusLog", back_populates="project")
     revisions = relationship("ProjectRevision", back_populates="project")
+    tasks = relationship("Task", back_populates="project")
     
     def to_dict(self):
         return {
@@ -158,8 +159,7 @@ class Project(Base):
             "structured_tz": self.structured_tz,
             "project_metadata": self.project_metadata,
             "assigned_executor_id": self.assigned_executor_id,
-            "assigned_at": self.assigned_at.isoformat() if self.assigned_at else None,
-            "assigned_executor": self.assigned_executor.to_dict() if self.assigned_executor else None
+            "assigned_at": self.assigned_at.isoformat() if self.assigned_at else None
         }
 
 class Message(Base):
@@ -1292,7 +1292,8 @@ class Task(Base):
     # Назначение и создание
     assigned_to_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)  # Исполнитель
     created_by_id = Column(Integer, ForeignKey("admin_users.id"), nullable=False)  # Кто создал
-    
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)  # Связь с проектом (опционально)
+
     # Временные рамки
     deadline = Column(DateTime, nullable=True)  # Дедлайн
     estimated_hours = Column(Integer, nullable=True)  # Оценочное время в часах
@@ -1317,6 +1318,7 @@ class Task(Base):
     # Связи
     assigned_to = relationship("AdminUser", foreign_keys=[assigned_to_id], back_populates="assigned_tasks")
     created_by = relationship("AdminUser", foreign_keys=[created_by_id], back_populates="created_tasks")
+    project = relationship("Project", back_populates="tasks")
     comments = relationship("TaskComment", back_populates="task")
     
     def to_dict(self):
@@ -1330,6 +1332,7 @@ class Task(Base):
             "tags": self.tags or [],
             "assigned_to_id": self.assigned_to_id,
             "created_by_id": self.created_by_id,
+            "project_id": self.project_id,
             "deadline": self.deadline.isoformat() if self.deadline else None,
             "estimated_hours": self.estimated_hours,
             "actual_hours": self.actual_hours,
@@ -1610,6 +1613,10 @@ class HostingServer(Base):
     client_price = Column(Float, nullable=False)  # Цена для клиента (₽/мес)
     service_fee = Column(Float, default=0)  # Стоимость обслуживания (₽/мес)
 
+    # Баланс и предоплата
+    balance = Column(Float, default=0.0)  # Текущий баланс клиента (₽)
+    balance_last_updated = Column(DateTime, nullable=True)  # Дата последнего изменения баланса
+
     # Даты и периодичность
     start_date = Column(DateTime, nullable=False)  # Дата начала аренды
     next_payment_date = Column(DateTime, nullable=False)  # Следующий платеж
@@ -1646,6 +1653,60 @@ class HostingServer(Base):
             "percent": round(profit_percent, 2)
         }
 
+    def calculate_days_remaining(self):
+        """Рассчитать количество дней, на которые хватит баланса"""
+        if not self.balance or self.balance <= 0:
+            return 0
+
+        # Общая стоимость в месяц
+        monthly_cost = self.client_price + (self.service_fee or 0)
+        if monthly_cost <= 0:
+            return 0
+
+        # Стоимость за день (месяц = 30 дней)
+        daily_cost = monthly_cost / 30.0
+
+        # Количество дней, на которые хватит баланса
+        days_remaining = self.balance / daily_cost
+
+        return round(days_remaining, 1)
+
+    def get_payment_calendar(self, months_ahead=6):
+        """Сформировать календарь платежей на N месяцев вперед"""
+        from datetime import timedelta
+
+        calendar = []
+        monthly_cost = self.client_price + (self.service_fee or 0)
+        current_balance = self.balance or 0
+        current_date = datetime.utcnow()
+
+        for month in range(months_ahead):
+            payment_date = current_date + timedelta(days=30 * month)
+
+            # Рассчитываем, хватит ли баланса на этот месяц
+            if current_balance >= monthly_cost:
+                status = "paid"
+                current_balance -= monthly_cost
+            elif current_balance > 0:
+                status = "partial"
+                shortage = monthly_cost - current_balance
+                current_balance = 0
+            else:
+                status = "unpaid"
+                shortage = monthly_cost
+                current_balance = 0
+
+            calendar.append({
+                "month": payment_date.strftime("%B %Y"),
+                "date": payment_date.isoformat(),
+                "amount": monthly_cost,
+                "status": status,
+                "shortage": shortage if status in ["partial", "unpaid"] else 0,
+                "balance_after": current_balance
+            })
+
+        return calendar
+
     def to_dict(self):
         profit = self.calculate_profit()
         return {
@@ -1664,6 +1725,9 @@ class HostingServer(Base):
             "total_price": self.client_price + (self.service_fee or 0),
             "profit_amount": profit["amount"],
             "profit_percent": profit["percent"],
+            "balance": self.balance or 0,
+            "balance_last_updated": self.balance_last_updated.isoformat() if self.balance_last_updated else None,
+            "days_remaining": self.calculate_days_remaining(),
             "start_date": self.start_date.isoformat() if self.start_date else None,
             "next_payment_date": self.next_payment_date.isoformat() if self.next_payment_date else None,
             "payment_period": self.payment_period,

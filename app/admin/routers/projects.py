@@ -140,7 +140,7 @@ async def get_current_user(credentials: HTTPBasicCredentials = Depends(security)
 
     # Если не подошло, проверяем новую систему (исполнители)
     try:
-        with get_db_context() as db:
+        async with get_db_context() as db:
             from ...services.auth_service import AuthService
             from sqlalchemy.orm import selectinload
 
@@ -208,18 +208,18 @@ async def get_projects(
     search: Optional[str] = None,
     sort_by: str = "created_desc",
     show_archived: bool = False,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить список проектов с фильтрами (с учетом ролей доступа)"""
     try:
         logger.info(f"[API] GET /api/projects/ - Пользователь: {current_user['username']}, Роль: {current_user['role']}, ID: {current_user['id']}")
 
-        with get_db_context() as db:
-            from sqlalchemy.orm import joinedload, selectinload
+        async with get_db_context() as db:
+            from sqlalchemy.orm import selectinload
 
             # Начинаем с базового запроса
             stmt = select(Project).options(
-                joinedload(Project.user)  # Предзагрузка пользователя
+                selectinload(Project.user)  # Предзагрузка пользователя
             )
 
             # Фильтр архивных проектов
@@ -265,7 +265,7 @@ async def get_projects(
 
             # Подсчитываем общее количество
             count_stmt = select(func.count()).select_from(stmt.subquery())
-            total_result = db.execute(count_stmt)
+            total_result = await db.execute(count_stmt)
             total = total_result.scalar()
             logger.info(f"[API] После фильтрации найдено проектов: {total}")
 
@@ -274,7 +274,7 @@ async def get_projects(
             stmt = stmt.offset(offset).limit(per_page)
 
             # Выполняем запрос
-            result = db.execute(stmt)
+            result = await db.execute(stmt)
             projects = result.scalars().all()
             logger.info(f"[API] Возвращаем проектов на странице: {len(projects)}")
 
@@ -308,7 +308,7 @@ async def get_projects(
                 # Добавляем информацию об исполнителе
                 if project.assigned_executor_id:
                     executor_stmt = select(AdminUser).filter(AdminUser.id == project.assigned_executor_id)
-                    executor_result = db.execute(executor_stmt)
+                    executor_result = await db.execute(executor_stmt)
                     executor = executor_result.scalar_one_or_none()
 
                     if executor:
@@ -326,7 +326,7 @@ async def get_projects(
                 # Добавляем информацию о менеджере
                 if project.responsible_manager_id:
                     manager_stmt = select(AdminUser).filter(AdminUser.id == project.responsible_manager_id)
-                    manager_result = db.execute(manager_stmt)
+                    manager_result = await db.execute(manager_stmt)
                     manager = manager_result.scalar_one_or_none()
 
                     if manager:
@@ -340,12 +340,12 @@ async def get_projects(
 
                 # Добавляем количество файлов
                 files_stmt = select(func.count()).select_from(ProjectFile).filter(ProjectFile.project_id == project.id)
-                files_result = db.execute(files_stmt)
+                files_result = await db.execute(files_stmt)
                 project_dict["files_count"] = files_result.scalar()
 
                 # Добавляем количество ревизий
                 revisions_stmt = select(func.count()).select_from(ProjectRevision).filter(ProjectRevision.project_id == project.id)
-                revisions_result = db.execute(revisions_stmt)
+                revisions_result = await db.execute(revisions_stmt)
                 project_dict["revisions_count"] = revisions_result.scalar()
 
                 # Добавляем читаемые названия статуса и приоритета
@@ -424,13 +424,13 @@ async def get_projects(
 async def get_projects_stats(
     request: Request,
     show_archived: bool = False,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """Получить KPI статистику по проектам"""
     try:
         logger.info(f"[API] GET /api/projects/statistics - Пользователь: {current_user['username']}, Роль: {current_user['role']}")
 
-        with get_db_context() as db:
+        async with get_db_context() as db:
             # Базовый запрос проектов
             stmt = select(Project)
 
@@ -445,7 +445,7 @@ async def get_projects_stats(
                 stmt = stmt.filter(Project.assigned_executor_id == current_user["id"])
 
             # Получаем все проекты для расчетов
-            result = db.execute(stmt)
+            result = await db.execute(stmt)
             projects = result.scalars().all()
 
         # Расчет статистики
@@ -502,10 +502,20 @@ async def get_projects_stats(
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=f"Ошибка получения статистики: {str(e)}")
 
+# Алиас для совместимости с фронтендом
+@router.get("/stats", response_class=JSONResponse)
+async def get_projects_stats_alias(
+    request: Request,
+    show_archived: bool = False,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Алиас для /statistics - для совместимости с фронтендом"""
+    return await get_projects_stats(request, show_archived, current_user)
+
 @router.get("/{project_id}/tasks", response_class=JSONResponse)
 async def get_project_tasks(
     project_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Получить задачи проекта"""
@@ -532,7 +542,7 @@ async def get_project_tasks(
 @router.get("/{project_id}")
 async def get_project(
     project_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Получить проект по ID (с учетом ролей доступа)"""
@@ -664,7 +674,7 @@ async def get_project(
 async def update_project_status(
     project_id: int,
     request: Request,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Обновить статус проекта (с учетом ролей доступа)"""
@@ -791,7 +801,7 @@ async def get_project_statuses(current_user: dict = Depends(get_current_user)):
 async def update_project(
     project_id: int,
     project_data: ProjectUpdateModel,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Полное редактирование проекта (с учетом ролей доступа)"""
@@ -1251,7 +1261,7 @@ async def create_project(
     status: str = Form("new"),
     assigned_executor_id: Optional[int] = Form(None),
     tz_file: Optional[UploadFile] = File(None),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Создать новый проект вручную через админку с возможностью загрузки файла ТЗ"""
@@ -1493,7 +1503,7 @@ async def create_project(
 @router.get("/{project_id}/tz-file")
 async def download_tz_file(
     project_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Скачать файл ТЗ проекта"""
@@ -1533,7 +1543,7 @@ async def download_tz_file(
 @router.get("/{project_id}/files")
 async def get_project_files(
     project_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Получить файлы проекта"""
@@ -1602,7 +1612,7 @@ async def upload_project_file(
     project_id: int,
     file: UploadFile = File(...),
     description: str = Form(""),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Загрузить файл проекта"""
@@ -1690,7 +1700,7 @@ async def upload_project_file(
 async def delete_project_file(
     project_id: int,
     file_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Удалить файл проекта"""
@@ -1753,7 +1763,7 @@ async def delete_project_file(
 @router.post("/{project_id}/archive")
 async def archive_project(
     project_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Переместить проект в архив (только для владельца)"""
@@ -1815,7 +1825,7 @@ async def archive_project(
 @router.delete("/{project_id}")
 async def delete_project(
     project_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Удалить проект (только для владельца)"""
@@ -2097,7 +2107,7 @@ async def add_project_payment(
 ):
     """Добавить оплату к проекту"""
     try:
-        with get_db_context() as db:
+        async with get_db_context() as db:
             # Проверяем существование проекта
             project = db.query(Project).filter(Project.id == project_id).first()
             if not project:
@@ -2160,7 +2170,7 @@ async def add_executor_payment(
 ):
     """Добавить оплату исполнителю"""
     try:
-        with get_db_context() as db:
+        async with get_db_context() as db:
             # Проверяем существование проекта
             project = db.query(Project).filter(Project.id == project_id).first()
             if not project:
@@ -2227,7 +2237,7 @@ async def assign_executor(
 ):
     """Назначить исполнителя на проект"""
     try:
-        with get_db_context() as db:
+        async with get_db_context() as db:
             # Проверяем существование проекта
             project = db.query(Project).filter(Project.id == project_id).first()
             if not project:
@@ -2257,4 +2267,160 @@ async def assign_executor(
     except Exception as e:
         logger.error(f"Ошибка назначения исполнителя на проект {project_id}: {e}")
         logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ================== ENDPOINTS ДЛЯ ЗАДАЧ ПРОЕКТА ==================
+
+@router.get("/api/projects/{project_id}/tasks", response_class=JSONResponse)
+async def get_project_tasks(
+    project_id: int,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Получить все задачи проекта"""
+    try:
+        with get_db_context() as db:
+            # Проверяем существование проекта
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+
+            # Получаем задачи проекта
+            tasks = db.query(Task).filter(Task.project_id == project_id).all()
+
+            return {
+                "success": True,
+                "tasks": [task.to_dict() for task in tasks]
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка получения задач проекта {project_id}: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class TaskCreateModel(BaseModel):
+    title: str
+    description: Optional[str] = None
+    status: str = "pending"
+    priority: str = "normal"
+    assigned_to_id: int
+    deadline: Optional[datetime] = None
+    estimated_hours: Optional[int] = None
+
+
+@router.post("/api/projects/{project_id}/tasks", response_class=JSONResponse)
+async def create_project_task(
+    project_id: int,
+    task_data: TaskCreateModel,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Создать задачу в проекте"""
+    try:
+        with get_db_context() as db:
+            # Проверяем существование проекта
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+
+            # Проверяем существование исполнителя
+            executor = db.query(AdminUser).filter(AdminUser.id == task_data.assigned_to_id).first()
+            if not executor:
+                raise HTTPException(status_code=404, detail="Исполнитель не найден")
+
+            # Создаем задачу
+            new_task = Task(
+                title=task_data.title,
+                description=task_data.description,
+                status=task_data.status,
+                priority=task_data.priority,
+                assigned_to_id=task_data.assigned_to_id,
+                created_by_id=current_user['id'],
+                project_id=project_id,  # Связываем с проектом
+                deadline=task_data.deadline,
+                estimated_hours=task_data.estimated_hours
+            )
+
+            db.add(new_task)
+            db.commit()
+            db.refresh(new_task)
+
+            logger.info(f"Создана задача {new_task.id} для проекта {project_id}")
+
+            return {
+                "success": True,
+                "message": "Задача успешно создана",
+                "task": new_task.to_dict()
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка создания задачи для проекта {project_id}: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/api/tasks", response_class=JSONResponse)
+async def get_all_tasks(
+    project_id: Optional[int] = None,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Получить все задачи с опциональным фильтром по проекту"""
+    try:
+        with get_db_context() as db:
+            query = db.query(Task)
+            
+            # Фильтр по проекту если указан
+            if project_id is not None:
+                query = query.filter(Task.project_id == project_id)
+            
+            tasks = query.all()
+
+            return {
+                "success": True,
+                "tasks": [task.to_dict() for task in tasks]
+            }
+
+    except Exception as e:
+        logger.error(f"Ошибка получения задач: {e}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=str(e))
+
+# API endpoints для ревизий проекта
+@router.get("/api/projects/{project_id}/revisions", response_class=JSONResponse)
+async def get_project_revisions(
+    project_id: int,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Получить все ревизии проекта"""
+    try:
+        with get_db_context() as db:
+            project = db.query(Project).filter(Project.id == project_id).first()
+            if not project:
+                raise HTTPException(status_code=404, detail="Проект не найден")
+
+            revisions = db.query(ProjectRevision).filter(ProjectRevision.project_id == project_id).all()
+
+            # Добавляем к каждой ревизии информацию для совместимости с фронтендом
+            revisions_data = []
+            for rev in revisions:
+                rev_dict = rev.to_dict()
+                # Добавляем поле type для совместимости с ProjectRevisions.tsx
+                rev_dict['type'] = 'REVISION'
+                # Добавляем поле assigned_to_name если есть исполнитель
+                if rev.assigned_to:
+                    rev_dict['assigned_to_name'] = rev.assigned_to.username
+                revisions_data.append(rev_dict)
+
+            return {
+                "success": True,
+                "revisions": revisions_data
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка получения ревизий проекта {project_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))

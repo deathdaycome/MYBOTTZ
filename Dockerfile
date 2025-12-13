@@ -42,7 +42,7 @@ COPY requirements.txt .
 # Устанавливаем Python зависимости
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt || true && \
-    pip install --no-cache-dir websockets wsproto uvicorn[standard] requests httpx aiohttp fastapi sqlalchemy python-telegram-bot aiogram openai pydantic pydantic-settings python-jose passlib python-multipart bcrypt aiofiles python-dotenv jinja2 PyPDF2 pdfplumber python-docx openpyxl Pillow nest-asyncio redis alembic SpeechRecognition pydub APScheduler python-dateutil pytz xlsxwriter cryptography marshmallow structlog prometheus-client asyncpg psutil email-validator
+    pip install --no-cache-dir websockets wsproto uvicorn[standard] requests httpx aiohttp fastapi sqlalchemy python-telegram-bot aiogram openai pydantic pydantic-settings python-jose passlib python-multipart bcrypt aiofiles python-dotenv jinja2 PyPDF2 pdfplumber python-docx openpyxl Pillow nest-asyncio redis alembic SpeechRecognition pydub APScheduler python-dateutil pytz xlsxwriter cryptography marshmallow structlog prometheus-client asyncpg psutil email-validator aiosqlite faster-whisper
 
 # Копируем код приложения
 COPY app/ ./app/

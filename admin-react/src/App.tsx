@@ -58,6 +58,7 @@ function App() {
               <Route element={<PrivateRoute />}>
                 <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
+            <Route path="dashboard" element={<Dashboard />} />
             <Route path="projects" element={<Projects />} />
 
             {/* Карточка проекта с вкладками */}

@@ -12,13 +12,27 @@ from ..config.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Создание движка базы данных
+# ========== ВАЖНО: СИНХРОННЫЙ ENGINE ДЛЯ АДМИН-ПАНЕЛИ ==========
+# Этот модуль используется ТОЛЬКО для админ-панели и должен использовать СИНХРОННЫЙ драйвер
+# API роутеры используют АСИНХРОННЫЙ engine из app/core/database.py
+# Это позволяет избежать конфликта sync/async кода и ошибки MissingGreenlet
+
+# Конвертируем DATABASE_URL в синхронную версию
+sync_database_url = settings.DATABASE_URL.replace("sqlite+aiosqlite://", "sqlite://")
+sync_database_url = sync_database_url.replace("postgresql+asyncpg://", "postgresql://")
+
+logger.info(f"🔍 ОТЛАДКА: Исходный DATABASE_URL = {settings.DATABASE_URL}")
+logger.info(f"🔍 ОТЛАДКА: Sync DATABASE_URL = {sync_database_url}")
+
+# Создание СИНХРОННОГО движка базы данных для админ-панели
 engine = create_engine(
-    settings.DATABASE_URL,
+    sync_database_url,
     echo=settings.DATABASE_ECHO,
-    connect_args={"check_same_thread": False} if "sqlite" in settings.DATABASE_URL else {},
-    poolclass=StaticPool if "sqlite" in settings.DATABASE_URL else None,
+    connect_args={"check_same_thread": False} if "sqlite" in sync_database_url else {},
+    poolclass=StaticPool if "sqlite" in sync_database_url else None,
 )
+
+logger.info(f"✅ Sync database engine created with dialect: {engine.dialect.name}")
 
 # Создание фабрики сессий
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -1946,3 +1946,54 @@ async def get_archived_tasks(
         import traceback
         logger.error(traceback.format_exc())
         return {"success": False, "error": str(e)}
+
+# API endpoint для обновления задачи
+from pydantic import BaseModel
+
+class TaskUpdateModel(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    deadline: Optional[datetime] = None
+
+@router.put("/api/tasks/{task_id}", response_class=JSONResponse)
+async def update_task(
+    task_id: int,
+    task_data: TaskUpdateModel,
+    current_user: dict = Depends(get_current_admin_user)
+):
+    """Обновить задачу"""
+    try:
+        with get_db_context() as db:
+            task = db.query(Task).filter(Task.id == task_id).first()
+            if not task:
+                raise HTTPException(status_code=404, detail="Задача не найдена")
+
+            # Обновляем только те поля, которые переданы
+            if task_data.title is not None:
+                task.title = task_data.title
+            if task_data.description is not None:
+                task.description = task_data.description
+            if task_data.status is not None:
+                task.status = task_data.status
+            if task_data.priority is not None:
+                task.priority = task_data.priority
+            if task_data.deadline is not None:
+                task.deadline = task_data.deadline
+
+            db.commit()
+            db.refresh(task)
+
+            logger.info(f"Задача {task_id} обновлена пользователем {current_user['username']}")
+
+            return {
+                "success": True,
+                "message": "Задача успешно обновлена",
+                "task": task.to_dict()
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка обновления задачи {task_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
